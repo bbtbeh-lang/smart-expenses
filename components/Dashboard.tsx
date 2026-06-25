@@ -1,0 +1,392 @@
+'use client';
+
+import { useState } from 'react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Loader2, ChevronRight, Wallet } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Translations } from '@/lib/translations';
+import { AppState, DraftTransaction, Transaction, VALID_CODES } from '@/lib/types';
+import { formatCurrency } from '@/lib/utils';
+
+interface DashboardProps {
+  state: AppState;
+  tr: Translations;
+  onAddTransaction: () => void;
+  onOpenUpgrade: () => void;
+  onOpenTaxReport: () => void;
+  onOpenAIReview: (draft: DraftTransaction) => void;
+  onApplyCode: (code: string) => boolean;
+  onOpenPlanManager: () => void;
+  onOpenBudget: () => void;
+  onDemoReset: () => void;
+}
+
+const EXPENSE_CATS_PERSONAL = [
+  'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
+  'catHealth', 'catEntertainment', 'catOther',
+];
+const EXPENSE_CATS_BUSINESS = [
+  'catBusinessMaterials', 'catOffice', 'catMarketing', 'catSoftware',
+  'catTravel', 'catRestaurant', 'catTransport', 'catUtilities', 'catOther',
+];
+
+export default function Dashboard({
+  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onOpenAIReview, onApplyCode, onOpenPlanManager, onOpenBudget, onDemoReset,
+}: DashboardProps) {
+  const [code, setCode] = useState('');
+  const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const netProfit = state.totalIncome - state.totalExpenses;
+  const scansLeft = state.tier === 'premium' ? Infinity : state.maxDailyScans - state.scansUsedToday;
+
+  const monthlyData = (() => {
+    const result: { month: string; income: number; expenses: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const ym = d.toISOString().slice(0, 7);
+      const label = d.toLocaleString('default', { month: 'short' });
+      const txs = state.transactions.filter((t: Transaction) => t.date.startsWith(ym));
+      result.push({
+        month: label,
+        income: +txs.filter((t: Transaction) => t.type === 'income').reduce((s: number, t: Transaction) => s + t.amount, 0).toFixed(0),
+        expenses: +txs.filter((t: Transaction) => t.type === 'expense').reduce((s: number, t: Transaction) => s + t.amount, 0).toFixed(0),
+      });
+    }
+    return result;
+  })();
+
+  // Category spending for current month
+  const currentYm = new Date().toISOString().slice(0, 7);
+  const expenseCats = state.accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
+  const allCategorySpending = [
+    ...expenseCats.map(cat => ({
+      cat,
+      label: (tr as any)[cat] as string,
+      spent: state.transactions.filter(t => t.type === 'expense' && t.category === cat && t.date.startsWith(currentYm)).reduce((s, t) => s + t.amount, 0),
+      budget: state.budgets[cat] ?? 0,
+    })),
+    ...Object.entries(state.customCategories).map(([key, label]) => ({
+      cat: key,
+      label,
+      spent: state.transactions.filter(t => t.type === 'expense' && t.category === key && t.date.startsWith(currentYm)).reduce((s, t) => s + t.amount, 0),
+      budget: state.budgets[key] ?? 0,
+    })),
+  ].filter(x => x.spent > 0 || x.budget > 0);
+
+  const handleApplyCode = () => {
+    if (!code.trim()) return;
+    const success = onApplyCode(code.trim().toUpperCase());
+    setCodeMsg({ text: success ? tr.codeSuccess : tr.codeError, ok: success });
+    if (success) setCode('');
+    setTimeout(() => setCodeMsg(null), 4000);
+  };
+
+  const handleTierBadgeClick = () => {
+    if (state.tier === 'premium') {
+      onOpenPlanManager();
+    } else {
+      onOpenUpgrade();
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 pt-5 pb-28 space-y-4">
+
+      {/* Tier Badge + Scan Status */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <button onClick={handleTierBadgeClick} className="transition-opacity hover:opacity-80 active:opacity-60">
+            {state.tier === 'premium' ? (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-full px-3 py-1.5">
+                <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span className="text-xs font-bold text-amber-700">{tr.tier}: {tr.premium}</span>
+              </div>
+            ) : state.codeActivated ? (
+              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5">
+                <span className="text-sm">💼</span>
+                <span className="text-xs font-bold text-emerald-700">{tr.tier}: Business</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5">
+                <span className="text-sm">💡</span>
+                <span className="text-xs font-semibold text-slate-600">{tr.tier}: {tr.free}</span>
+              </div>
+            )}
+          </button>
+
+          {state.accountType && state.codeActivated && (
+            <div className="flex items-center gap-1 text-xs text-slate-400 bg-slate-50 rounded-full px-2.5 py-1">
+              {state.accountType === 'business' ? '💼' : '🏠'}
+              <span className="font-medium capitalize">{state.accountType}</span>
+            </div>
+          )}
+
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : state.codeActivated && scansLeft > 0 ? 'bg-blue-50' : 'bg-rose-50'}`}>
+            <span className="text-sm">⚡</span>
+            {state.tier === 'premium' ? (
+              <span className="text-xs font-semibold text-emerald-600">{tr.scansUnlimited}</span>
+            ) : (
+              <span className={`text-xs font-semibold ${state.codeActivated && scansLeft > 0 ? 'text-blue-600' : 'text-rose-600'}`} dir="ltr">
+                {tr.scansRemaining}: {state.codeActivated ? scansLeft : 0}/{state.maxDailyScans}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* YouTube Code Widget (Free only) */}
+      {state.tier === 'free' && (
+        <div className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-8 h-8 rounded-xl bg-rose-500 flex items-center justify-center shrink-0">
+              <Youtube className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-slate-800">{tr.youtubeWidgetTitle}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{tr.youtubeWidgetSub}</div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleApplyCode();
+                }
+              }}
+              placeholder={tr.enterCode}
+              className="flex-1 px-3 py-2.5 bg-white border border-rose-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
+              dir="ltr"
+            />
+            <button
+              type="button"
+              onClick={handleApplyCode}
+              disabled={!code.trim()}
+              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.97] whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {tr.applyCode}
+            </button>
+          </div>
+          {codeMsg && (
+            <div className={`mt-2.5 text-xs font-medium rounded-xl px-3 py-2 ${codeMsg.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              {codeMsg.ok ? '🎉 ' : '❌ '}{codeMsg.text}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Metrics Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm text-center">
+          <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center mx-auto mb-2">
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-xs text-slate-500 leading-tight mb-1">{tr.totalIncome}</div>
+          <div className="text-base font-bold text-emerald-600" dir="ltr">{formatCurrency(state.totalIncome, state.lang)}</div>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm text-center">
+          <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center mx-auto mb-2">
+            <TrendingDown className="w-4 h-4 text-rose-500" />
+          </div>
+          <div className="text-xs text-slate-500 leading-tight mb-1">{tr.totalExpenses}</div>
+          <div className="text-base font-bold text-rose-500" dir="ltr">{formatCurrency(state.totalExpenses, state.lang)}</div>
+        </div>
+
+        <div className={`border rounded-2xl p-4 shadow-sm text-center ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-2 ${netProfit >= 0 ? 'bg-emerald-200' : 'bg-rose-200'}`}>
+            {netProfit >= 0
+              ? <TrendingUp className="w-4 h-4 text-emerald-700" />
+              : <TrendingDown className="w-4 h-4 text-rose-700" />
+            }
+          </div>
+          <div className="text-xs text-slate-500 leading-tight mb-1">{tr.netProfit}</div>
+          <div className={`text-base font-bold ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} dir="ltr">
+            {netProfit >= 0 ? '+' : ''}{formatCurrency(netProfit, state.lang)}
+          </div>
+        </div>
+      </div>
+
+      {/* Monthly Trend Chart */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{tr.monthlyTrend}</div>
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={monthlyData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+            <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+            <Tooltip
+              contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 12 }}
+              labelStyle={{ fontWeight: 700, color: '#1e293b' }}
+            />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+            />
+            <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
+            <Line type="monotone" dataKey="expenses" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3, fill: '#f43f5e' }} activeDot={{ r: 5 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Monthly Budget / Category Spending */}
+      {allCategorySpending.length > 0 && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">{tr.spendingByCategory}</div>
+            <button
+              onClick={onOpenBudget}
+              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+            >
+              <Wallet className="w-3.5 h-3.5" />
+              {tr.manageBudgets}
+            </button>
+          </div>
+          <div className="space-y-3">
+            {allCategorySpending.map(({ cat, label, spent, budget }) => {
+              const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
+              const over = budget > 0 && spent > budget;
+              return (
+                <div key={cat}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-slate-600">{label}</span>
+                    <span className={`text-xs font-semibold ${over ? 'text-rose-500' : 'text-slate-500'}`} dir="ltr">
+                      {formatCurrency(spent, state.lang)}{budget > 0 ? ` / ${formatCurrency(budget, state.lang)}` : ''}
+                      {over && <span className="ml-1 text-rose-500">!</span>}
+                    </span>
+                  </div>
+                  {budget > 0 && (
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-rose-400' : pct > 80 ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Budget CTA when no spending yet */}
+      {allCategorySpending.length === 0 && (
+        <button
+          onClick={onOpenBudget}
+          className="w-full bg-white border border-dashed border-slate-200 rounded-2xl p-4 flex items-center gap-3 hover:border-emerald-300 hover:bg-emerald-50 transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 flex items-center justify-center shrink-0 transition-colors">
+            <Wallet className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="text-left">
+            <div className="text-sm font-semibold text-slate-700">{tr.manageBudgets}</div>
+            <div className="text-xs text-slate-400">{tr.budgetTitle}</div>
+          </div>
+        </button>
+      )}
+
+      {/* Processing Queue */}
+      {state.draftQueue.length > 0 && (
+        <div>
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">{tr.processingQueue}</div>
+          <div className="space-y-2">
+            {state.draftQueue.map(draft => (
+              <div key={draft.id}>
+                {draft.status === 'processing' ? (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                      <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-700">{draft.type === 'income' ? '💰' : '💸'} {draft.type === 'income' ? tr.income : tr.expense}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{tr.aiParsing}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => onOpenAIReview(draft)}
+                    className="w-full bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:bg-emerald-100 active:scale-[0.99] transition-all"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0">
+                      <span className="text-lg">{draft.type === 'income' ? '💰' : '💸'}</span>
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-bold text-emerald-800">{tr.readyForReview}</div>
+                      <div className="text-xs text-emerald-600 mt-0.5">{tr.tapToReview}</div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-emerald-500 shrink-0" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Transactions (latest 5) */}
+      <div>
+        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Recent Transactions</div>
+        {state.transactions.length === 0 ? (
+          <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">
+            <div className="text-3xl mb-2">📋</div>
+            <div className="text-sm text-slate-400">{tr.noTransactions}</div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {state.transactions.slice(-5).reverse().map(tx => (
+              <div key={tx.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                  <span className="text-lg">{tx.type === 'income' ? '💰' : '💸'}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-slate-800 truncate">{tx.description}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{tx.date}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className={`text-sm font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`} dir="ltr">
+                    {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, state.lang, 2)}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[80px] text-right">{(tr as any)[tx.category] || tx.category}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="grid grid-cols-2 gap-3 pt-2">
+        <button
+          onClick={onOpenTaxReport}
+          className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:border-teal-400 hover:bg-teal-50 rounded-2xl text-sm font-semibold text-slate-700 hover:text-teal-700 transition-all duration-150 shadow-sm"
+        >
+          <FileText className="w-4 h-4" />
+          {tr.generateTaxReport}
+        </button>
+        <button
+          onClick={state.tier === 'premium' ? onOpenPlanManager : onOpenUpgrade}
+          className={`flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all duration-150 shadow-sm ${state.tier === 'premium' ? 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-200 hover:shadow-amber-300'}`}
+        >
+          <Crown className="w-4 h-4" />
+          {state.tier === 'premium' ? `${tr.tier}: ${tr.premium}` : tr.upgradeToPremium}
+        </button>
+      </div>
+
+      {/* Demo reset */}
+      <div className="pt-4 flex justify-center">
+        <button
+          onClick={onDemoReset}
+          className="text-xs text-slate-400 border border-dashed border-slate-300 rounded-full px-4 py-1.5 hover:text-rose-500 hover:border-rose-300 transition-colors"
+          dir="rtl"
+        >
+          ریست دمو
+        </button>
+      </div>
+    </div>
+  );
+}
