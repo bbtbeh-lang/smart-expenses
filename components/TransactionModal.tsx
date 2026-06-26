@@ -42,41 +42,7 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function parseOcrText(text: string) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
 
-  let amount = '';
-  const totalMatch = text.match(/(?:total|amount|subtotal|grand\s+total)[^\d]*\$?\s*(\d+[.,]\d{2})/i);
-  if (totalMatch) {
-    amount = totalMatch[1].replace(',', '.');
-  } else {
-    const amountRe = /\$?\s*(\d{1,5}[.,]\d{2})/g;
-    const allAmounts: number[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = amountRe.exec(text)) !== null) {
-      const n = parseFloat(m[1].replace(',', '.'));
-      if (n > 0) allAmounts.push(n);
-    }
-    if (allAmounts.length) amount = String(Math.max(...allAmounts));
-  }
-
-  const merchant = lines[0]?.replace(/[^a-zA-Z0-9\s\u0600-\u06FF\u0750-\u077F\u0041-\u007A]/g, ' ').trim() || '';
-
-  let date = new Date().toISOString().slice(0, 10);
-  const dateMatch = text.match(/(\d{4}[-\/]\d{1,2}[-\/]\d{1,2})|(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/);
-  if (dateMatch) {
-    const raw = dateMatch[0];
-    const parts = raw.split(/[-\/]/);
-    if (parts[0].length === 4) {
-      date = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-    } else {
-      const y = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-      date = `${y}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-    }
-  }
-
-  return { amount, merchant, date };
-}
 
 export default function TransactionModal({
   tr, accountType, tier, codeActivated, scansUsedToday, maxDailyScans,
@@ -134,30 +100,29 @@ export default function TransactionModal({
 
   const runOcr = useCallback(async (file: File) => {
     setOcrStatus('scanning');
-    setOcrProgress(0);
+    setOcrProgress(30);
     setOcrBanner(tr.ocrScanning);
     try {
-      if (!(window as any).Tesseract) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('Failed to load Tesseract.js'));
-          document.head.appendChild(script);
-        });
-      }
-      const TesseractLib = (window as any).Tesseract;
-      const { data: { text } } = await TesseractLib.recognize(file, 'eng', {
-        logger: (m: { status: string; progress: number }) => {
-          if (m.status === 'recognizing text') {
-            setOcrProgress(Math.round(m.progress * 100));
-          }
-        },
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
       });
-      const parsed = parseOcrText(text);
+      setOcrProgress(60);
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64, mimeType: file.type }),
+      });
+      const parsed = await response.json();
+      setOcrProgress(100);
       if (parsed.amount) setAmount(parsed.amount);
-      if (parsed.merchant) setDescription(parsed.merchant);
-      setDate(parsed.date);
+      if (parsed.description) setDescription(parsed.description);
+      if (parsed.date) setDate(parsed.date);
       setOcrStatus('done');
       setOcrBanner(tr.ocrReady);
       setTimeout(() => setStep('manual'), 600);
