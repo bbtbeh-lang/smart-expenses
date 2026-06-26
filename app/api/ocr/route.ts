@@ -4,23 +4,47 @@ export const maxDuration = 30;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+
+function getSupportedMimeType(mimeType: string): ImageMediaType {
+  const supported: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (supported.includes(mimeType as ImageMediaType)) {
+    return mimeType as ImageMediaType;
+  }
+  return 'image/jpeg';
+}
+
 export async function POST(req: Request) {
   try {
     const { image, mimeType } = await req.json();
+    const safeMimeType = getSupportedMimeType(mimeType);
+
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 256,
       messages: [{
         role: 'user',
         content: [
-          { type: 'image', source: { type: 'base64', media_type: mimeType, data: image } },
-          { type: 'text', text: 'Extract from this receipt: total amount (number only, no currency), merchant name, date. Reply ONLY with JSON: {"amount":"","description":"","date":"YYYY-MM-DD"}' }
+          { 
+            type: 'image', 
+            source: { 
+              type: 'base64', 
+              media_type: safeMimeType, 
+              data: image 
+            } 
+          },
+          { 
+            type: 'text', 
+            text: 'Extract from this receipt: total amount (number only, no currency symbol), store/merchant name, and date. Reply ONLY with this JSON format, nothing else: {"amount":"","description":"","date":"YYYY-MM-DD"}' 
+          }
         ]
       }]
     });
+
     const text = (msg.content[0] as {type: string; text: string}).text.trim();
     const jsonMatch = text.match(/\{.*\}/s);
-    if (!jsonMatch) throw new Error('No JSON');
+    if (!jsonMatch) throw new Error('No JSON found');
+    
     return Response.json(JSON.parse(jsonMatch[0]));
   } catch (error) {
     console.error('OCR error:', error);
