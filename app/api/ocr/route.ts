@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
+      max_tokens: 1024,
       messages: [{
         role: 'user',
         content: [
@@ -35,19 +35,31 @@ export async function POST(req: Request) {
           },
           { 
             type: 'text', 
-            text: 'Extract from this receipt: total amount (number only, no currency symbol), store/merchant name, and date. Reply ONLY with this JSON format, nothing else: {"amount":"","description":"","date":"YYYY-MM-DD"}' 
+            text: `You are an expert receipt scanner. Carefully read this receipt/invoice image in ANY language (Persian/Farsi, English, French, Arabic, etc.) and ANY currency.
+
+Extract ALL of the following:
+1. STORE: The store/merchant/restaurant name.
+2. DATE: The date in YYYY-MM-DD format.
+3. ITEMS: Every single line item on the receipt with name and price.
+4. TOTAL: The final total amount (number only, no currency symbol). Look for: total, جمع کل, مبلغ کل, مجموع, grand total, amount due.
+
+Reply ONLY with this exact JSON (no extra text, no markdown):
+{"amount":"total number only","description":"store name - item1, item2, item3","date":"YYYY-MM-DD","items":[{"name":"item name","price":"price number"}]}
+
+If a value is not found, use empty string. Always try your best to read even partial or unclear text.`
           }
         ]
       }]
     });
 
     const text = (msg.content[0] as {type: string; text: string}).text.trim();
-    const jsonMatch = text.match(/\{.*\}/s);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found');
     
-    return Response.json(JSON.parse(jsonMatch[0]));
+    const parsed = JSON.parse(jsonMatch[0]);
+    return Response.json(parsed);
   } catch (error) {
     console.error('OCR error:', error);
-    return Response.json({ amount: '', description: '', date: '' });
+    return Response.json({ amount: '', description: '', date: '', items: [] });
   }
 }
