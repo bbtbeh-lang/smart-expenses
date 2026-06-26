@@ -5,6 +5,11 @@ export type TransactionType = 'income' | 'expense';
 export type DraftStatus = 'processing' | 'ready';
 export type AppScreen = 'auth' | 'onboarding' | 'dashboard';
 
+export interface ReceiptItem {
+  name: string;
+  price: number;
+}
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -17,6 +22,7 @@ export interface Transaction {
   taxAmount?: number;
   originalCurrency?: string;
   originalAmount?: number;
+  items?: ReceiptItem[];
 }
 
 export interface DraftTransaction {
@@ -39,7 +45,7 @@ export interface AppState {
   totalIncome: number;
   totalExpenses: number;
   budgets: Record<string, number>;
-  customCategories: Record<string, string>; // key -> display label
+  customCategories: Record<string, string>;
 }
 
 export const INITIAL_STATE: AppState = {
