@@ -7,9 +7,8 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
 function getSupportedMimeType(mimeType: string): ImageMediaType {
-  if (mimeType === 'image/png') return 'image/png';
-  if (mimeType === 'image/gif') return 'image/gif';
-  if (mimeType === 'image/webp') return 'image/webp';
+  const supported: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (supported.includes(mimeType as ImageMediaType)) return mimeType as ImageMediaType;
   return 'image/jpeg';
 }
 
@@ -20,7 +19,7 @@ export async function POST(req: Request) {
 
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
+      max_tokens: 2048,
       messages: [{
         role: 'user',
         content: [
@@ -30,32 +29,43 @@ export async function POST(req: Request) {
           },
           {
             type: 'text',
-            text: `You are a receipt OCR expert. Look at this receipt image carefully.
-Extract:
-1. The TOTAL amount paid (the largest/final number, no currency symbol)
-2. The store or merchant name
-3. The date (YYYY-MM-DD format)
+            text: `You are an expert receipt/invoice scanner. Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency.
 
-If any field is unclear, use empty string.
-Reply ONLY with valid JSON, nothing else:
-{"amount":"","description":"","date":""}`
+Extract:
+1. merchant: store/restaurant/business name
+2. date: date in YYYY-MM-DD format
+3. items: EVERY line item with name and price (number only)
+4. amount: final TOTAL (number only, no currency symbol)
+
+Return ONLY valid JSON, no markdown:
+{"merchant":"","date":"YYYY-MM-DD","amount":"","items":[{"name":"","price":""}]}`
           }
         ]
       }]
     });
 
-    const text = (msg.content[0] as {type: string; text: string}).text.trim();
-    const jsonMatch = text.match(/\{[^{}]*\}/);
+    const text = (msg.content[0] as { type: string; text: string }).text.trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON');
 
-    const result = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]);
+    const itemNames = (parsed.items || []).map((i: {name: string}) => i.name).filter(Boolean);
+    const description = parsed.merchant
+      ? (itemNames.length > 0 ? `${parsed.merchant} — ${itemNames.join(', ')}` : parsed.merchant)
+      : itemNames.join(', ');
+
     return Response.json({
-      amount: result.amount || '',
-      description: result.description || '',
-      date: result.date || new Date().toISOString().slice(0, 10)
+      amount: parsed.amount || '',
+      description,
+      date: parsed.date || '',
+      merchant: parsed.merchant || '',
+      items: (parsed.items || []).map((i: {name: string; price: string}) => ({
+        name: i.name,
+        price: parseFloat(i.price) || 0,
+      })),
     });
   } catch (error) {
     console.error('OCR error:', error);
-    return Response.json({ amount: '', description: '', date: new Date().toISOString().slice(0, 10) });
+    return Response.json({ amount: '', description: '', date: '', merchant: '', items: [] }, { status: 500 });
   }
 }
