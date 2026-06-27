@@ -33,8 +33,8 @@ function freshState(lang: Lang = 'EN'): AppState {
     accountType: null,
     tier: 'free',
     codeActivated: false,
-    scansUsedToday: 2,
-    maxDailyScans: 2,
+    scansUsedToday: 0,
+    maxDailyScans: 10,
     transactions: [],
     draftQueue: [],
     totalIncome: 0,
@@ -238,7 +238,7 @@ export default function Home() {
   };
 
   const handleDowngrade = () => {
-    setState(prev => ({ ...prev, tier: 'free', scansUsedToday: 0, maxDailyScans: 2 }));
+    setState(prev => ({ ...prev, tier: 'free', scansUsedToday: 0, maxDailyScans: 10 }));
     setShowPlanManager(false);
     addToast(tr.downgradeSuccess, 'info');
   };
@@ -312,7 +312,7 @@ export default function Home() {
                 onApplyCode={handleApplyCode}
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
-                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, scansUsedToday: 2, tier: 'free' }))}
+                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, scansUsedToday: 0, tier: 'free' }))}
               />
             )}
             {activeTab === 'transactions' && (
