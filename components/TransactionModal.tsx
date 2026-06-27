@@ -327,7 +327,7 @@ export default function TransactionModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
                   onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
                 />
