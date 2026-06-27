@@ -7,13 +7,6 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'FinSnap — Smart Finance Management',
   description: 'AI-powered income, expense, and tax management for personal and business use.',
-  openGraph: {
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
-  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
