@@ -68,8 +68,8 @@ export default function TransactionModal({
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const scansLeft = tier === 'premium' ? Infinity : maxDailyScans - scansUsedToday;
-  const scanExhausted = tier !== 'premium' && scansLeft <= 0;
+  const scansLeft = Infinity;
+  const scanExhausted = false;
   const expenseCats = accountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
   const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
