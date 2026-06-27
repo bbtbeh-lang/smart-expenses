@@ -105,6 +105,7 @@ export default function TransactionModal({
     setOcrBanner(tr.ocrScanning);
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
+        // Convert any image to JPEG for compatibility
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
@@ -327,7 +328,7 @@ export default function TransactionModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept="image/jpeg,image/png,image/webp"
                   className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
                   onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
                 />
