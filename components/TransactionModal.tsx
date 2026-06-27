@@ -69,7 +69,7 @@ export default function TransactionModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scansLeft = tier === 'premium' ? Infinity : maxDailyScans - scansUsedToday;
-  const scanExhausted = tier !== 'premium' && (!codeActivated || scansLeft <= 0);
+  const scanExhausted = tier !== 'premium' && scansLeft <= 0;
   const expenseCats = accountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
   const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
