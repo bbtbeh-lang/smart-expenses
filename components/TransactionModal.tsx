@@ -104,21 +104,34 @@ export default function TransactionModal({
     setOcrProgress(30);
     setOcrBanner(tr.ocrScanning);
     try {
+      // Resize image before sending to reduce size
       const base64 = await new Promise<string>((resolve, reject) => {
-        // Convert any image to JPEG for compatibility
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]);
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX = 1200;
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) {
+            if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+            else { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          resolve(dataUrl.split(',')[1]);
         };
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = url;
       });
       setOcrProgress(60);
       const response = await fetch('/api/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, mimeType: file.type }),
+        body: JSON.stringify({ image: base64, mimeType: 'image/jpeg' }),
       });
       const parsed = await response.json();
       setOcrProgress(100);
@@ -328,7 +341,7 @@ export default function TransactionModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/*"
                   className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
                   onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
                 />
