@@ -7,63 +7,46 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
 function getSupportedMimeType(mimeType: string): ImageMediaType {
-  const supported: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-  if (supported.includes(mimeType as ImageMediaType)) return mimeType as ImageMediaType;
+  if (mimeType === 'image/png') return 'image/png';
+  if (mimeType === 'image/gif') return 'image/gif';
+  if (mimeType === 'image/webp') return 'image/webp';
   return 'image/jpeg';
 }
 
 export async function POST(req: Request) {
   try {
     const { image, mimeType } = await req.json();
-
-    let messageContent: Anthropic.MessageParam['content'];
-
-    if (mimeType === 'application/pdf') {
-      // Handle PDF
-      messageContent = [
-        {
-          type: 'document',
-          source: { type: 'base64', media_type: 'application/pdf', data: image }
-        } as any,
-        {
-          type: 'text',
-          text: `Extract from this receipt/invoice:
-1. Total amount (final total number only, no currency)
-2. Store/merchant name
-3. Date (YYYY-MM-DD format)
-
-Reply ONLY with JSON: {"amount":"","description":"","date":""}`
-        }
-      ];
-    } else {
-      // Handle image
-      const safeMimeType = getSupportedMimeType(mimeType);
-      messageContent = [
-        {
-          type: 'image',
-          source: { type: 'base64', media_type: safeMimeType, data: image }
-        },
-        {
-          type: 'text',
-          text: `Extract from this receipt/invoice:
-1. Total amount (final total number only, no currency)
-2. Store/merchant name  
-3. Date (YYYY-MM-DD format)
-
-Reply ONLY with JSON: {"amount":"","description":"","date":""}`
-        }
-      ];
-    }
+    const safeMimeType = getSupportedMimeType(mimeType);
 
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
-      messages: [{ role: 'user', content: messageContent }]
+      max_tokens: 512,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: safeMimeType, data: image }
+          },
+          {
+            type: 'text',
+            text: `You are a receipt OCR expert. Look at this receipt image carefully.
+Extract:
+1. The TOTAL amount paid (the largest/final number, no currency symbol)
+2. The store or merchant name
+3. The date (YYYY-MM-DD format)
+
+If any field is unclear, use empty string.
+Reply ONLY with valid JSON, nothing else:
+{"amount":"","description":"","date":""}`
+          }
+        ]
+      }]
     });
 
     const text = (msg.content[0] as {type: string; text: string}).text.trim();
     const jsonMatch = text.match(/\{[^{}]*\}/);
-    if (!jsonMatch) throw new Error('No JSON found');
+    if (!jsonMatch) throw new Error('No JSON');
 
     const result = JSON.parse(jsonMatch[0]);
     return Response.json({
