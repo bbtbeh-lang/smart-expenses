@@ -1,448 +1,77 @@
-// @refresh reset
-'use client';
-
-import { useState, useCallback, useEffect } from 'react';
-import { AppState, Transaction, DraftTransaction, TransactionType, VALID_CODES, AccountType, Lang } from '@/lib/types';
-import { t } from '@/lib/translations';
-import Header from '@/components/Header';
-import NavBar, { NavTab } from '@/components/NavBar';
-import AuthScreen from '@/components/AuthScreen';
-import OnboardingScreen from '@/components/OnboardingScreen';
-import Dashboard from '@/components/Dashboard';
-import TransactionsTab from '@/components/TransactionsTab';
-import SettingsTab from '@/components/SettingsTab';
-import TransactionModal from '@/components/TransactionModal';
-import AIReviewModal from '@/components/AIReviewModal';
-import TaxReportModal from '@/components/TaxReportModal';
-import UpgradeModal from '@/components/UpgradeModal';
-import PlanModal from '@/components/PlanModal';
-import BudgetModal from '@/components/BudgetModal';
-import Toast, { ToastMessage } from '@/components/Toast';
-import { supabase } from '@/lib/supabase';
-
-const STORAGE_KEY = 'finsnap_state_v1';
-
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function freshState(lang: Lang = 'EN'): AppState {
-  return {
-    screen: 'auth',
-    lang,
-    accountType: null,
-    tier: 'free',
-    codeActivated: false,
-    scansUsedToday: 0,
-    maxDailyScans: 10,
-    transactions: [],
-    draftQueue: [],
-    totalIncome: 0,
-    totalExpenses: 0,
-    budgets: {},
-    customCategories: {},
-  };
-}
-
-function loadState(): AppState {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return { ...freshState(parsed.lang), ...parsed };
-    }
-  } catch {}
-  return freshState();
-}
-
-function saveState(state: AppState) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
-}
-
-export default function Home() {
-  const [state, setState] = useState<AppState>(freshState);
-  const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
-  const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [showAIReview, setShowAIReview] = useState<DraftTransaction | null>(null);
-  const [showTaxReport, setShowTaxReport] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
-  const [showPlanManager, setShowPlanManager] = useState(false);
-  const [showBudget, setShowBudget] = useState(false);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    setState(loadState());
-  }, []);
-
-  // Save to localStorage whenever state changes
-  useEffect(() => {
-    if (state.screen !== 'auth') {
-      saveState(state);
-    }
-  }, [state]);
-
-  const tr = t[state.lang];
-
-  const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
-    const id = generateId();
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const toggleLang = (lang: Lang) => {
-    setState(prev => ({ ...prev, lang }));
-  };
-
-  const handleLogin = (email: string) => {
-    const isPremium = email.trim().toLowerCase() === 'bbtbeh@gmail.com';
-    setState(prev => ({
-      ...prev,
-      screen: 'onboarding',
-      ...(isPremium ? { tier: 'premium' as const } : {}),
-    }));
-  };
-
-  const handleLogout = () => {
-    addToast(tr.signingOut, 'info');
-    setTimeout(() => {
-      localStorage.removeItem(STORAGE_KEY);
-      setState(freshState(state.lang));
-      setActiveTab('dashboard');
-    }, 1000);
-  };
-
-  const handleSelectAccountType = (type: AccountType) => {
-    setState(prev => ({ ...prev, accountType: type, screen: 'dashboard' }));
-  };
-
-  const handleApplyCode = (code: string): boolean => {
-    if (VALID_CODES.includes(code)) {
-      setState(prev => ({ ...prev, codeActivated: true, scansUsedToday: 0 }));
-      addToast(tr.codeSuccess, 'success');
-      return true;
-    }
-    const today = new Date().toISOString().slice(0, 10);
-    supabase
-      .from('daily_codes')
-      .select('uses, max_uses')
-      .eq('code', code)
-      .eq('valid_date', today)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error || !data || data.uses >= data.max_uses) {
-          addToast(tr.codeError, 'error');
-          return;
-        }
-        supabase
-          .from('daily_codes')
-          .update({ uses: data.uses + 1 })
-          .eq('code', code)
-          .then(() => {
-            setState(prev => ({ ...prev, codeActivated: true, scansUsedToday: 0 }));
-            addToast(tr.codeSuccess, 'success');
-          });
-      });
-    return false;
-  };
-
-  const handleSaveManual = (tx: Transaction) => {
-    setState(prev => ({
-      ...prev,
-      transactions: [...prev.transactions, tx],
-      totalIncome: tx.type === 'income' ? prev.totalIncome + tx.amount : prev.totalIncome,
-      totalExpenses: tx.type === 'expense' ? prev.totalExpenses + tx.amount : prev.totalExpenses,
-    }));
-    setShowTransactionModal(false);
-    addToast(`${tx.type === 'income' ? '💰' : '💸'} Transaction saved!`, 'success');
-  };
-
-  const handleUpdateTransaction = (tx: Transaction) => {
-    setState(prev => {
-      const old = prev.transactions.find(t => t.id === tx.id);
-      const oldIncome = old?.type === 'income' ? old.amount : 0;
-      const oldExpense = old?.type === 'expense' ? old.amount : 0;
-      return {
-        ...prev,
-        transactions: prev.transactions.map(t => t.id === tx.id ? tx : t),
-        totalIncome: prev.totalIncome - oldIncome + (tx.type === 'income' ? tx.amount : 0),
-        totalExpenses: prev.totalExpenses - oldExpense + (tx.type === 'expense' ? tx.amount : 0),
-      };
-    });
-    setEditingTransaction(null);
-    addToast('Transaction updated!', 'success');
-  };
-
-  const handleDeleteTransaction = (id: string) => {
-    setState(prev => {
-      const tx = prev.transactions.find(t => t.id === id);
-      return {
-        ...prev,
-        transactions: prev.transactions.filter(t => t.id !== id),
-        totalIncome: tx?.type === 'income' ? prev.totalIncome - tx.amount : prev.totalIncome,
-        totalExpenses: tx?.type === 'expense' ? prev.totalExpenses - tx.amount : prev.totalExpenses,
-      };
-    });
-    setEditingTransaction(null);
-    addToast('Transaction deleted.', 'info');
-  };
-
-  const handleStartReceiptUpload = (type: TransactionType) => {
-    const draftId = generateId();
-    const draft: DraftTransaction = {
-      id: draftId,
-      type,
-      status: 'processing',
-      createdAt: Date.now(),
-    };
-
-    setState(prev => ({
-      ...prev,
-      scansUsedToday: prev.tier === 'free' ? prev.scansUsedToday + 1 : prev.scansUsedToday,
-      draftQueue: [...prev.draftQueue, draft],
-    }));
-    setShowTransactionModal(false);
-    addToast('Receipt uploaded! AI is analyzing...', 'info');
-
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        draftQueue: prev.draftQueue.map(d => d.id === draftId ? { ...d, status: 'ready' as const } : d),
-      }));
-      addToast('Receipt analysis complete! Tap to review.', 'success');
-    }, 3000);
-  };
-
-  const handleConfirmAIReview = (tx: Transaction) => {
-    setState(prev => ({
-      ...prev,
-      transactions: [...prev.transactions, tx],
-      totalIncome: tx.type === 'income' ? prev.totalIncome + tx.amount : prev.totalIncome,
-      totalExpenses: tx.type === 'expense' ? prev.totalExpenses + tx.amount : prev.totalExpenses,
-      draftQueue: prev.draftQueue.filter(d => d.id !== showAIReview?.id),
-    }));
-    setShowAIReview(null);
-    addToast(`${tr.confirmSave}! Transaction added.`, 'success');
-  };
-
-  const handleUpgrade = () => {
-    setState(prev => ({ ...prev, tier: 'premium', scansUsedToday: 0 }));
-    setShowUpgrade(false);
-    addToast(tr.upgradeSuccess, 'success');
-  };
-
-  const handleDowngrade = () => {
-    setState(prev => ({ ...prev, tier: 'free', scansUsedToday: 0, maxDailyScans: 10 }));
-    setShowPlanManager(false);
-    addToast(tr.downgradeSuccess, 'info');
-  };
-
-  const handleSwitchPlan = (_plan: 'business' | 'personal') => {
-    setShowPlanManager(false);
-    addToast(tr.planSwitchSuccess, 'success');
-  };
-
-  const handleSaveBudgets = (budgets: Record<string, number>, customCategories: Record<string, string>) => {
-    setState(prev => ({ ...prev, budgets, customCategories }));
-    setShowBudget(false);
-    addToast(tr.saveBudgets, 'success');
-  };
-
-  const handleAddCustomCategory = (key: string, label: string) => {
-    setState(prev => ({ ...prev, customCategories: { ...prev.customCategories, [key]: label } }));
-  };
-
-  const isRtl = state.lang === 'FA';
-  const isLoggedIn = state.screen !== 'auth';
-
-  const transactionModalProps = {
-    tr,
-    accountType: state.accountType || 'personal' as const,
-    tier: state.tier,
-    codeActivated: state.codeActivated,
-    scansUsedToday: state.scansUsedToday,
-    maxDailyScans: state.maxDailyScans,
-    customCategories: state.customCategories,
-    onAddCustomCategory: handleAddCustomCategory,
-    onStartReceiptUpload: handleStartReceiptUpload,
-    onIncrementScan: () => setState(prev => ({ ...prev, scansUsedToday: prev.tier === 'free' ? prev.scansUsedToday + 1 : prev.scansUsedToday })),
-    onOpenUpgrade: () => { setShowTransactionModal(false); setEditingTransaction(null); setShowUpgrade(true); },
-    onScanBlocked: () => addToast('سهمیه ۲ اسکن رایگان امروز شما به پایان رسیده است!', 'error'),
-  };
-
-  return (
-    <div
-      className="min-h-screen bg-slate-50"
-      dir={isRtl ? 'rtl' : 'ltr'}
-      style={isRtl ? { fontFamily: "'Vazirmatn', sans-serif" } : undefined}
-    >
-      <Header
-        lang={state.lang}
-        tr={tr}
-        onLangToggle={toggleLang}
-        onLogout={handleLogout}
-        isLoggedIn={isLoggedIn}
-      />
-
-      <main>
-        {state.screen === 'auth' && (
-          <AuthScreen tr={tr} onLogin={handleLogin} />
-        )}
-
-        {state.screen === 'onboarding' && (
-          <OnboardingScreen tr={tr} onSelect={handleSelectAccountType} />
-        )}
-
-        {state.screen === 'dashboard' && (
-          <>
-            {activeTab === 'dashboard' && (
-              <Dashboard
-                state={state}
-                tr={tr}
-                onAddTransaction={() => setShowTransactionModal(true)}
-                onOpenUpgrade={() => setShowUpgrade(true)}
-                onOpenTaxReport={() => setShowTaxReport(true)}
-                onOpenAIReview={draft => setShowAIReview(draft)}
-                onApplyCode={handleApplyCode}
-                onOpenPlanManager={() => setShowPlanManager(true)}
-                onOpenBudget={() => setShowBudget(true)}
-                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, scansUsedToday: 0, tier: 'free' }))}
-              />
-            )}
-            {activeTab === 'transactions' && (
-              <TransactionsTab
-                transactions={state.transactions}
-                tr={tr}
-                lang={state.lang}
-                onEdit={tx => setEditingTransaction(tx)}
-              />
-            )}
-            {activeTab === 'settings' && (
-              <SettingsTab
-                state={state}
-                tr={tr}
-                onLogout={handleLogout}
-                onOpenUpgrade={() => setShowUpgrade(true)}
-                onOpenPlanManager={() => setShowPlanManager(true)}
-                onLangToggle={toggleLang}
-              />
-            )}
-          </>
-        )}
-      </main>
-
-      {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} />
-      )}
-
-      {state.screen === 'dashboard' && activeTab === 'dashboard' && (
-        <div className="fixed bottom-20 left-4 right-4 z-30 max-w-sm mx-auto">
-          <button
-            onClick={() => setShowTransactionModal(true)}
-            className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-2xl text-sm shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            {tr.addTransaction}
-          </button>
-        </div>
-      )}
-
-      {state.screen === 'dashboard' && activeTab === 'transactions' && (
-        <div className="fixed bottom-20 right-4 z-30">
-          <button
-            onClick={() => setShowTransactionModal(true)}
-            className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 active:scale-[0.95] transition-all duration-150 flex items-center justify-center"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {showTransactionModal && (
-        <TransactionModal
-          {...transactionModalProps}
-          onClose={() => setShowTransactionModal(false)}
-          onSaveManual={handleSaveManual}
-        />
-      )}
-
-      {editingTransaction && (
-        <TransactionModal
-          {...transactionModalProps}
-          editTransaction={editingTransaction}
-          onClose={() => setEditingTransaction(null)}
-          onSaveManual={handleSaveManual}
-          onUpdate={handleUpdateTransaction}
-          onDelete={handleDeleteTransaction}
-        />
-      )}
-
-      {showAIReview && (
-        <AIReviewModal
-          tr={tr}
-          draftId={showAIReview.id}
-          transactionType={showAIReview.type}
-          accountType={state.accountType || 'personal'}
-          lang={state.lang}
-          onConfirm={handleConfirmAIReview}
-          onClose={() => setShowAIReview(null)}
-        />
-      )}
-
-      {showTaxReport && (
-        <TaxReportModal
-          tr={tr}
-          tier={state.tier}
-          lang={state.lang}
-          transactions={state.transactions}
-          onClose={() => setShowTaxReport(false)}
-          onOpenUpgrade={() => { setShowTaxReport(false); setShowUpgrade(true); }}
-        />
-      )}
-
-      {showUpgrade && (
-        <UpgradeModal
-          tr={tr}
-          accountType={state.accountType}
-          onClose={() => setShowUpgrade(false)}
-          onUpgrade={handleUpgrade}
-        />
-      )}
-
-      {showPlanManager && (
-        <PlanModal
-          tr={tr}
-          tier={state.tier}
-          accountType={state.accountType}
-          onClose={() => setShowPlanManager(false)}
-          onDowngrade={handleDowngrade}
-          onSwitchPlan={handleSwitchPlan}
-        />
-      )}
-
-      {showBudget && (
-        <BudgetModal
-          tr={tr}
-          accountType={state.accountType || 'personal'}
-          lang={state.lang}
-          budgets={state.budgets}
-          customCategories={state.customCategories}
-          onSave={handleSaveBudgets}
-          onClose={() => setShowBudget(false)}
-        />
-      )}
-
-      <Toast toasts={toasts} onRemove={removeToast} />
-    </div>
-  );
+{
+  "name": "nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@hookform/resolvers": "^3.9.0",
+    "@netlify/plugin-nextjs": "^5.15.1",
+    "@next/swc-wasm-nodejs": "13.5.1",
+    "@radix-ui/react-accordion": "^1.2.0",
+    "@radix-ui/react-alert-dialog": "^1.1.1",
+    "@radix-ui/react-aspect-ratio": "^1.1.0",
+    "@radix-ui/react-avatar": "^1.1.0",
+    "@radix-ui/react-checkbox": "^1.1.1",
+    "@radix-ui/react-collapsible": "^1.1.0",
+    "@radix-ui/react-context-menu": "^2.2.1",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.1",
+    "@radix-ui/react-hover-card": "^1.1.1",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-menubar": "^1.1.1",
+    "@radix-ui/react-navigation-menu": "^1.2.0",
+    "@radix-ui/react-popover": "^1.1.1",
+    "@radix-ui/react-progress": "^1.1.0",
+    "@radix-ui/react-radio-group": "^1.2.0",
+    "@radix-ui/react-scroll-area": "^1.1.0",
+    "@radix-ui/react-select": "^2.1.1",
+    "@radix-ui/react-separator": "^1.1.0",
+    "@radix-ui/react-slider": "^1.2.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.0",
+    "@radix-ui/react-toast": "^1.2.1",
+    "@radix-ui/react-toggle": "^1.1.0",
+    "@radix-ui/react-toggle-group": "^1.1.0",
+    "@radix-ui/react-tooltip": "^1.1.2",
+    "@supabase/supabase-js": "^2.58.0",
+    "@types/node": "20.6.2",
+    "@types/react": "18.2.22",
+    "@types/react-dom": "18.2.7",
+    "autoprefixer": "10.4.15",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.0.0",
+    "date-fns": "^3.6.0",
+    "embla-carousel-react": "^8.3.0",
+    "encoding": "^0.1.13",
+    "eslint": "8.49.0",
+    "eslint-config-next": "13.5.1",
+    "html2pdf.js": "^0.14.0",
+    "input-otp": "^1.2.4",
+    "lucide-react": "^0.446.0",
+    "next": "13.5.1",
+    "next-themes": "^0.3.0",
+    "postcss": "8.4.30",
+    "react": "18.2.0",
+    "react-day-picker": "^8.10.1",
+    "react-dom": "18.2.0",
+    "react-hook-form": "^7.53.0",
+    "react-resizable-panels": "^2.1.3",
+    "recharts": "^2.12.7",
+    "sonner": "^1.5.0",
+    "tailwind-merge": "^2.5.2",
+    "tailwindcss": "3.3.3",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "5.2.2",
+    "vaul": "^0.9.9",
+    "zod": "^3.23.8"
+  }
 }
