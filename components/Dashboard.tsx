@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Loader2, ChevronRight, Wallet } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, DraftTransaction, Transaction, VALID_CODES } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
+
+type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
 
 interface DashboardProps {
   state: AppState;
@@ -29,16 +31,64 @@ const EXPENSE_CATS_BUSINESS = [
   'catTravel', 'catRestaurant', 'catTransport', 'catUtilities', 'catOther',
 ];
 
+const DONUT_COLORS = [
+  '#10b981', '#6366f1', '#f59e0b', '#f43f5e',
+  '#3b82f6', '#a855f7', '#ec4899', '#14b8a6', '#84cc16',
+];
+
+const DATE_FILTERS: { key: DateFilter; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'this_week', label: 'Week' },
+  { key: 'this_month', label: 'Month' },
+  { key: 'last_3_months', label: '3 Mo' },
+  { key: 'all', label: 'All' },
+];
+
+function getDateRange(filter: DateFilter): { from: Date; to: Date } {
+  const now = new Date();
+  const to = new Date(now);
+  to.setHours(23, 59, 59, 999);
+  const from = new Date(now);
+  from.setHours(0, 0, 0, 0);
+
+  switch (filter) {
+    case 'today': break;
+    case 'this_week': from.setDate(now.getDate() - now.getDay()); break;
+    case 'this_month': from.setDate(1); break;
+    case 'last_3_months': from.setMonth(now.getMonth() - 3); from.setDate(1); break;
+    case 'all': from.setFullYear(2000); break;
+  }
+  return { from, to };
+}
+
+function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
+  const { from, to } = getDateRange(filter);
+  return txs.filter(t => {
+    const d = new Date(t.date);
+    return d >= from && d <= to;
+  });
+}
+
 export default function Dashboard({
   state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onOpenAIReview, onApplyCode, onOpenPlanManager, onOpenBudget, onDemoReset,
 }: DashboardProps) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('this_month');
 
-  const netProfit = state.totalIncome - state.totalExpenses;
   const scansLeft = state.tier === 'premium' ? Infinity : state.maxDailyScans - state.scansUsedToday;
 
-  const monthlyData = (() => {
+  // Filtered transactions
+  const filteredTxs = useMemo(() => filterTxByDate(state.transactions, dateFilter), [state.transactions, dateFilter]);
+
+  // Metrics for filtered period
+  const periodIncome = useMemo(() => filteredTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0), [filteredTxs]);
+  const periodExpenses = useMemo(() => filteredTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0), [filteredTxs]);
+  const netProfit = periodIncome - periodExpenses;
+  const profitMargin = periodIncome > 0 ? Math.round((netProfit / periodIncome) * 100) : 0;
+
+  // Monthly trend (always last 6 months)
+  const monthlyData = useMemo(() => {
     const result: { month: string; income: number; expenses: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date();
@@ -49,18 +99,29 @@ export default function Dashboard({
       const txs = state.transactions.filter((t: Transaction) => t.date.startsWith(ym));
       result.push({
         month: label,
-        income: +txs.filter((t: Transaction) => t.type === 'income').reduce((s: number, t: Transaction) => s + t.amount, 0).toFixed(0),
-        expenses: +txs.filter((t: Transaction) => t.type === 'expense').reduce((s: number, t: Transaction) => s + t.amount, 0).toFixed(0),
+        income: +txs.filter((t: Transaction) => t.type === 'income').reduce((s, t) => s + t.amount, 0).toFixed(0),
+        expenses: +txs.filter((t: Transaction) => t.type === 'expense').reduce((s, t) => s + t.amount, 0).toFixed(0),
       });
     }
     return result;
-  })();
+  }, [state.transactions]);
 
-  // Category spending for current month
+  // Donut chart data — expenses by category for filtered period
+  const expenseCatKeys = state.accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
+  const donutData = useMemo(() => {
+    const catMap: Record<string, { label: string; value: number }> = {};
+    filteredTxs.filter(t => t.type === 'expense').forEach(t => {
+      const label = (tr as any)[t.category] || state.customCategories[t.category] || t.category;
+      if (!catMap[t.category]) catMap[t.category] = { label, value: 0 };
+      catMap[t.category].value += t.amount;
+    });
+    return Object.values(catMap).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
+  }, [filteredTxs, tr, state.customCategories]);
+
+  // Category spending vs budget
   const currentYm = new Date().toISOString().slice(0, 7);
-  const expenseCats = state.accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
-  const allCategorySpending = [
-    ...expenseCats.map(cat => ({
+  const allCategorySpending = useMemo(() => [
+    ...expenseCatKeys.map(cat => ({
       cat,
       label: (tr as any)[cat] as string,
       spent: state.transactions.filter(t => t.type === 'expense' && t.category === cat && t.date.startsWith(currentYm)).reduce((s, t) => s + t.amount, 0),
@@ -72,7 +133,7 @@ export default function Dashboard({
       spent: state.transactions.filter(t => t.type === 'expense' && t.category === key && t.date.startsWith(currentYm)).reduce((s, t) => s + t.amount, 0),
       budget: state.budgets[key] ?? 0,
     })),
-  ].filter(x => x.spent > 0 || x.budget > 0);
+  ].filter(x => x.spent > 0 || x.budget > 0), [state.transactions, state.budgets, state.customCategories, expenseCatKeys, tr, currentYm]);
 
   const handleApplyCode = () => {
     if (!code.trim()) return;
@@ -83,11 +144,8 @@ export default function Dashboard({
   };
 
   const handleTierBadgeClick = () => {
-    if (state.tier === 'premium') {
-      onOpenPlanManager();
-    } else {
-      onOpenUpgrade();
-    }
+    if (state.tier === 'premium') onOpenPlanManager();
+    else onOpenUpgrade();
   };
 
   return (
@@ -115,20 +173,13 @@ export default function Dashboard({
             )}
           </button>
 
-          {state.accountType && state.codeActivated && (
-            <div className="flex items-center gap-1 text-xs text-slate-400 bg-slate-50 rounded-full px-2.5 py-1">
-              {state.accountType === 'business' ? '💼' : '🏠'}
-              <span className="font-medium capitalize">{state.accountType}</span>
-            </div>
-          )}
-
-          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : state.codeActivated && scansLeft > 0 ? 'bg-blue-50' : 'bg-rose-50'}`}>
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : 'bg-blue-50'}`}>
             <span className="text-sm">⚡</span>
             {state.tier === 'premium' ? (
               <span className="text-xs font-semibold text-emerald-600">{tr.scansUnlimited}</span>
             ) : (
-              <span className={`text-xs font-semibold ${state.codeActivated && scansLeft > 0 ? 'text-blue-600' : 'text-rose-600'}`} dir="ltr">
-                {tr.scansRemaining}: {state.codeActivated ? scansLeft : 0}/{state.maxDailyScans}
+              <span className="text-xs font-semibold text-blue-600" dir="ltr">
+                {tr.scansRemaining}: {scansLeft}/{state.maxDailyScans}
               </span>
             )}
           </div>
@@ -152,12 +203,7 @@ export default function Dashboard({
               type="text"
               value={code}
               onChange={e => setCode(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleApplyCode();
-                }
-              }}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCode(); } }}
               placeholder={tr.enterCode}
               className="flex-1 px-3 py-2.5 bg-white border border-rose-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent transition-all"
               dir="ltr"
@@ -166,7 +212,7 @@ export default function Dashboard({
               type="button"
               onClick={handleApplyCode}
               disabled={!code.trim()}
-              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.97] whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.97] whitespace-nowrap disabled:opacity-40"
             >
               {tr.applyCode}
             </button>
@@ -179,6 +225,23 @@ export default function Dashboard({
         </div>
       )}
 
+      {/* Date Filter */}
+      <div className="flex gap-1.5 bg-white border border-slate-100 rounded-2xl p-1.5 shadow-sm">
+        {DATE_FILTERS.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setDateFilter(f.key)}
+            className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              dateFilter === f.key
+                ? 'bg-emerald-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Metrics Cards */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm text-center">
@@ -186,7 +249,7 @@ export default function Dashboard({
             <TrendingUp className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="text-xs text-slate-500 leading-tight mb-1">{tr.totalIncome}</div>
-          <div className="text-base font-bold text-emerald-600" dir="ltr">{formatCurrency(state.totalIncome, state.lang)}</div>
+          <div className="text-base font-bold text-emerald-600" dir="ltr">{formatCurrency(periodIncome, state.lang)}</div>
         </div>
 
         <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm text-center">
@@ -194,20 +257,22 @@ export default function Dashboard({
             <TrendingDown className="w-4 h-4 text-rose-500" />
           </div>
           <div className="text-xs text-slate-500 leading-tight mb-1">{tr.totalExpenses}</div>
-          <div className="text-base font-bold text-rose-500" dir="ltr">{formatCurrency(state.totalExpenses, state.lang)}</div>
+          <div className="text-base font-bold text-rose-500" dir="ltr">{formatCurrency(periodExpenses, state.lang)}</div>
         </div>
 
         <div className={`border rounded-2xl p-4 shadow-sm text-center ${netProfit >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-2 ${netProfit >= 0 ? 'bg-emerald-200' : 'bg-rose-200'}`}>
-            {netProfit >= 0
-              ? <TrendingUp className="w-4 h-4 text-emerald-700" />
-              : <TrendingDown className="w-4 h-4 text-rose-700" />
-            }
+            {netProfit >= 0 ? <TrendingUp className="w-4 h-4 text-emerald-700" /> : <TrendingDown className="w-4 h-4 text-rose-700" />}
           </div>
           <div className="text-xs text-slate-500 leading-tight mb-1">{tr.netProfit}</div>
-          <div className={`text-base font-bold ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} dir="ltr">
+          <div className={`text-sm font-bold ${netProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} dir="ltr">
             {netProfit >= 0 ? '+' : ''}{formatCurrency(netProfit, state.lang)}
           </div>
+          {periodIncome > 0 && (
+            <div className={`text-[10px] font-semibold mt-0.5 ${profitMargin >= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
+              {profitMargin >= 0 ? '+' : ''}{profitMargin}% margin
+            </div>
+          )}
         </div>
       </div>
 
@@ -218,30 +283,69 @@ export default function Dashboard({
           <LineChart data={monthlyData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-            <Tooltip
-              contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 12 }}
-              labelStyle={{ fontWeight: 700, color: '#1e293b' }}
-            />
-            <Legend
-              iconType="circle"
-              iconSize={8}
-              wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-            />
+            <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 12 }} labelStyle={{ fontWeight: 700, color: '#1e293b' }} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
             <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
             <Line type="monotone" dataKey="expenses" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3, fill: '#f43f5e' }} activeDot={{ r: 5 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
+      {/* Donut Chart — Expenses by Category */}
+      {donutData.length > 0 && (
+        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+            Expense Breakdown
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="shrink-0">
+              <PieChart width={130} height={130}>
+                <Pie
+                  data={donutData}
+                  cx={60}
+                  cy={60}
+                  innerRadius={38}
+                  outerRadius={58}
+                  paddingAngle={3}
+                  dataKey="value"
+                  strokeWidth={0}
+                >
+                  {donutData.map((_, i) => (
+                    <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 11 }}
+                  formatter={(v: number) => [formatCurrency(v, state.lang), '']}
+                />
+              </PieChart>
+            </div>
+            <div className="flex-1 space-y-1.5 min-w-0">
+              {donutData.slice(0, 5).map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: DONUT_COLORS[i % DONUT_COLORS.length] }} />
+                    <span className="text-xs text-slate-600 truncate">{item.label}</span>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-700 shrink-0" dir="ltr">
+                    {formatCurrency(item.value, state.lang)}
+                  </span>
+                </div>
+              ))}
+              {donutData.length > 5 && (
+                <div className="text-[10px] text-slate-400 pl-3.5">+{donutData.length - 5} more</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Monthly Budget / Category Spending */}
       {allCategorySpending.length > 0 && (
         <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">{tr.spendingByCategory}</div>
-            <button
-              onClick={onOpenBudget}
-              className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
-            >
+            <button onClick={onOpenBudget} className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors">
               <Wallet className="w-3.5 h-3.5" />
               {tr.manageBudgets}
             </button>
@@ -256,7 +360,7 @@ export default function Dashboard({
                     <span className="text-xs font-medium text-slate-600">{label}</span>
                     <span className={`text-xs font-semibold ${over ? 'text-rose-500' : 'text-slate-500'}`} dir="ltr">
                       {formatCurrency(spent, state.lang)}{budget > 0 ? ` / ${formatCurrency(budget, state.lang)}` : ''}
-                      {over && <span className="ml-1 text-rose-500">!</span>}
+                      {over && <span className="ml-1">!</span>}
                     </span>
                   </div>
                   {budget > 0 && (
@@ -274,7 +378,6 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Budget CTA when no spending yet */}
       {allCategorySpending.length === 0 && (
         <button
           onClick={onOpenBudget}
@@ -328,17 +431,20 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* Recent Transactions (latest 5) */}
+      {/* Recent Transactions */}
       <div>
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">Recent Transactions</div>
-        {state.transactions.length === 0 ? (
+        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
+          Recent Transactions
+          {filteredTxs.length > 0 && <span className="ml-2 text-slate-400 font-normal normal-case">({filteredTxs.length} total)</span>}
+        </div>
+        {filteredTxs.length === 0 ? (
           <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">
             <div className="text-3xl mb-2">📋</div>
             <div className="text-sm text-slate-400">{tr.noTransactions}</div>
           </div>
         ) : (
           <div className="space-y-2">
-            {state.transactions.slice(-5).reverse().map(tx => (
+            {filteredTxs.slice(-5).reverse().map(tx => (
               <div key={tx.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
                   <span className="text-lg">{tx.type === 'income' ? '💰' : '💸'}</span>
@@ -346,6 +452,11 @@ export default function Dashboard({
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-slate-800 truncate">{tx.description}</div>
                   <div className="text-xs text-slate-400 mt-0.5">{tx.date}</div>
+                  {tx.items && tx.items.length > 0 && (
+                    <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      {tx.items.map(i => i.name).join(' · ')}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <div className={`text-sm font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`} dir="ltr">
@@ -377,7 +488,6 @@ export default function Dashboard({
         </button>
       </div>
 
-      {/* Demo reset */}
       <div className="pt-4 flex justify-center">
         <button
           onClick={onDemoReset}
