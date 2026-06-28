@@ -133,16 +133,26 @@ export default function TransactionModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64, mimeType: 'image/jpeg' }),
       });
+
+      if (!response.ok) {
+        const errText = await response.text().catch(() => 'Unknown error');
+        console.error('OCR API error:', response.status, errText);
+        throw new Error(`OCR API returned ${response.status}`);
+      }
+
       const parsed = await response.json();
       setOcrProgress(100);
-      if (parsed.amount) setAmount(parsed.amount);
+
+      if (parsed.amount) setAmount(String(parsed.amount));
       if (parsed.description) setDescription(parsed.description);
       if (parsed.date) setDate(parsed.date);
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
+
       setOcrStatus('done');
       setOcrBanner(tr.ocrReady);
       setTimeout(() => setStep('manual'), 600);
-    } catch {
+    } catch (err) {
+      console.error('OCR failed:', err);
       setOcrStatus('error');
       setOcrBanner('OCR failed — please enter details manually.');
       setTimeout(() => setStep('manual'), 1200);
