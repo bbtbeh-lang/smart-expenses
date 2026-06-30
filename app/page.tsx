@@ -74,6 +74,31 @@ export default function Home() {
   const [showBudget, setShowBudget] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Listen for Supabase auth changes (Google redirect, email verification, etc.)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user && state.screen === 'auth') {
+        setState(prev => ({ ...loadState(), screen: 'onboarding', lang: prev.lang }));
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setState(prev => {
+          if (prev.screen === 'auth') {
+            return { ...loadState(), screen: 'onboarding', lang: prev.lang };
+          }
+          return prev;
+        });
+      } else {
+        setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load from localStorage on mount
   useEffect(() => {
     setState(loadState());
