@@ -1,9 +1,9 @@
 'use client';
 
-import { LayoutDashboard, List, Settings } from 'lucide-react';
+import { LayoutDashboard, List, Settings, BarChart2 } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 
-export type NavTab = 'dashboard' | 'transactions' | 'settings';
+export type NavTab = 'dashboard' | 'transactions' | 'reports' | 'settings';
 
 interface NavBarProps {
   activeTab: NavTab;
@@ -15,6 +15,7 @@ export default function NavBar({ activeTab, onTabChange, tr }: NavBarProps) {
   const tabs: { id: NavTab; icon: React.ReactNode; label: string }[] = [
     { id: 'dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: tr.navDashboard },
     { id: 'transactions', icon: <List className="w-5 h-5" />, label: tr.navTransactions },
+    { id: 'reports', icon: <BarChart2 className="w-5 h-5" />, label: 'Reports' },
     { id: 'settings', icon: <Settings className="w-5 h-5" />, label: tr.navSettings },
   ];
 
