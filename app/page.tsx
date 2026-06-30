@@ -10,6 +10,7 @@ import AuthScreen from '@/components/AuthScreen';
 import OnboardingScreen from '@/components/OnboardingScreen';
 import Dashboard from '@/components/Dashboard';
 import TransactionsTab from '@/components/TransactionsTab';
+import ReportsTab from '@/components/ReportsTab';
 import SettingsTab from '@/components/SettingsTab';
 import TransactionModal from '@/components/TransactionModal';
 import AIReviewModal from '@/components/AIReviewModal';
@@ -321,6 +322,12 @@ export default function Home() {
                 tr={tr}
                 lang={state.lang}
                 onEdit={tx => setEditingTransaction(tx)}
+              />
+            )}
+            {activeTab === 'reports' && (
+              <ReportsTab
+                transactions={state.transactions}
+                lang={state.lang}
               />
             )}
             {activeTab === 'settings' && (
