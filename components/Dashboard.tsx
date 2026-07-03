@@ -76,7 +76,7 @@ export default function Dashboard({
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>('this_month');
 
-  const scansLeft = state.tier === 'premium' ? Infinity : state.maxDailyScans - state.scansUsedToday;
+  const scansLeft = Math.max(0, state.scanLimit - state.scansUsedThisPeriod);
 
   // Filtered transactions
   const filteredTxs = useMemo(() => filterTxByDate(state.transactions, dateFilter), [state.transactions, dateFilter]);
@@ -175,13 +175,9 @@ export default function Dashboard({
 
           <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : 'bg-blue-50'}`}>
             <span className="text-sm">⚡</span>
-            {state.tier === 'premium' ? (
-              <span className="text-xs font-semibold text-emerald-600">{tr.scansUnlimited}</span>
-            ) : (
-              <span className="text-xs font-semibold text-blue-600" dir="ltr">
-                {tr.scansRemaining}: {scansLeft}/{state.maxDailyScans}
-              </span>
-            )}
+            <span className={`text-xs font-semibold ${state.tier === 'premium' ? 'text-emerald-600' : 'text-blue-600'}`} dir="ltr">
+              {tr.scansRemaining}: {scansLeft}/{state.scanLimit}
+            </span>
           </div>
         </div>
       </div>

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2 } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { TransactionType, AccountType, Tier, Transaction, ReceiptItem } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
 type ModalStep = 'type' | 'receipt' | 'manual' | 'ocr';
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
@@ -23,7 +24,7 @@ interface TransactionModalProps {
   onUpdate?: (tx: Transaction) => void;
   onDelete?: (id: string) => void;
   onStartReceiptUpload: (type: TransactionType) => void;
-  onIncrementScan: () => void;
+  onIncrementScan: () => Promise<boolean>;
   onOpenUpgrade: () => void;
   onScanBlocked: () => void;
 }
@@ -66,10 +67,12 @@ export default function TransactionModal({
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState('');
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
+  const [receiptHash, setReceiptHash] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const scansLeft = Infinity;
-  const scanExhausted = false;
+  const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
+  const scanExhausted = scansLeft <= 0;
   const expenseCats = accountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
   const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
@@ -90,12 +93,16 @@ export default function TransactionModal({
     setStep('receipt');
   };
 
-  const handleReceiptYes = () => {
+  const handleReceiptYes = async () => {
     if (scanExhausted) {
       onScanBlocked();
       return;
     }
-    onIncrementScan();
+    const allowed = await onIncrementScan();
+    if (!allowed) {
+      onScanBlocked();
+      return;
+    }
     setStep('ocr');
   };
 
@@ -128,9 +135,13 @@ export default function TransactionModal({
         img.src = url;
       });
       setOcrProgress(60);
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch('/api/ocr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ image: base64, mimeType: 'image/jpeg' }),
       });
 
@@ -147,6 +158,15 @@ export default function TransactionModal({
       if (parsed.description) setDescription(parsed.description);
       if (parsed.date) setDate(parsed.date);
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
+      if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
+      if (parsed.duplicate?.isDuplicate) {
+        setDuplicateWarning({
+          matchedMerchant: parsed.duplicate.matchedMerchant,
+          matchedDate: parsed.duplicate.matchedDate,
+        });
+      } else {
+        setDuplicateWarning(null);
+      }
 
       setOcrStatus('done');
       setOcrBanner(tr.ocrReady);
@@ -187,6 +207,18 @@ export default function TransactionModal({
       onUpdate(tx);
     } else {
       onSaveManual(tx);
+    }
+    // Only receipts that actually went through OCR get a fingerprint —
+    // manually-entered transactions have nothing to compare against.
+    if (receiptHash) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) return;
+        fetch('/api/receipts/record-scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ receiptHash, merchant: description, amount: parseFloat(amount), date }),
+        }).catch(() => { /* non-critical — a missed fingerprint just means one fewer future duplicate check */ });
+      });
     }
   };
 
@@ -420,6 +452,23 @@ export default function TransactionModal({
                 <div className={`flex items-center gap-2 text-xs font-medium rounded-xl px-3 py-2 ${ocrStatus === 'done' ? 'bg-emerald-50 text-emerald-700' : ocrStatus === 'error' ? 'bg-rose-50 text-rose-600' : ''}`}>
                   {ocrStatus === 'done' && <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
                   {ocrBanner}
+                </div>
+              )}
+
+              {duplicateWarning && (
+                <div className="flex items-start gap-2.5 text-xs font-medium rounded-xl px-3 py-2.5 bg-amber-50 text-amber-800 border border-amber-200">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-semibold mb-0.5">{tr.duplicateReceiptTitle}</div>
+                    <div className="text-amber-700 font-normal">
+                      {tr.duplicateReceiptDesc
+                        .replace('{merchant}', duplicateWarning.matchedMerchant || '')
+                        .replace('{date}', duplicateWarning.matchedDate || '')}
+                    </div>
+                  </div>
+                  <button onClick={() => setDuplicateWarning(null)} className="shrink-0">
+                    <X className="w-3.5 h-3.5 text-amber-500" />
+                  </button>
                 </div>
               )}
 

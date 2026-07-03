@@ -33,6 +33,12 @@ function freshState(lang: Lang = 'EN'): AppState {
     lang,
     accountType: null,
     tier: 'free',
+    plan: 'free',
+    billingPeriod: null,
+    scansUsedThisPeriod: 0,
+    scanLimit: 5,
+    currentPeriodEnd: null,
+    subscriptionLoaded: false,
     codeActivated: false,
     scansUsedToday: 0,
     maxDailyScans: 10,
@@ -74,11 +80,38 @@ export default function Home() {
   const [showBudget, setShowBudget] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  // Fetches the real subscription/plan status from Supabase (via our API,
+  // which reads the `subscriptions` table written by the Stripe webhook).
+  const refreshSubscription = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/subscription', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const sub = await res.json();
+      setState(prev => ({
+        ...prev,
+        plan: sub.plan,
+        billingPeriod: sub.billingPeriod,
+        scansUsedThisPeriod: sub.scansUsed,
+        scanLimit: sub.scanLimit,
+        currentPeriodEnd: sub.currentPeriodEnd,
+        subscriptionLoaded: true,
+        tier: sub.plan === 'free' ? 'free' : 'premium',
+      }));
+    } catch {
+      // Network error — leave existing state as-is, will retry on next auth event.
+    }
+  }, []);
+
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user && state.screen === 'auth') {
         setState(prev => ({ ...loadState(), screen: 'onboarding', lang: prev.lang }));
+        refreshSubscription();
       }
     });
 
@@ -90,12 +123,36 @@ export default function Home() {
           }
           return prev;
         });
+        refreshSubscription();
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
       }
     });
 
     return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // After returning from Stripe Checkout, re-fetch the subscription so the
+  // new plan shows up immediately (the webhook usually beats the redirect,
+  // but we retry briefly in case it hasn't landed yet).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get('checkout');
+    if (!checkout) return;
+
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (checkout === 'success') {
+      addToast(tr.upgradeSuccess, 'success');
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts += 1;
+        await refreshSubscription();
+        if (attempts >= 5) clearInterval(interval);
+      }, 1500);
+      return () => clearInterval(interval);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -257,21 +314,50 @@ export default function Home() {
     addToast(`${tr.confirmSave}! Transaction added.`, 'success');
   };
 
-  const handleUpgrade = () => {
-    setState(prev => ({ ...prev, tier: 'premium', scansUsedToday: 0 }));
-    setShowUpgrade(false);
-    addToast(tr.upgradeSuccess, 'success');
+  // Redirects to Stripe Checkout for the chosen plan/billing period.
+  const handleStartCheckout = async (plan: 'basic' | 'pro' | 'business', billingPeriod: 'monthly' | 'yearly') => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      addToast(tr.signingOut, 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ plan, billingPeriod }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        addToast(data.error || 'Checkout failed', 'error');
+      }
+    } catch {
+      addToast('Checkout failed', 'error');
+    }
   };
 
-  const handleDowngrade = () => {
-    setState(prev => ({ ...prev, tier: 'free', scansUsedToday: 0, maxDailyScans: 10 }));
-    setShowPlanManager(false);
-    addToast(tr.downgradeSuccess, 'info');
-  };
-
-  const handleSwitchPlan = (_plan: 'business' | 'personal') => {
-    setShowPlanManager(false);
-    addToast(tr.planSwitchSuccess, 'success');
+  // Opens the Stripe Customer Portal so an already-subscribed user can
+  // upgrade, downgrade, change billing period, or cancel — Stripe handles
+  // all of that natively, so we don't need to build it ourselves.
+  const handleManageSubscription = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        addToast(data.error || 'Could not open subscription management', 'error');
+      }
+    } catch {
+      addToast('Could not open subscription management', 'error');
+    }
   };
 
   const handleSaveBudgets = (budgets: Record<string, number>, customCategories: Record<string, string>) => {
@@ -287,19 +373,39 @@ export default function Home() {
   const isRtl = state.lang === 'FA';
   const isLoggedIn = state.screen !== 'auth';
 
+  // Asks the server whether this user still has scans left this billing
+  // period, and if so, atomically counts one against their limit. The
+  // limit is enforced server-side (Supabase) so it can't be bypassed by
+  // editing local state.
+  const incrementScan = async (): Promise<boolean> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return false;
+    try {
+      const res = await fetch('/api/subscription/increment-scan', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      setState(prev => ({ ...prev, scansUsedThisPeriod: data.scansUsed ?? prev.scansUsedThisPeriod }));
+      return !!data.allowed;
+    } catch {
+      return false;
+    }
+  };
+
   const transactionModalProps = {
     tr,
     accountType: state.accountType || 'personal' as const,
     tier: state.tier,
     codeActivated: state.codeActivated,
-    scansUsedToday: state.scansUsedToday,
-    maxDailyScans: state.maxDailyScans,
+    scansUsedToday: state.scansUsedThisPeriod,
+    maxDailyScans: state.scanLimit,
     customCategories: state.customCategories,
     onAddCustomCategory: handleAddCustomCategory,
     onStartReceiptUpload: handleStartReceiptUpload,
-    onIncrementScan: () => setState(prev => ({ ...prev, scansUsedToday: prev.tier === 'free' ? prev.scansUsedToday + 1 : prev.scansUsedToday })),
+    onIncrementScan: incrementScan,
     onOpenUpgrade: () => { setShowTransactionModal(false); setEditingTransaction(null); setShowUpgrade(true); },
-    onScanBlocked: () => addToast('سهمیه ۲ اسکن رایگان امروز شما به پایان رسیده است!', 'error'),
+    onScanBlocked: () => addToast(tr.scanLimitReached || 'You have reached your monthly scan limit for this plan.', 'error'),
   };
 
   return (
@@ -445,20 +551,20 @@ export default function Home() {
       {showUpgrade && (
         <UpgradeModal
           tr={tr}
-          accountType={state.accountType}
+          currentPlan={state.plan}
           onClose={() => setShowUpgrade(false)}
-          onUpgrade={handleUpgrade}
+          onSelectPlan={handleStartCheckout}
         />
       )}
 
       {showPlanManager && (
         <PlanModal
           tr={tr}
-          tier={state.tier}
-          accountType={state.accountType}
+          plan={state.plan}
+          billingPeriod={state.billingPeriod}
+          currentPeriodEnd={state.currentPeriodEnd}
           onClose={() => setShowPlanManager(false)}
-          onDowngrade={handleDowngrade}
-          onSwitchPlan={handleSwitchPlan}
+          onManageSubscription={handleManageSubscription}
         />
       )}
 
