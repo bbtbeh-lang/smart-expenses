@@ -71,8 +71,16 @@ export default function TransactionModal({
   const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
-  const scanExhausted = scansLeft <= 0;
+  // Access logic:
+  // - hasPlan: purchased a plan → full access (manual + OCR)
+  // - hasYoutubeCode: entered daily YouTube code → manual only
+  // - neither → no access
+  const hasPlan = tier === 'premium';
+  const hasYoutubeCode = codeActivated;
+  const canManualEntry = hasPlan || hasYoutubeCode;
+  const canScan = hasPlan; // YouTube code never unlocks OCR
+  const scanExhausted = !canScan;
+  const scansLeft = hasPlan ? Infinity : 0;
   const expenseCats = accountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
   const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
@@ -332,43 +340,56 @@ export default function TransactionModal({
                   {txType === 'income' ? '💰' : '💸'} {txType === 'income' ? tr.income : tr.expense}
                 </span>
               </div>
-              <p className="text-base font-semibold text-slate-800">{tr.receiptQuestion}</p>
 
-              {scanExhausted && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 leading-relaxed" dir="rtl">
-                  سهمیه ۲ اسکن رایگان امروز شما به پایان رسیده است!
+              {/* No access at all */}
+              {!canManualEntry && !canScan && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center" dir="rtl">
+                  <div className="text-2xl mb-2">🔒</div>
+                  <div className="text-sm font-bold text-amber-800 mb-1">دسترسی ندارید</div>
+                  <div className="text-xs text-amber-700">کد روزانه YouTube رو وارد کنید تا بتوانید فاکتور ثبت کنید.</div>
                 </div>
               )}
 
-              <button
-                onClick={handleReceiptYes}
-                className={`w-full flex items-center gap-4 p-5 border-2 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] group ${scanExhausted ? 'border-slate-200 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-teal-400 hover:bg-teal-50'}`}
-              >
-                <div className="text-3xl">📸</div>
-                <div>
-                  <div className="font-bold text-slate-900">{tr.yesUpload}</div>
-                  {tier === 'free' && (
-                    <div className="text-xs text-slate-500 mt-0.5" dir="ltr">
-                      {scansLeft > 0 ? `${scansLeft} scan${scansLeft !== 1 ? 's' : ''} remaining today` : 'No scans remaining'}
-                    </div>
-                  )}
-                </div>
-                <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
-                  <ScanLine className="w-3.5 h-3.5" />
-                  OCR
-                </div>
-              </button>
+              {/* OCR Scan — only for plan users */}
+              {canScan && (
+                <button
+                  onClick={handleReceiptYes}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-teal-400 hover:bg-teal-50 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] group"
+                >
+                  <div className="text-3xl">📸</div>
+                  <div>
+                    <div className="font-bold text-slate-900">{tr.yesUpload}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">اسکن هوشمند رسید با AI</div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
+                    <ScanLine className="w-3.5 h-3.5" />
+                    OCR
+                  </div>
+                </button>
+              )}
 
-              <button
-                onClick={() => setStep('manual')}
-                className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-slate-400 rounded-2xl text-left transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
-              >
-                <div className="text-3xl">✍️</div>
-                <div>
-                  <div className="font-bold text-slate-900">{tr.noManual}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">Enter details yourself</div>
+              {/* Manual Entry — for plan users OR YouTube code users */}
+              {canManualEntry && (
+                <button
+                  onClick={() => setStep('manual')}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-slate-400 rounded-2xl text-left transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
+                >
+                  <div className="text-3xl">✍️</div>
+                  <div>
+                    <div className="font-bold text-slate-900">{tr.noManual}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {hasYoutubeCode && !hasPlan ? 'دسترسی با کد YouTube ✓' : 'ورود دستی اطلاعات'}
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* Upgrade hint for YouTube code users */}
+              {hasYoutubeCode && !hasPlan && (
+                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs text-teal-700 text-center">
+                  برای اسکن هوشمند رسید، پلن Premium بگیرید 🚀
                 </div>
-              </button>
+              )}
             </div>
           )}
 
