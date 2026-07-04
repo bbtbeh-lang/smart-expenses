@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2, Lock } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { TransactionType, AccountType, Tier, Transaction, ReceiptItem } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -13,7 +13,8 @@ interface TransactionModalProps {
   tr: Translations;
   accountType: AccountType;
   tier: Tier;
-  codeActivated: boolean;
+  hasManualAccess: boolean;
+  hasScanAccess: boolean;
   scansUsedToday: number;
   maxDailyScans: number;
   editTransaction?: Transaction;
@@ -46,7 +47,7 @@ function generateId() {
 
 
 export default function TransactionModal({
-  tr, accountType, tier, codeActivated, scansUsedToday, maxDailyScans,
+  tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
   editTransaction, customCategories = {}, onAddCustomCategory,
   onClose, onSaveManual, onUpdate, onDelete,
   onStartReceiptUpload, onIncrementScan, onOpenUpgrade, onScanBlocked,
@@ -71,16 +72,8 @@ export default function TransactionModal({
   const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Access logic:
-  // - hasPlan: purchased a plan → full access (manual + OCR)
-  // - hasYoutubeCode: entered daily YouTube code → manual only
-  // - neither → no access
-  const hasPlan = tier === 'premium';
-  const hasYoutubeCode = codeActivated;
-  const canManualEntry = hasPlan || hasYoutubeCode;
-  const canScan = hasPlan; // YouTube code never unlocks OCR
-  const scanExhausted = !canScan;
-  const scansLeft = hasPlan ? Infinity : 0;
+  const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
+  const scanExhausted = scansLeft <= 0;
   const expenseCats = accountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
   const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
@@ -340,36 +333,47 @@ export default function TransactionModal({
                   {txType === 'income' ? '💰' : '💸'} {txType === 'income' ? tr.income : tr.expense}
                 </span>
               </div>
+              <p className="text-base font-semibold text-slate-800">{tr.receiptQuestion}</p>
 
-              {/* No access at all */}
-              {!canManualEntry && !canScan && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center" dir="rtl">
-                  <div className="text-2xl mb-2">🔒</div>
-                  <div className="text-sm font-bold text-amber-800 mb-1">دسترسی ندارید</div>
-                  <div className="text-xs text-amber-700">کد روزانه YouTube رو وارد کنید تا بتوانید فاکتور ثبت کنید.</div>
-                </div>
-              )}
-
-              {/* OCR Scan — only for plan users */}
-              {canScan && (
+              {/* Scan/OCR: exclusively for active paid plans — never shown as a
+                  usable option for free users or daily-code users, per the
+                  rule that OCR must stay exclusive to purchased plans. */}
+              {hasScanAccess ? (
                 <button
                   onClick={handleReceiptYes}
-                  className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-teal-400 hover:bg-teal-50 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] group"
+                  className={`w-full flex items-center gap-4 p-5 border-2 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] group ${scanExhausted ? 'border-slate-200 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-teal-400 hover:bg-teal-50'}`}
                 >
                   <div className="text-3xl">📸</div>
                   <div>
                     <div className="font-bold text-slate-900">{tr.yesUpload}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">اسکن هوشمند رسید با AI</div>
+                    <div className="text-xs text-slate-500 mt-0.5" dir="ltr">
+                      {scansLeft > 0 ? `${scansLeft} scan${scansLeft !== 1 ? 's' : ''} left this month` : tr.scanLimitReached}
+                    </div>
                   </div>
                   <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
                     <ScanLine className="w-3.5 h-3.5" />
                     OCR
                   </div>
                 </button>
+              ) : (
+                <button
+                  onClick={onOpenUpgrade}
+                  className="w-full flex items-center gap-4 p-5 border-2 border-dashed border-slate-200 rounded-2xl text-left transition-all duration-150 hover:border-teal-300 hover:bg-teal-50 active:scale-[0.98]"
+                >
+                  <div className="text-3xl opacity-50">📸</div>
+                  <div>
+                    <div className="font-bold text-slate-500">{tr.yesUpload}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{tr.scanRequiresPlan}</div>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">
+                    <Lock className="w-3.5 h-3.5" />
+                  </div>
+                </button>
               )}
 
-              {/* Manual Entry — for plan users OR YouTube code users */}
-              {canManualEntry && (
+              {/* Manual entry: available to plan holders AND today's daily-code
+                  redeemers — but not to a fully free/locked user. */}
+              {hasManualAccess ? (
                 <button
                   onClick={() => setStep('manual')}
                   className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-slate-400 rounded-2xl text-left transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
@@ -377,17 +381,16 @@ export default function TransactionModal({
                   <div className="text-3xl">✍️</div>
                   <div>
                     <div className="font-bold text-slate-900">{tr.noManual}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {hasYoutubeCode && !hasPlan ? 'دسترسی با کد YouTube ✓' : 'ورود دستی اطلاعات'}
-                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{tr.enterDetailsYourself}</div>
                   </div>
                 </button>
-              )}
-
-              {/* Upgrade hint for YouTube code users */}
-              {hasYoutubeCode && !hasPlan && (
-                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-xs text-teal-700 text-center">
-                  برای اسکن هوشمند رسید، پلن Premium بگیرید 🚀
+              ) : (
+                <div className="w-full flex items-center gap-4 p-5 border-2 border-dashed border-slate-200 rounded-2xl opacity-70">
+                  <div className="text-3xl opacity-50">✍️</div>
+                  <div>
+                    <div className="font-bold text-slate-500">{tr.noManual}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{tr.manualRequiresCodeOrPlan}</div>
+                  </div>
                 </div>
               )}
             </div>

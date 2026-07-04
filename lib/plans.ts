@@ -54,6 +54,6 @@ export function planFromPriceId(priceId: string): { plan: PlanId; billingPeriod:
 }
 
 export function scanLimitForPlan(plan: PlanId | 'free'): number {
-  if (plan === 'free') return 5; // small free allowance
+  if (plan === 'free') return 0; // OCR/scanning is exclusive to paying plans — see checkAccess in /api/subscription.
   return PLANS[plan].scanLimit;
 }

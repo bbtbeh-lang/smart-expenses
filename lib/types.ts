@@ -45,6 +45,8 @@ export interface AppState {
   scanLimit: number;
   currentPeriodEnd: string | null;
   subscriptionLoaded: boolean;
+  hasManualAccess: boolean;
+  hasScanAccess: boolean;
   codeActivated: boolean;
   scansUsedToday: number;
   maxDailyScans: number;
@@ -64,9 +66,11 @@ export const INITIAL_STATE: AppState = {
   plan: 'free',
   billingPeriod: null,
   scansUsedThisPeriod: 0,
-  scanLimit: 5,
+  scanLimit: 0,
   currentPeriodEnd: null,
   subscriptionLoaded: false,
+  hasManualAccess: false,
+  hasScanAccess: false,
   codeActivated: false,
   scansUsedToday: 2,
   maxDailyScans: 2,
@@ -78,4 +82,6 @@ export const INITIAL_STATE: AppState = {
   customCategories: {},
 };
 
-export const VALID_CODES = ['FINFREE', 'SNAP2026'];
+// Hardcoded bypass codes were removed as a security fix — all code
+// redemption now goes through the atomic, rate-limited, one-per-user
+// redeem_daily_code() flow (see /api/code/apply).

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Loader2, ChevronRight, Wallet } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Loader2, ChevronRight, Wallet, Lock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
-import { AppState, DraftTransaction, Transaction, VALID_CODES } from '@/lib/types';
+import { AppState, DraftTransaction, Transaction } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -16,7 +16,7 @@ interface DashboardProps {
   onOpenUpgrade: () => void;
   onOpenTaxReport: () => void;
   onOpenAIReview: (draft: DraftTransaction) => void;
-  onApplyCode: (code: string) => boolean;
+  onApplyCode: (code: string) => Promise<{ success: boolean; message: string }>;
   onOpenPlanManager: () => void;
   onOpenBudget: () => void;
   onDemoReset: () => void;
@@ -135,10 +135,14 @@ export default function Dashboard({
     })),
   ].filter(x => x.spent > 0 || x.budget > 0), [state.transactions, state.budgets, state.customCategories, expenseCatKeys, tr, currentYm]);
 
-  const handleApplyCode = () => {
+  const handleApplyCode = async () => {
     if (!code.trim()) return;
-    const success = onApplyCode(code.trim().toUpperCase());
-    setCodeMsg({ text: success ? tr.codeSuccess : tr.codeError, ok: success });
+    const { success, message } = await onApplyCode(code.trim().toUpperCase());
+    const errorText = message === 'limit_reached' ? tr.codeLimitReached
+      : message === 'already_used' ? tr.codeAlreadyUsed
+      : message === 'invalid_or_expired' ? tr.codeError
+      : tr.codeError;
+    setCodeMsg({ text: success ? tr.codeSuccess : errorText, ok: success });
     if (success) setCode('');
     setTimeout(() => setCodeMsg(null), 4000);
   };
@@ -160,10 +164,10 @@ export default function Dashboard({
                 <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                 <span className="text-xs font-bold text-amber-700">{tr.tier}: {tr.premium}</span>
               </div>
-            ) : state.codeActivated ? (
+            ) : state.hasManualAccess ? (
               <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5">
-                <span className="text-sm">💼</span>
-                <span className="text-xs font-bold text-emerald-700">{tr.tier}: Business</span>
+                <span className="text-sm">✏️</span>
+                <span className="text-xs font-bold text-emerald-700">{tr.manualAccessUnlockedToday}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1.5 bg-slate-100 rounded-full px-3 py-1.5">
@@ -173,17 +177,27 @@ export default function Dashboard({
             )}
           </button>
 
-          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : 'bg-blue-50'}`}>
-            <span className="text-sm">⚡</span>
-            <span className={`text-xs font-semibold ${state.tier === 'premium' ? 'text-emerald-600' : 'text-blue-600'}`} dir="ltr">
-              {tr.scansRemaining}: {scansLeft}/{state.scanLimit}
-            </span>
-          </div>
+          {state.hasScanAccess ? (
+            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : 'bg-blue-50'}`}>
+              <span className="text-sm">⚡</span>
+              <span className={`text-xs font-semibold ${state.tier === 'premium' ? 'text-emerald-600' : 'text-blue-600'}`} dir="ltr">
+                {tr.scansRemaining}: {scansLeft}/{state.scanLimit}
+              </span>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenUpgrade}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 bg-slate-100 hover:bg-slate-200 transition-colors"
+            >
+              <Lock className="w-3 h-3 text-slate-500" />
+              <span className="text-xs font-semibold text-slate-500">{tr.scanRequiresPlan}</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* YouTube Code Widget (Free only) */}
-      {state.tier === 'free' && (
+      {/* YouTube Code Widget — unlocks Manual Entry ONLY, never OCR scanning */}
+      {!state.hasManualAccess && (
         <div className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 rounded-2xl p-4">
           <div className="flex items-start gap-3 mb-3">
             <div className="w-8 h-8 rounded-xl bg-rose-500 flex items-center justify-center shrink-0">

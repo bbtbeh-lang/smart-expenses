@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { AppState, Transaction, DraftTransaction, TransactionType, VALID_CODES, AccountType, Lang } from '@/lib/types';
+import { AppState, Transaction, DraftTransaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
 import NavBar, { NavTab } from '@/components/NavBar';
@@ -36,9 +36,11 @@ function freshState(lang: Lang = 'EN'): AppState {
     plan: 'free',
     billingPeriod: null,
     scansUsedThisPeriod: 0,
-    scanLimit: 5,
+    scanLimit: 0,
     currentPeriodEnd: null,
     subscriptionLoaded: false,
+    hasManualAccess: false,
+    hasScanAccess: false,
     codeActivated: false,
     scansUsedToday: 0,
     maxDailyScans: 10,
@@ -100,6 +102,8 @@ export default function Home() {
         currentPeriodEnd: sub.currentPeriodEnd,
         subscriptionLoaded: true,
         tier: sub.plan === 'free' ? 'free' : 'premium',
+        hasManualAccess: !!sub.hasManualAccess,
+        hasScanAccess: !!sub.hasScanAccess,
       }));
     } catch {
       // Network error — leave existing state as-is, will retry on next auth event.
@@ -205,34 +209,28 @@ export default function Home() {
     setState(prev => ({ ...prev, accountType: type, screen: 'dashboard' }));
   };
 
-  const handleApplyCode = (code: string): boolean => {
-    if (VALID_CODES.includes(code)) {
-      setState(prev => ({ ...prev, codeActivated: true, scansUsedToday: 0 }));
-      addToast(tr.codeSuccess, 'success');
-      return true;
-    }
-    const today = new Date().toISOString().slice(0, 10);
-    supabase
-      .from('daily_codes')
-      .select('uses, max_uses')
-      .eq('code', code)
-      .eq('valid_date', today)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error || !data || data.uses >= data.max_uses) {
-          addToast(tr.codeError, 'error');
-          return;
-        }
-        supabase
-          .from('daily_codes')
-          .update({ uses: data.uses + 1 })
-          .eq('code', code)
-          .then(() => {
-            setState(prev => ({ ...prev, codeActivated: true, scansUsedToday: 0 }));
-            addToast(tr.codeSuccess, 'success');
-          });
+  // Redeems today's code server-side. The server is the only place that can
+  // check "is this code still valid / under its cap / not already used by
+  // this user" and write the result — see /api/code/apply and the
+  // redeem_daily_code() database function for why this can't be done safely
+  // from the browser.
+  const handleApplyCode = async (code: string): Promise<{ success: boolean; message: string }> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return { success: false, message: 'not_authenticated' };
+    try {
+      const res = await fetch('/api/code/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ code }),
       });
-    return false;
+      const data = await res.json();
+      if (data.success) {
+        await refreshSubscription();
+      }
+      return { success: !!data.success, message: data.message || 'server_error' };
+    } catch {
+      return { success: false, message: 'server_error' };
+    }
   };
 
   const handleSaveManual = (tx: Transaction) => {
@@ -397,7 +395,8 @@ export default function Home() {
     tr,
     accountType: state.accountType || 'personal' as const,
     tier: state.tier,
-    codeActivated: state.codeActivated,
+    hasManualAccess: state.hasManualAccess,
+    hasScanAccess: state.hasScanAccess,
     scansUsedToday: state.scansUsedThisPeriod,
     maxDailyScans: state.scanLimit,
     customCategories: state.customCategories,
@@ -444,7 +443,7 @@ export default function Home() {
                 onApplyCode={handleApplyCode}
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
-                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, scansUsedToday: 0, tier: 'free' }))}
+                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, hasManualAccess: false, hasScanAccess: false, scansUsedToday: 0, tier: 'free' }))}
               />
             )}
             {activeTab === 'transactions' && (
