@@ -20,6 +20,7 @@ import PlanModal from '@/components/PlanModal';
 import BudgetModal from '@/components/BudgetModal';
 import Toast, { ToastMessage } from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
+import { syncTransactions, upsertTransaction, deleteTransactionRemote } from '@/lib/transactionSync';
 
 const STORAGE_KEY = 'finsnap_state_v1';
 
@@ -110,24 +111,36 @@ export default function Home() {
     }
   }, []);
 
+  // Pulls this user's transactions down from Supabase (and, the first time
+  // a device with pre-existing local data signs in, pushes those local
+  // transactions up once so they aren't lost) — see lib/transactionSync.ts.
+  const syncUserTransactions = useCallback(async (userId: string, localTx: Transaction[]) => {
+    const merged = await syncTransactions(userId, localTx);
+    setState(prev => ({ ...prev, transactions: merged }));
+  }, []);
+
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user && state.screen === 'auth') {
-        setState(prev => ({ ...loadState(), screen: 'onboarding', lang: prev.lang }));
+        const loaded = loadState();
+        setState(prev => ({ ...loaded, screen: 'onboarding', lang: prev.lang }));
         refreshSubscription();
+        syncUserTransactions(session.user.id, loaded.transactions);
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        const loaded = loadState();
         setState(prev => {
           if (prev.screen === 'auth') {
-            return { ...loadState(), screen: 'onboarding', lang: prev.lang };
+            return { ...loaded, screen: 'onboarding', lang: prev.lang };
           }
           return prev;
         });
         refreshSubscription();
+        syncUserTransactions(session.user.id, loaded.transactions);
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
       }
@@ -242,6 +255,9 @@ export default function Home() {
     }));
     setShowTransactionModal(false);
     addToast(`${tx.type === 'income' ? '💰' : '💸'} Transaction saved!`, 'success');
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) upsertTransaction(tx, user.id);
+    });
   };
 
   const handleUpdateTransaction = (tx: Transaction) => {
@@ -258,6 +274,9 @@ export default function Home() {
     });
     setEditingTransaction(null);
     addToast('Transaction updated!', 'success');
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) upsertTransaction(tx, user.id);
+    });
   };
 
   const handleDeleteTransaction = (id: string) => {
@@ -272,6 +291,7 @@ export default function Home() {
     });
     setEditingTransaction(null);
     addToast('Transaction deleted.', 'info');
+    deleteTransactionRemote(id);
   };
 
   const handleStartReceiptUpload = (type: TransactionType) => {
@@ -310,6 +330,9 @@ export default function Home() {
     }));
     setShowAIReview(null);
     addToast(`${tr.confirmSave}! Transaction added.`, 'success');
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) upsertTransaction(tx, user.id);
+    });
   };
 
   // Redirects to Stripe Checkout for the chosen plan/billing period.
