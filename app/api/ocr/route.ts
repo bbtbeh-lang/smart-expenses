@@ -86,9 +86,10 @@ Extract:
 2. date: date in YYYY-MM-DD format
 3. items: EVERY line item with name and price (number only)
 4. amount: final TOTAL (number only, no currency symbol)
+5. tax: the sales tax amount shown on the receipt (e.g. a line labeled "GST", "HST", "QST", "TPS", "TVQ", or "Tax"). Sum multiple tax lines if there are several. Use "" if no tax line is shown.
 
 Return ONLY valid JSON, no markdown:
-{"merchant":"","date":"YYYY-MM-DD","amount":"","items":[{"name":"","price":""}]}`
+{"merchant":"","date":"YYYY-MM-DD","amount":"","tax":"","items":[{"name":"","price":""}]}`
           }
         ]
       }]
@@ -111,6 +112,7 @@ Return ONLY valid JSON, no markdown:
       description,
       date: parsed.date || '',
       merchant: parsed.merchant || '',
+      tax: parsed.tax || '',
       items: (parsed.items || []).map((i: {name: string; price: string}) => ({
         name: i.name,
         price: parseFloat(i.price) || 0,
@@ -124,6 +126,6 @@ Return ONLY valid JSON, no markdown:
     });
   } catch (error) {
     console.error('OCR error:', error);
-    return Response.json({ amount: '', description: '', date: '', merchant: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
+    return Response.json({ amount: '', description: '', date: '', merchant: '', tax: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
   }
 }

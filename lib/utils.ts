@@ -6,12 +6,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function getCurrencySymbol(lang: Lang): string {
-  return lang === 'FA' ? 'تومان' : '$';
+// FinSnap is a Canadian-dollar product for the Canadian market — the
+// currency never changes with the UI language. Only the surrounding text
+// (labels, categories, etc.) is translated; showing amounts in Iranian
+// Toman for Persian-speaking users would be financially misleading, since
+// they're actually paying and being billed in CAD.
+export function getCurrencySymbol(_lang: Lang): string {
+  return '$';
 }
 
-// Returns e.g. "$1,234" or "1,234 تومان"
-export function formatCurrency(amount: number, lang: Lang, decimals = 0): string {
-  const num = amount.toFixed(decimals);
-  return lang === 'FA' ? `${num} تومان` : `$${num}`;
+// Returns e.g. "$1,234.00" — always CAD, with thousands separators.
+export function formatCurrency(amount: number, _lang: Lang, decimals = 2): string {
+  const formatted = amount.toLocaleString('en-CA', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `$${formatted}`;
 }

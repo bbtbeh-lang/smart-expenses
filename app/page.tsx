@@ -200,22 +200,46 @@ export default function Home() {
     setState(prev => ({ ...prev, lang }));
   };
 
-  const handleLogin = (email: string) => {
-    const isPremium = email.trim().toLowerCase() === 'bbtbeh@gmail.com';
-    setState(prev => ({
-      ...prev,
-      screen: 'onboarding',
-      ...(isPremium ? { tier: 'premium' as const } : {}),
-    }));
+  const handleLogin = (_email: string) => {
+    // Real plan/scan/manual-access status is always fetched from the
+    // server right after this (see the auth effect's refreshSubscription
+    // call) — there is no client-side shortcut to premium access.
+    setState(prev => ({ ...prev, screen: 'onboarding' }));
   };
 
   const handleLogout = () => {
     addToast(tr.signingOut, 'info');
-    setTimeout(() => {
+    setTimeout(async () => {
+      await supabase.auth.signOut();
       localStorage.removeItem(STORAGE_KEY);
       setState(freshState(state.lang));
       setActiveTab('dashboard');
     }, 1000);
+  };
+
+  // Deletes the account server-side (cascades to all of the user's data —
+  // see /api/account/delete), then ends the session and returns to the
+  // sign-in screen. There is no undo, which is why the confirmation lives
+  // in SettingsTab before this ever gets called.
+  const handleDeleteAccount = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    try {
+      const res = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        addToast('Failed to delete account. Please try again.', 'error');
+        return;
+      }
+      await supabase.auth.signOut();
+      localStorage.removeItem(STORAGE_KEY);
+      setState(freshState(state.lang));
+      setActiveTab('dashboard');
+    } catch {
+      addToast('Failed to delete account. Please try again.', 'error');
+    }
   };
 
   const handleSelectAccountType = (type: AccountType) => {
@@ -491,6 +515,7 @@ export default function Home() {
                 onOpenUpgrade={() => setShowUpgrade(true)}
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onLangToggle={toggleLang}
+                onDeleteAccount={handleDeleteAccount}
               />
             )}
           </>

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Globe, Bell, Shield, ChevronRight, Moon, Sun, Smartphone } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AppState, Lang } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 
 interface SettingsTabProps {
   state: AppState;
@@ -12,6 +13,7 @@ interface SettingsTabProps {
   onOpenUpgrade: () => void;
   onOpenPlanManager: () => void;
   onLangToggle: (lang: Lang) => void;
+  onDeleteAccount: () => Promise<void>;
 }
 
 const LANGS: { id: Lang; native: string; flag: string }[] = [
@@ -20,8 +22,26 @@ const LANGS: { id: Lang; native: string; flag: string }[] = [
   { id: 'FA', native: 'فارسی', flag: '🇮🇷' },
 ];
 
-export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpenPlanManager, onLangToggle }: SettingsTabProps) {
+export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpenPlanManager, onLangToggle, onDeleteAccount }: SettingsTabProps) {
   const [notifications, setNotifications] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserEmail(user?.email || null);
+    });
+  }, []);
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await onDeleteAccount();
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-5 pb-28 space-y-5">
@@ -34,7 +54,7 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
               <User className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="text-white font-bold">demo@finsnap.ai</div>
+              <div className="text-white font-bold">{userEmail || '—'}</div>
               <div className="text-emerald-100 text-xs mt-0.5 capitalize">{state.accountType} account</div>
             </div>
           </div>
@@ -130,16 +150,61 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
         </div>
         <div className="divide-y divide-slate-50">
           {[
-            { label: tr.settingsVersion, value: 'v1.0.0' },
-            { label: tr.settingsPrivacy, value: '→' },
-            { label: tr.settingsTerms, value: '→' },
-          ].map(({ label, value }) => (
-            <div key={label} className="px-5 py-3.5 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">{label}</span>
-              <span className="text-xs text-slate-400">{value}</span>
-            </div>
+            { label: tr.settingsVersion, value: 'v1.0.0', href: null },
+            { label: tr.settingsPrivacy, value: '→', href: '/privacy' },
+            { label: tr.settingsTerms, value: '→', href: '/terms' },
+          ].map(({ label, value, href }) => (
+            href ? (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+              >
+                <span className="text-sm font-medium text-slate-700">{label}</span>
+                <span className="text-xs text-slate-400">{value}</span>
+              </a>
+            ) : (
+              <div key={label} className="px-5 py-3.5 flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700">{label}</span>
+                <span className="text-xs text-slate-400">{value}</span>
+              </div>
+            )
           ))}
         </div>
+      </div>
+
+      {/* Danger Zone: delete account */}
+      <div className="bg-white border border-rose-100 rounded-2xl shadow-sm p-4">
+        {!confirmingDelete ? (
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            className="w-full text-center text-sm font-semibold text-rose-500 hover:text-rose-600 transition-colors"
+          >
+            {tr.deleteAccountBtn}
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-xs text-rose-600 text-center leading-relaxed">{tr.deleteAccountConfirm}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-sm transition-all"
+              >
+                {tr.cancel}
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleting}
+                className="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl text-sm transition-all disabled:opacity-60"
+              >
+                {deleting ? '…' : tr.deleteAccountConfirmBtn}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sign Out */}

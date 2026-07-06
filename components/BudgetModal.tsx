@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { X, Wallet, Plus, Trash2 } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AccountType, Lang } from '@/lib/types';
-import { getCurrencySymbol } from '@/lib/utils';
 
 const EXPENSE_CATS_PERSONAL = [
   'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
@@ -43,9 +42,6 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
     cats.forEach(c => { init[c] = budgets[c] ? String(budgets[c]) : ''; });
     return init;
   });
-
-  const currSym = getCurrencySymbol(lang);
-  const isFA = lang === 'FA';
 
   // Custom items: pre-populate from existing customCategories
   const [customItems, setCustomItems] = useState<CustomItem[]>(() =>
@@ -112,17 +108,16 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
             {cats.map(cat => (
               <div key={cat} className="flex items-center gap-3">
                 <div className="flex-1 text-sm font-medium text-slate-700">{(tr as any)[cat]}</div>
-                <div className={`relative w-36 ${isFA ? '' : ''}`} dir="ltr">
-                  {!isFA && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">$</span>}
+                <div className="relative w-36" dir="ltr">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">$</span>
                   <input
                     type="number"
                     inputMode="decimal"
                     value={values[cat] ?? ''}
                     onChange={e => setValues(prev => ({ ...prev, [cat]: e.target.value }))}
                     placeholder={tr.noBudget}
-                    className={`w-full ${!isFA ? 'pl-7' : 'pl-3'} pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all`}
+                    className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                   />
-                  {isFA && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">تومان</span>}
                 </div>
               </div>
             ))}
@@ -147,16 +142,15 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
                     />
                   </div>
                   <div className="relative w-28" dir="ltr">
-                    {!isFA && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">$</span>}
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">$</span>
                     <input
                       type="number"
                       inputMode="decimal"
                       value={item.amount}
                       onChange={e => setCustomItems(prev => prev.map(i => i.key === item.key ? { ...i, amount: e.target.value } : i))}
                       placeholder={tr.noBudget}
-                      className={`w-full ${!isFA ? 'pl-7' : 'pl-3'} pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all`}
+                      className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                     />
-                    {isFA && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">تومان</span>}
                   </div>
                   <button
                     onClick={() => handleRemoveCustom(item.key)}

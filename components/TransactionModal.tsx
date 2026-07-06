@@ -68,7 +68,9 @@ export default function TransactionModal({
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState('');
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
+  const [taxAmount, setTaxAmount] = useState<number | undefined>(editTransaction?.taxAmount);
   const [receiptHash, setReceiptHash] = useState<string | null>(null);
+  const [receiptImageBase64, setReceiptImageBase64] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -136,6 +138,7 @@ export default function TransactionModal({
         img.src = url;
       });
       setOcrProgress(60);
+      setReceiptImageBase64(base64);
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch('/api/ocr', {
         method: 'POST',
@@ -160,6 +163,7 @@ export default function TransactionModal({
       if (parsed.date) setDate(parsed.date);
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
       if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
+      if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
       if (parsed.duplicate?.isDuplicate) {
         setDuplicateWarning({
           matchedMerchant: parsed.duplicate.matchedMerchant,
@@ -203,6 +207,8 @@ export default function TransactionModal({
       date,
       hasReceipt: editTransaction?.hasReceipt ?? (step === 'manual' && ocrStatus !== 'idle'),
       items: receiptItems.length > 0 ? receiptItems : undefined,
+      taxAmount,
+      receiptHash: receiptHash || undefined,
     };
     if (isEditMode && onUpdate) {
       onUpdate(tx);
@@ -217,7 +223,13 @@ export default function TransactionModal({
         fetch('/api/receipts/record-scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ receiptHash, merchant: description, amount: parseFloat(amount), date }),
+          body: JSON.stringify({
+            receiptHash,
+            merchant: description,
+            amount: parseFloat(amount),
+            date,
+            image: receiptImageBase64,
+          }),
         }).catch(() => { /* non-critical — a missed fingerprint just means one fewer future duplicate check */ });
       });
     }

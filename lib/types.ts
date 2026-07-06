@@ -25,6 +25,7 @@ export interface Transaction {
   originalCurrency?: string;
   originalAmount?: number;
   items?: ReceiptItem[];
+  receiptHash?: string;
 }
 
 export interface DraftTransaction {
