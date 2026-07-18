@@ -1,7 +1,7 @@
 // @refresh reset
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState, Transaction, DraftTransaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
@@ -119,6 +119,11 @@ export default function Home() {
     setState(prev => ({ ...prev, transactions: merged }));
   }, []);
 
+  // Always reflects the latest in-memory transactions, so a resync never
+  // has to guess whether localStorage has caught up with the newest edit.
+  const transactionsRef = useRef<Transaction[]>(state.transactions);
+  useEffect(() => { transactionsRef.current = state.transactions; }, [state.transactions]);
+
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -130,7 +135,7 @@ export default function Home() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         const loaded = loadState();
         setState(prev => {
@@ -140,7 +145,15 @@ export default function Home() {
           return prev;
         });
         refreshSubscription();
-        syncUserTransactions(session.user.id, loaded.transactions);
+        // Subscription status is always safe to overwrite from the server —
+        // there's no "local edit" to lose there. Transactions are different:
+        // only resync them on an actual sign-in, using whatever is live in
+        // memory right now (not a localStorage snapshot) as the local side
+        // of the merge, so a periodic TOKEN_REFRESHED event firing moments
+        // after the user adds a transaction can never make it disappear.
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          syncUserTransactions(session.user.id, transactionsRef.current.length > 0 ? transactionsRef.current : loaded.transactions);
+        }
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
       }
@@ -418,26 +431,6 @@ export default function Home() {
   const isRtl = state.lang === 'FA';
   const isLoggedIn = state.screen !== 'auth';
 
-  // Asks the server whether this user still has scans left this billing
-  // period, and if so, atomically counts one against their limit. The
-  // limit is enforced server-side (Supabase) so it can't be bypassed by
-  // editing local state.
-  const incrementScan = async (): Promise<boolean> => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return false;
-    try {
-      const res = await fetch('/api/subscription/increment-scan', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      const data = await res.json();
-      setState(prev => ({ ...prev, scansUsedThisPeriod: data.scansUsed ?? prev.scansUsedThisPeriod }));
-      return !!data.allowed;
-    } catch {
-      return false;
-    }
-  };
-
   const transactionModalProps = {
     tr,
     accountType: state.accountType || 'personal' as const,
@@ -449,7 +442,7 @@ export default function Home() {
     customCategories: state.customCategories,
     onAddCustomCategory: handleAddCustomCategory,
     onStartReceiptUpload: handleStartReceiptUpload,
-    onIncrementScan: incrementScan,
+    onScanConsumed: (scansUsed: number) => setState(prev => ({ ...prev, scansUsedThisPeriod: scansUsed })),
     onOpenUpgrade: () => { setShowTransactionModal(false); setEditingTransaction(null); setShowUpgrade(true); },
     onScanBlocked: () => addToast(tr.scanLimitReached || 'You have reached your monthly scan limit for this plan.', 'error'),
   };

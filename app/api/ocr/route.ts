@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { computeReceiptHash, hammingDistance, DUPLICATE_THRESHOLD } from '@/lib/imageHash';
+import { consumeScan } from '@/lib/scanAccess';
 
 export const maxDuration = 30;
 
@@ -21,24 +22,36 @@ const DUPLICATE_LOOKBACK_DAYS = 180;
 
 export async function POST(req: Request) {
   try {
-    const { image, mimeType } = await req.json();
-    const safeMimeType = getSupportedMimeType(mimeType);
-
-    // Identify the user (if signed in) so we can check for duplicate scans.
-    // This never blocks OCR itself — if auth fails, we just skip the check.
+    // Gate access BEFORE doing anything expensive: OCR is exclusive to
+    // active, in-quota paid plans. This must happen before the Claude API
+    // call — not just in the UI — or this endpoint could be hit directly
+    // (bypassing the app entirely) for unlimited free scans.
     const authHeader = req.headers.get('authorization') || '';
     const token = authHeader.replace('Bearer ', '');
-    let userId: string | null = null;
-    if (token) {
-      const { data: userData } = await supabaseAdmin.auth.getUser(token);
-      userId = userData?.user?.id || null;
+    if (!token) {
+      return Response.json({ error: 'not_authenticated' }, { status: 401 });
     }
+    const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !userData?.user) {
+      return Response.json({ error: 'not_authenticated' }, { status: 401 });
+    }
+    const userId = userData.user.id;
+
+    const scanResult = await consumeScan(userId);
+    if (!scanResult.allowed) {
+      return Response.json(
+        { error: 'scan_not_allowed', scansUsed: scanResult.scansUsed, scanLimit: scanResult.scanLimit },
+        { status: 403 }
+      );
+    }
+
+    const { image, mimeType } = await req.json();
+    const safeMimeType = getSupportedMimeType(mimeType);
 
     // Kick off the duplicate check in parallel with the OCR call — they're
     // independent, so there's no reason to wait for one before the other.
     const imageBuffer = Buffer.from(image, 'base64');
     const duplicateCheckPromise = (async () => {
-      if (!userId) return { isDuplicate: false, receiptHash: null as string | null };
       try {
         const receiptHash = await computeReceiptHash(imageBuffer);
         const since = new Date(Date.now() - DUPLICATE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -123,6 +136,8 @@ Return ONLY valid JSON, no markdown:
         matchedDate: duplicateInfo.matchedDate || null,
       },
       receiptHash: duplicateInfo.receiptHash,
+      scansUsed: scanResult.scansUsed,
+      scanLimit: scanResult.scanLimit,
     });
   } catch (error) {
     console.error('OCR error:', error);

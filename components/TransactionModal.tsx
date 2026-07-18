@@ -25,7 +25,7 @@ interface TransactionModalProps {
   onUpdate?: (tx: Transaction) => void;
   onDelete?: (id: string) => void;
   onStartReceiptUpload: (type: TransactionType) => void;
-  onIncrementScan: () => Promise<boolean>;
+  onScanConsumed: (scansUsed: number) => void;
   onOpenUpgrade: () => void;
   onScanBlocked: () => void;
 }
@@ -50,7 +50,7 @@ export default function TransactionModal({
   tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
   editTransaction, customCategories = {}, onAddCustomCategory,
   onClose, onSaveManual, onUpdate, onDelete,
-  onStartReceiptUpload, onIncrementScan, onOpenUpgrade, onScanBlocked,
+  onStartReceiptUpload, onScanConsumed, onOpenUpgrade, onScanBlocked,
 }: TransactionModalProps) {
   const isEditMode = !!editTransaction;
 
@@ -101,11 +101,11 @@ export default function TransactionModal({
       onScanBlocked();
       return;
     }
-    const allowed = await onIncrementScan();
-    if (!allowed) {
-      onScanBlocked();
-      return;
-    }
+    // The actual, authoritative check-and-consume now happens atomically
+    // inside /api/ocr right before it spends money on the Claude API call
+    // — see runOcr's 403 handling below. This client-side check is just a
+    // fast, friendly guard to avoid an unnecessary round trip when we
+    // already know the answer.
     setStep('ocr');
   };
 
@@ -150,6 +150,11 @@ export default function TransactionModal({
       });
 
       if (!response.ok) {
+        if (response.status === 403) {
+          onScanBlocked();
+          setStep('receipt');
+          return;
+        }
         const errText = await response.text().catch(() => 'Unknown error');
         console.error('OCR API error:', response.status, errText);
         throw new Error(`OCR API returned ${response.status}`);
@@ -164,6 +169,7 @@ export default function TransactionModal({
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
       if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
+      if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
       if (parsed.duplicate?.isDuplicate) {
         setDuplicateWarning({
           matchedMerchant: parsed.duplicate.matchedMerchant,

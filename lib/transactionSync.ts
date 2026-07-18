@@ -40,11 +40,18 @@ function fromRow(row: Record<string, unknown>): Transaction {
 }
 
 /**
- * Fetches this user's transactions from Supabase. If the server has none
- * yet but the caller passes existing local transactions (from
- * localStorage, e.g. from before this device had server sync), those get
- * uploaded once so they aren't lost — after that, the server is always
- * the source of truth.
+ * Fetches this user's transactions from Supabase and merges them with
+ * whatever is currently showing locally.
+ *
+ * IMPORTANT: this never simply returns "whatever the server has" — a
+ * transaction the user just added might not have finished writing to the
+ * server yet (the write is fire-and-forget for a snappy UI), so blindly
+ * trusting a fresh SELECT here would make that transaction vanish from
+ * the screen the next time this runs (e.g. on the periodic auth-token
+ * refresh). Instead, anything present locally but missing from the
+ * server is (a) kept in the returned list so it never disappears, and
+ * (b) re-pushed to the server, which also self-heals any write that
+ * silently failed earlier.
  */
 export async function syncTransactions(userId: string, localTransactions: Transaction[]): Promise<Transaction[]> {
   const { data, error } = await supabase
@@ -58,14 +65,19 @@ export async function syncTransactions(userId: string, localTransactions: Transa
     return localTransactions; // fail safe: keep showing whatever was already on screen
   }
 
-  if ((data?.length || 0) === 0 && localTransactions.length > 0) {
-    const rows = localTransactions.map(tx => toRow(tx, userId));
-    const { error: insertError } = await supabase.from('transactions').insert(rows);
-    if (insertError) console.error('One-time local->server transaction migration failed:', insertError);
-    return localTransactions;
+  const serverTransactions = (data || []).map(fromRow);
+  const serverIds = new Set(serverTransactions.map(t => t.id));
+  const missingFromServer = localTransactions.filter(t => !serverIds.has(t.id));
+
+  if (missingFromServer.length > 0) {
+    const rows = missingFromServer.map(tx => toRow(tx, userId));
+    const { error: pushError } = await supabase.from('transactions').upsert(rows);
+    if (pushError) console.error('Failed to push local-only transactions to server:', pushError);
   }
 
-  return (data || []).map(fromRow);
+  const merged = [...serverTransactions, ...missingFromServer];
+  merged.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return merged;
 }
 
 export async function upsertTransaction(tx: Transaction, userId: string) {
