@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Globe, Bell, Shield, ChevronRight, Moon, Sun, Smartphone } from 'lucide-react';
+import { User, Globe, Bell, Shield, ChevronRight, Moon, Sun, Smartphone, Briefcase, Home } from 'lucide-react';
 import { Translations } from '@/lib/translations';
-import { AppState, Lang } from '@/lib/types';
+import { AppState, Lang, AccountType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
 interface SettingsTabProps {
@@ -14,6 +14,7 @@ interface SettingsTabProps {
   onOpenPlanManager: () => void;
   onLangToggle: (lang: Lang) => void;
   onDeleteAccount: () => Promise<void>;
+  onChangeAccountType: (type: AccountType) => void;
 }
 
 const LANGS: { id: Lang; native: string; flag: string }[] = [
@@ -22,7 +23,7 @@ const LANGS: { id: Lang; native: string; flag: string }[] = [
   { id: 'FA', native: 'فارسی', flag: '🇮🇷' },
 ];
 
-export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpenPlanManager, onLangToggle, onDeleteAccount }: SettingsTabProps) {
+export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpenPlanManager, onLangToggle, onDeleteAccount, onChangeAccountType }: SettingsTabProps) {
   const [notifications, setNotifications] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -98,6 +99,40 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
               <span className="text-xl">{lang.flag}</span>
               <span className="text-sm font-medium flex-1">{lang.native}</span>
               {state.lang === lang.id && (
+                <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Account Type */}
+      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-50">
+          <div className="flex items-center gap-2">
+            <Briefcase className="w-4 h-4 text-slate-400" />
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{tr.settingsAccountType}</span>
+          </div>
+        </div>
+        <div className="px-3 py-2 space-y-1">
+          {([
+            { id: 'personal' as AccountType, icon: Home, label: tr.personal },
+            { id: 'business' as AccountType, icon: Briefcase, label: tr.business },
+          ]).map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => onChangeAccountType(opt.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+                state.accountType === opt.id ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-50 text-slate-700'
+              }`}
+            >
+              <opt.icon className="w-4 h-4" />
+              <span className="text-sm font-medium flex-1">{opt.label}</span>
+              {state.accountType === opt.id && (
                 <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
                   <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />

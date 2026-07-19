@@ -171,6 +171,7 @@ export const t = {
     // Settings tab
     settingsManagePlan: 'Manage your plan',
     settingsLanguage: 'Language',
+    settingsAccountType: 'Account Type',
     settingsPreferences: 'Preferences',
     settingsNotifications: 'Daily reminders',
     settingsNotificationsDesc: 'Get reminded to log transactions',
@@ -371,6 +372,7 @@ export const t = {
     newCategoryLabel: 'Nom de la nouvelle catégorie',
     settingsManagePlan: 'Gérer votre abonnement',
     settingsLanguage: 'Langue',
+    settingsAccountType: 'Type de compte',
     settingsPreferences: 'Préférences',
     settingsNotifications: 'Rappels quotidiens',
     settingsNotificationsDesc: 'Rappel pour enregistrer vos transactions',
@@ -569,6 +571,7 @@ export const t = {
     newCategoryLabel: 'نام دسته جدید',
     settingsManagePlan: 'مدیریت اشتراک',
     settingsLanguage: 'زبان',
+    settingsAccountType: 'نوع حساب',
     settingsPreferences: 'تنظیمات',
     settingsNotifications: 'یادآوری روزانه',
     settingsNotificationsDesc: 'یادآوری برای ثبت تراکنش‌ها',

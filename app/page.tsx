@@ -259,6 +259,14 @@ export default function Home() {
     setState(prev => ({ ...prev, accountType: type, screen: 'dashboard' }));
   };
 
+  // Lets the user switch between Personal and Business later from Settings
+  // — previously this was a one-time choice made only during onboarding,
+  // with no way back.
+  const handleChangeAccountType = (type: AccountType) => {
+    setState(prev => ({ ...prev, accountType: type }));
+    addToast(tr.settingsAccountType + ': ' + (type === 'business' ? tr.business : tr.personal), 'success');
+  };
+
   // Redeems today's code server-side. The server is the only place that can
   // check "is this code still valid / under its cap / not already used by
   // this user" and write the result — see /api/code/apply and the
@@ -509,6 +517,7 @@ export default function Home() {
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onLangToggle={toggleLang}
                 onDeleteAccount={handleDeleteAccount}
+                onChangeAccountType={handleChangeAccountType}
               />
             )}
           </>
