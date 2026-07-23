@@ -56,6 +56,11 @@ export default function TransactionModal({
 
   const [step, setStep] = useState<ModalStep>(isEditMode ? 'manual' : 'type');
   const [txType, setTxType] = useState<TransactionType>(editTransaction?.type ?? 'expense');
+  // Which "bucket" this specific transaction belongs to. Defaults to the
+  // user's current global setting, but can be overridden per-transaction —
+  // e.g. someone in "Business" mode still occasionally logs a personal
+  // expense, and shouldn't have to leave the modal to do it.
+  const [txAccountType, setTxAccountType] = useState<AccountType>(editTransaction?.accountType ?? accountType);
   const [amount, setAmount] = useState(editTransaction ? String(editTransaction.amount) : '');
   const [description, setDescription] = useState(editTransaction?.description ?? '');
   const [category, setCategory] = useState(editTransaction?.category ?? '');
@@ -76,7 +81,7 @@ export default function TransactionModal({
 
   const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
   const scanExhausted = scansLeft <= 0;
-  const expenseCats = accountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
+  const expenseCats = txAccountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
   const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
 
@@ -92,7 +97,7 @@ export default function TransactionModal({
 
   const handleTypeSelect = (type: TransactionType) => {
     setTxType(type);
-    setCategory(type === 'income' ? 'catSalary' : (accountType === 'business' ? 'catBusinessMaterials' : 'catGroceries'));
+    setCategory(type === 'income' ? 'catSalary' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries'));
     setStep('receipt');
   };
 
@@ -207,6 +212,7 @@ export default function TransactionModal({
     const tx: Transaction = {
       id: editTransaction?.id ?? generateId(),
       type: txType,
+      accountType: txAccountType,
       amount: parseFloat(amount),
       description,
       category,
@@ -490,6 +496,33 @@ export default function TransactionModal({
           {/* Step: manual entry */}
           {step === 'manual' && (
             <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.settingsAccountType}</label>
+                <div className="flex gap-2">
+                  {(['personal', 'business'] as const).map(opt => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        setTxAccountType(opt);
+                        // Keep the category sane if it doesn't exist in the new bucket's list.
+                        if (txType === 'expense') {
+                          const nextCats = opt === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
+                          if (!nextCats.includes(category) && !customExpenseCatKeys.includes(category)) {
+                            setCategory(opt === 'business' ? 'catBusinessMaterials' : 'catGroceries');
+                          }
+                        }
+                      }}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                        txAccountType === opt ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {opt === 'business' ? `💼 ${tr.business}` : `🏠 ${tr.personal}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {ocrBanner && (
                 <div className={`flex items-center gap-2 text-xs font-medium rounded-xl px-3 py-2 ${ocrStatus === 'done' ? 'bg-emerald-50 text-emerald-700' : ocrStatus === 'error' ? 'bg-rose-50 text-rose-600' : ''}`}>
                   {ocrStatus === 'done' && <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
@@ -521,7 +554,7 @@ export default function TransactionModal({
                       key={t}
                       onClick={() => {
                         setTxType(t);
-                        const defaultCat = t === 'income' ? 'catSalary' : (accountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
+                        const defaultCat = t === 'income' ? 'catSalary' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
                         if (!cats.includes(category)) setCategory(defaultCat);
                       }}
                       className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${txType === t ? (t === 'income' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}

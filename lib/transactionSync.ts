@@ -6,6 +6,7 @@ function toRow(tx: Transaction, userId: string) {
     id: tx.id,
     user_id: userId,
     type: tx.type,
+    account_type: tx.accountType || 'personal',
     amount: tx.amount,
     description: tx.description,
     category: tx.category,
@@ -25,6 +26,7 @@ function fromRow(row: Record<string, unknown>): Transaction {
   return {
     id: row.id as string,
     type: row.type as Transaction['type'],
+    accountType: (row.account_type as Transaction['accountType']) || 'personal',
     amount: Number(row.amount),
     description: row.description as string,
     category: row.category as string,

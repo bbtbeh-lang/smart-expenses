@@ -1,7 +1,7 @@
 // @refresh reset
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState, Transaction, DraftTransaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
@@ -436,6 +436,23 @@ export default function Home() {
     setState(prev => ({ ...prev, customCategories: { ...prev.customCategories, [key]: label } }));
   };
 
+  // The single source of truth for which "bucket" is currently being
+  // viewed. Every list, chart, and total on screen is derived from this —
+  // switching it (from Settings or the header pill) instantly shows a
+  // completely separate slice of the data, never a mix of both.
+  const activeAccountType = state.accountType || 'personal';
+  const filteredTransactions = useMemo(
+    () => state.transactions.filter(t => (t.accountType || 'personal') === activeAccountType),
+    [state.transactions, activeAccountType]
+  );
+  // Dashboard reads several fields off of `state` directly (budgets,
+  // draftQueue, etc.) — swapping in the filtered list here means it stays
+  // untouched everywhere else while never seeing the other bucket's transactions.
+  const dashboardState = useMemo(
+    () => ({ ...state, transactions: filteredTransactions }),
+    [state, filteredTransactions]
+  );
+
   const isRtl = state.lang === 'FA';
   const isLoggedIn = state.screen !== 'auth';
 
@@ -467,6 +484,9 @@ export default function Home() {
         onLangToggle={toggleLang}
         onLogout={handleLogout}
         isLoggedIn={isLoggedIn}
+        accountType={state.accountType}
+        onChangeAccountType={handleChangeAccountType}
+        showAccountTypeSwitch={state.screen === 'dashboard'}
       />
 
       <main>
@@ -482,7 +502,7 @@ export default function Home() {
           <>
             {activeTab === 'dashboard' && (
               <Dashboard
-                state={state}
+                state={dashboardState}
                 tr={tr}
                 onAddTransaction={() => setShowTransactionModal(true)}
                 onOpenUpgrade={() => setShowUpgrade(true)}
@@ -496,7 +516,7 @@ export default function Home() {
             )}
             {activeTab === 'transactions' && (
               <TransactionsTab
-                transactions={state.transactions}
+                transactions={filteredTransactions}
                 tr={tr}
                 lang={state.lang}
                 onEdit={tx => setEditingTransaction(tx)}
@@ -504,7 +524,7 @@ export default function Home() {
             )}
             {activeTab === 'reports' && (
               <ReportsTab
-                transactions={state.transactions}
+                transactions={filteredTransactions}
                 lang={state.lang}
               />
             )}
@@ -591,7 +611,7 @@ export default function Home() {
           tr={tr}
           tier={state.tier}
           lang={state.lang}
-          transactions={state.transactions}
+          transactions={filteredTransactions}
           onClose={() => setShowTaxReport(false)}
           onOpenUpgrade={() => { setShowTaxReport(false); setShowUpgrade(true); }}
         />

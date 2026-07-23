@@ -30,7 +30,8 @@ export default function AIReviewModal({ tr, draftId, transactionType, accountTyp
     : (accountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
 
   const [category, setCategory] = useState(defaultCat);
-  const cats = transactionType === 'income' ? INCOME_CATS : (accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL);
+  const [txAccountType, setTxAccountType] = useState<AccountType>(accountType);
+  const cats = transactionType === 'income' ? INCOME_CATS : (txAccountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL);
 
   const mockData = {
     merchant: 'Costco Wholesale',
@@ -45,6 +46,7 @@ export default function AIReviewModal({ tr, draftId, transactionType, accountTyp
     const tx: Transaction = {
       id: generateId(),
       type: transactionType,
+      accountType: txAccountType,
       amount: mockData.convertedAmount,
       description: mockData.merchant,
       category,
@@ -85,6 +87,24 @@ export default function AIReviewModal({ tr, draftId, transactionType, accountTyp
           </div>
 
           <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.settingsAccountType}</label>
+              <div className="flex gap-2">
+                {(['personal', 'business'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setTxAccountType(opt)}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      txAccountType === opt ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {opt === 'business' ? `💼 ${tr.business}` : `🏠 ${tr.personal}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{tr.merchant}</span>
