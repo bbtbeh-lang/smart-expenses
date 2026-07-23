@@ -8,7 +8,7 @@ interface PricingTabProps {
   lang: Lang;
 }
 
-type OfferingType = 'product' | 'service';
+type OfferingType = 'product' | 'service' | 'trade';
 type CostMode = 'single' | 'items';
 
 interface CostItem {
@@ -44,6 +44,7 @@ const LABELS = {
     offeringLabel: 'What are you pricing?',
     offeringProduct: 'Physical Product',
     offeringService: 'Service / Freelance Work',
+    offeringTrade: 'Trade / Repair Work',
     costSection: 'Step 1 · Cost Breakdown',
     productName: 'Name',
     totalCost: 'Total Cost',
@@ -76,6 +77,7 @@ const LABELS = {
     offeringLabel: 'داری برای چی قیمت‌گذاری می‌کنی؟',
     offeringProduct: 'محصول فیزیکی',
     offeringService: 'خدمات / کار فریلنسری',
+    offeringTrade: 'خدمات فنی / تعمیراتی',
     costSection: 'مرحله ۱ · محاسبه هزینه‌ها',
     productName: 'نام',
     totalCost: 'مجموع هزینه',
@@ -123,6 +125,13 @@ const TYPE_LABELS = {
       cost3: 'Other Costs (travel, fees...)',
       quantity: 'Number of Clients / Projects',
     },
+    trade: {
+      namePlaceholder: 'e.g. Kitchen sink repair',
+      cost1: 'Parts / Materials Cost',
+      cost2: 'Labor / Time Cost',
+      cost3: 'Other Costs (travel, tools, fees...)',
+      quantity: 'Number of Jobs / Visits',
+    },
   },
   FA: {
     product: {
@@ -138,6 +147,13 @@ const TYPE_LABELS = {
       cost2: 'ابزار / نرم‌افزار / اشتراک‌ها',
       cost3: 'سایر هزینه‌ها (رفت‌وآمد، کارمزد...)',
       quantity: 'تعداد مشتری / پروژه',
+    },
+    trade: {
+      namePlaceholder: 'مثلاً تعمیر سینک ظرفشویی',
+      cost1: 'هزینه لوازم / قطعات مصرفی',
+      cost2: 'هزینه دستمزد و زمان',
+      cost3: 'سایر هزینه‌ها (رفت‌وآمد، ابزار، کارمزد...)',
+      quantity: 'تعداد سرویس / بازدید',
     },
   },
 };
@@ -372,16 +388,16 @@ export default function PricingTab({ lang }: PricingTabProps) {
       <div className="mb-4">
         <label className="text-xs font-semibold text-slate-600 mb-1.5 block">{L.offeringLabel}</label>
         <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1">
-          {(['product', 'service'] as OfferingType[]).map(t => (
+          {(['product', 'service', 'trade'] as OfferingType[]).map(t => (
             <button
               key={t}
               type="button"
               onClick={() => setOfferingType(t)}
-              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`flex-1 py-2 rounded-lg text-[11px] font-semibold transition-all ${
                 offeringType === t ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'
               }`}
             >
-              {t === 'product' ? L.offeringProduct : L.offeringService}
+              {t === 'product' ? L.offeringProduct : t === 'service' ? L.offeringService : L.offeringTrade}
             </button>
           ))}
         </div>
