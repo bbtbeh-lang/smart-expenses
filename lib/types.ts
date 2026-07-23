@@ -4,7 +4,6 @@ export type Tier = 'free' | 'premium';
 export type PlanId = 'free' | 'basic' | 'pro' | 'business';
 export type BillingPeriod = 'monthly' | 'yearly' | null;
 export type TransactionType = 'income' | 'expense';
-export type DraftStatus = 'processing' | 'ready';
 export type AppScreen = 'auth' | 'onboarding' | 'dashboard';
 
 export interface ReceiptItem {
@@ -29,13 +28,6 @@ export interface Transaction {
   receiptHash?: string;
 }
 
-export interface DraftTransaction {
-  id: string;
-  type: TransactionType;
-  status: DraftStatus;
-  createdAt: number;
-}
-
 export interface AppState {
   screen: AppScreen;
   lang: Lang;
@@ -53,7 +45,6 @@ export interface AppState {
   scansUsedToday: number;
   maxDailyScans: number;
   transactions: Transaction[];
-  draftQueue: DraftTransaction[];
   totalIncome: number;
   totalExpenses: number;
   budgets: Record<string, number>;
@@ -77,7 +68,6 @@ export const INITIAL_STATE: AppState = {
   scansUsedToday: 2,
   maxDailyScans: 2,
   transactions: [],
-  draftQueue: [],
   totalIncome: 0,
   totalExpenses: 0,
   budgets: {},

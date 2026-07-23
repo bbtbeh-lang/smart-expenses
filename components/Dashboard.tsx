@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Loader2, ChevronRight, Wallet, Lock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
-import { AppState, DraftTransaction, Transaction } from '@/lib/types';
+import { AppState, Transaction } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -15,7 +15,6 @@ interface DashboardProps {
   onAddTransaction: () => void;
   onOpenUpgrade: () => void;
   onOpenTaxReport: () => void;
-  onOpenAIReview: (draft: DraftTransaction) => void;
   onApplyCode: (code: string) => Promise<{ success: boolean; message: string }>;
   onOpenPlanManager: () => void;
   onOpenBudget: () => void;
@@ -70,7 +69,7 @@ function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
 }
 
 export default function Dashboard({
-  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onOpenAIReview, onApplyCode, onOpenPlanManager, onOpenBudget, onDemoReset,
+  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onOpenPlanManager, onOpenBudget, onDemoReset,
 }: DashboardProps) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -401,44 +400,6 @@ export default function Dashboard({
             <div className="text-xs text-slate-400">{tr.budgetTitle}</div>
           </div>
         </button>
-      )}
-
-      {/* Processing Queue */}
-      {state.draftQueue.length > 0 && (
-        <div>
-          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">{tr.processingQueue}</div>
-          <div className="space-y-2">
-            {state.draftQueue.map(draft => (
-              <div key={draft.id}>
-                {draft.status === 'processing' ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                      <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-700">{draft.type === 'income' ? '💰' : '💸'} {draft.type === 'income' ? tr.income : tr.expense}</div>
-                      <div className="text-xs text-slate-400 mt-0.5">{tr.aiParsing}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => onOpenAIReview(draft)}
-                    className="w-full bg-emerald-50 border-2 border-emerald-300 rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:bg-emerald-100 active:scale-[0.99] transition-all"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0">
-                      <span className="text-lg">{draft.type === 'income' ? '💰' : '💸'}</span>
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="text-sm font-bold text-emerald-800">{tr.readyForReview}</div>
-                      <div className="text-xs text-emerald-600 mt-0.5">{tr.tapToReview}</div>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-emerald-500 shrink-0" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* Recent Transactions */}

@@ -25,7 +25,6 @@ interface TransactionModalProps {
   onSaveManual: (tx: Transaction) => void;
   onUpdate?: (tx: Transaction) => void;
   onDelete?: (id: string) => void;
-  onStartReceiptUpload: (type: TransactionType) => void;
   onScanConsumed: (scansUsed: number) => void;
   onOpenUpgrade: () => void;
   onScanBlocked: () => void;
@@ -51,7 +50,7 @@ export default function TransactionModal({
   tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
   editTransaction, customCategories = {}, onAddCustomCategory,
   onClose, onSaveManual, onUpdate, onDelete,
-  onStartReceiptUpload, onScanConsumed, onOpenUpgrade, onScanBlocked,
+  onScanConsumed, onOpenUpgrade, onScanBlocked,
 }: TransactionModalProps) {
   const isEditMode = !!editTransaction;
 

@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { AppState, Transaction, DraftTransaction, TransactionType, AccountType, Lang } from '@/lib/types';
+import { AppState, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
 import NavBar, { NavTab } from '@/components/NavBar';
@@ -13,7 +13,6 @@ import TransactionsTab from '@/components/TransactionsTab';
 import ReportsTab from '@/components/ReportsTab';
 import SettingsTab from '@/components/SettingsTab';
 import TransactionModal from '@/components/TransactionModal';
-import AIReviewModal from '@/components/AIReviewModal';
 import TaxReportModal from '@/components/TaxReportModal';
 import UpgradeModal from '@/components/UpgradeModal';
 import PlanModal from '@/components/PlanModal';
@@ -46,7 +45,6 @@ function freshState(lang: Lang = 'EN'): AppState {
     scansUsedToday: 0,
     maxDailyScans: 10,
     transactions: [],
-    draftQueue: [],
     totalIncome: 0,
     totalExpenses: 0,
     budgets: {},
@@ -76,7 +74,6 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [showAIReview, setShowAIReview] = useState<DraftTransaction | null>(null);
   const [showTaxReport, setShowTaxReport] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showPlanManager, setShowPlanManager] = useState(false);
@@ -339,47 +336,6 @@ export default function Home() {
     deleteTransactionRemote(id);
   };
 
-  const handleStartReceiptUpload = (type: TransactionType) => {
-    const draftId = generateId();
-    const draft: DraftTransaction = {
-      id: draftId,
-      type,
-      status: 'processing',
-      createdAt: Date.now(),
-    };
-
-    setState(prev => ({
-      ...prev,
-      scansUsedToday: prev.tier === 'free' ? prev.scansUsedToday + 1 : prev.scansUsedToday,
-      draftQueue: [...prev.draftQueue, draft],
-    }));
-    setShowTransactionModal(false);
-    addToast('Receipt uploaded! AI is analyzing...', 'info');
-
-    setTimeout(() => {
-      setState(prev => ({
-        ...prev,
-        draftQueue: prev.draftQueue.map(d => d.id === draftId ? { ...d, status: 'ready' as const } : d),
-      }));
-      addToast('Receipt analysis complete! Tap to review.', 'success');
-    }, 3000);
-  };
-
-  const handleConfirmAIReview = (tx: Transaction) => {
-    setState(prev => ({
-      ...prev,
-      transactions: [...prev.transactions, tx],
-      totalIncome: tx.type === 'income' ? prev.totalIncome + tx.amount : prev.totalIncome,
-      totalExpenses: tx.type === 'expense' ? prev.totalExpenses + tx.amount : prev.totalExpenses,
-      draftQueue: prev.draftQueue.filter(d => d.id !== showAIReview?.id),
-    }));
-    setShowAIReview(null);
-    addToast(`${tr.confirmSave}! Transaction added.`, 'success');
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) upsertTransaction(tx, user.id);
-    });
-  };
-
   // Redirects to Stripe Checkout for the chosen plan/billing period.
   const handleStartCheckout = async (plan: 'basic' | 'pro' | 'business', billingPeriod: 'monthly' | 'yearly') => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -466,7 +422,6 @@ export default function Home() {
     maxDailyScans: state.scanLimit,
     customCategories: state.customCategories,
     onAddCustomCategory: handleAddCustomCategory,
-    onStartReceiptUpload: handleStartReceiptUpload,
     onScanConsumed: (scansUsed: number) => setState(prev => ({ ...prev, scansUsedThisPeriod: scansUsed })),
     onOpenUpgrade: () => { setShowTransactionModal(false); setEditingTransaction(null); setShowUpgrade(true); },
     onScanBlocked: () => addToast(tr.scanLimitReached || 'You have reached your monthly scan limit for this plan.', 'error'),
@@ -507,7 +462,6 @@ export default function Home() {
                 onAddTransaction={() => setShowTransactionModal(true)}
                 onOpenUpgrade={() => setShowUpgrade(true)}
                 onOpenTaxReport={() => setShowTaxReport(true)}
-                onOpenAIReview={draft => setShowAIReview(draft)}
                 onApplyCode={handleApplyCode}
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
@@ -591,20 +545,6 @@ export default function Home() {
           onSaveManual={handleSaveManual}
           onUpdate={handleUpdateTransaction}
           onDelete={handleDeleteTransaction}
-        />
-      )}
-
-      {showAIReview && (
-        <AIReviewModal
-          tr={tr}
-          draftId={showAIReview.id}
-          transactionType={showAIReview.type}
-          accountType={state.accountType || 'personal'}
-          lang={state.lang}
-          customCategories={state.customCategories}
-          onAddCustomCategory={handleAddCustomCategory}
-          onConfirm={handleConfirmAIReview}
-          onClose={() => setShowAIReview(null)}
         />
       )}
 
