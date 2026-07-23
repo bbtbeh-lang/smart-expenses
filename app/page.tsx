@@ -11,6 +11,7 @@ import OnboardingScreen from '@/components/OnboardingScreen';
 import Dashboard from '@/components/Dashboard';
 import TransactionsTab from '@/components/TransactionsTab';
 import ReportsTab from '@/components/ReportsTab';
+import PricingTab from '@/components/PricingTab';
 import SettingsTab from '@/components/SettingsTab';
 import TransactionModal from '@/components/TransactionModal';
 import TaxReportModal from '@/components/TaxReportModal';
@@ -482,6 +483,11 @@ export default function Home() {
                 lang={state.lang}
               />
             )}
+            {activeTab === 'pricing' && (
+              <PricingTab
+                lang={state.lang}
+              />
+            )}
             {activeTab === 'settings' && (
               <SettingsTab
                 state={state}
@@ -499,7 +505,7 @@ export default function Home() {
       </main>
 
       {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} />
+        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} lang={state.lang} />
       )}
 
       {state.screen === 'dashboard' && activeTab === 'dashboard' && (
