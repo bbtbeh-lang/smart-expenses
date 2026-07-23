@@ -8,6 +8,7 @@ interface PricingTabProps {
   lang: Lang;
 }
 
+type OfferingType = 'product' | 'service';
 type CostMode = 'single' | 'items';
 
 interface CostItem {
@@ -25,6 +26,7 @@ interface CostFieldState {
 interface SavedProduct {
   id: string;
   name: string;
+  offeringType: OfferingType;
   materialCost: number;
   packagingCost: number;
   otherCost: number;
@@ -38,14 +40,12 @@ const STORAGE_KEY = 'finsnap_pricing_v1';
 const LABELS = {
   EN: {
     title: '💰 Pricing & Profit Estimator',
-    subtitle: 'Work out what a product or order really costs you, then get a smart suggested selling price.',
+    subtitle: 'Work out what something really costs you, then get a smart suggested selling price.',
+    offeringLabel: 'What are you pricing?',
+    offeringProduct: 'Physical Product',
+    offeringService: 'Service / Freelance Work',
     costSection: 'Step 1 · Cost Breakdown',
-    productName: 'Product / Order Name',
-    productNamePlaceholder: 'e.g. Handmade candle - large',
-    materialCost: 'Materials / Ingredients Cost',
-    packagingCost: 'Packaging Cost',
-    otherCost: 'Other Costs (labor, shipping, fees...)',
-    quantity: 'Units Produced (batch size)',
+    productName: 'Name',
     totalCost: 'Total Cost',
     costPerUnit: 'Cost per Unit',
     priceSection: 'Step 2 · Smart Price Recommender',
@@ -57,9 +57,9 @@ const LABELS = {
     batchSummary: 'Batch Summary',
     totalRevenue: 'Total Revenue',
     totalProfit: 'Total Profit',
-    save: 'Save This Product',
-    saved: 'Saved Products',
-    noSaved: 'No saved products yet. Fill in the numbers above and save your first one.',
+    save: 'Save This',
+    saved: 'Saved Items',
+    noSaved: 'Nothing saved yet. Fill in the numbers above and save your first one.',
     delete: 'Delete',
     perUnit: 'per unit',
     modeSingle: 'One total',
@@ -72,14 +72,12 @@ const LABELS = {
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
-    subtitle: 'هزینه‌ی واقعی هر محصول یا سفارش را محاسبه کن و قیمت فروش پیشنهادی هوشمند دریافت کن.',
+    subtitle: 'هزینه‌ی واقعی چیزی که می‌فروشی را محاسبه کن و قیمت فروش پیشنهادی هوشمند دریافت کن.',
+    offeringLabel: 'داری برای چی قیمت‌گذاری می‌کنی؟',
+    offeringProduct: 'محصول فیزیکی',
+    offeringService: 'خدمات / کار فریلنسری',
     costSection: 'مرحله ۱ · محاسبه هزینه‌ها',
-    productName: 'نام محصول / سفارش',
-    productNamePlaceholder: 'مثلاً شمع دست‌ساز - بزرگ',
-    materialCost: 'هزینه مواد اولیه',
-    packagingCost: 'هزینه بسته‌بندی',
-    otherCost: 'سایر هزینه‌ها (دستمزد، ارسال، کارمزد...)',
-    quantity: 'تعداد تولید شده (اندازه دسته)',
+    productName: 'نام',
     totalCost: 'مجموع هزینه',
     costPerUnit: 'هزینه هر واحد',
     priceSection: 'مرحله ۲ · پیشنهاد هوشمند قیمت',
@@ -91,9 +89,9 @@ const LABELS = {
     batchSummary: 'خلاصه کل دسته',
     totalRevenue: 'مجموع درآمد',
     totalProfit: 'مجموع سود',
-    save: 'ذخیره این محصول',
-    saved: 'محصولات ذخیره‌شده',
-    noSaved: 'هنوز محصولی ذخیره نشده. اعداد بالا را وارد کن و اولین مورد را ذخیره کن.',
+    save: 'ذخیره',
+    saved: 'موارد ذخیره‌شده',
+    noSaved: 'هنوز چیزی ذخیره نشده. اعداد بالا را وارد کن و اولین مورد را ذخیره کن.',
     delete: 'حذف',
     perUnit: 'به ازای هر واحد',
     modeSingle: 'یک عدد کلی',
@@ -103,6 +101,44 @@ const LABELS = {
     addItem: '+ افزودن مورد',
     subtotal: 'جمع جزء',
     noItemsYet: 'هنوز موردی اضافه نشده.',
+  },
+};
+
+// Field labels/placeholders that change depending on whether the person is
+// pricing a physical product (materials, packaging...) or a service /
+// freelance job (time, tools...). Everything else in LABELS stays generic.
+const TYPE_LABELS = {
+  EN: {
+    product: {
+      namePlaceholder: 'e.g. Handmade candle - large',
+      cost1: 'Materials / Ingredients Cost',
+      cost2: 'Packaging Cost',
+      cost3: 'Other Costs (labor, shipping, fees...)',
+      quantity: 'Units Produced (batch size)',
+    },
+    service: {
+      namePlaceholder: 'e.g. Logo design package',
+      cost1: 'Time & Labor Cost',
+      cost2: 'Tools / Software / Subscriptions',
+      cost3: 'Other Costs (travel, fees...)',
+      quantity: 'Number of Clients / Projects',
+    },
+  },
+  FA: {
+    product: {
+      namePlaceholder: 'مثلاً شمع دست‌ساز - بزرگ',
+      cost1: 'هزینه مواد اولیه',
+      cost2: 'هزینه بسته‌بندی',
+      cost3: 'سایر هزینه‌ها (دستمزد، ارسال، کارمزد...)',
+      quantity: 'تعداد تولید شده (اندازه دسته)',
+    },
+    service: {
+      namePlaceholder: 'مثلاً پکیج طراحی لوگو',
+      cost1: 'هزینه زمان و دستمزد',
+      cost2: 'ابزار / نرم‌افزار / اشتراک‌ها',
+      cost3: 'سایر هزینه‌ها (رفت‌وآمد، کارمزد...)',
+      quantity: 'تعداد مشتری / پروژه',
+    },
   },
 };
 
@@ -253,6 +289,8 @@ export default function PricingTab({ lang }: PricingTabProps) {
   const isRtl = lang === 'FA';
   const L = isRtl ? LABELS.FA : LABELS.EN;
 
+  const [offeringType, setOfferingType] = useState<OfferingType>('product');
+  const FL = (isRtl ? TYPE_LABELS.FA : TYPE_LABELS.EN)[offeringType];
   const [name, setName] = useState('');
   const [material, setMaterial] = useState<CostFieldState>(emptyCostField);
   const [packaging, setPackaging] = useState<CostFieldState>(emptyCostField);
@@ -303,7 +341,8 @@ export default function PricingTab({ lang }: PricingTabProps) {
   const handleSave = () => {
     const entry: SavedProduct = {
       id: generateId(),
-      name: name.trim() || (isRtl ? 'محصول بدون نام' : 'Untitled product'),
+      name: name.trim() || (isRtl ? 'مورد بدون نام' : 'Untitled item'),
+      offeringType,
       materialCost: calc.materialTotal,
       packagingCost: calc.packagingTotal,
       otherCost: calc.otherTotal,
@@ -329,6 +368,25 @@ export default function PricingTab({ lang }: PricingTabProps) {
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
 
+      {/* Offering type: physical product vs service/freelance work — changes the wording below */}
+      <div className="mb-4">
+        <label className="text-xs font-semibold text-slate-600 mb-1.5 block">{L.offeringLabel}</label>
+        <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1">
+          {(['product', 'service'] as OfferingType[]).map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setOfferingType(t)}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
+                offeringType === t ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              {t === 'product' ? L.offeringProduct : L.offeringService}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Step 1: Cost breakdown */}
       <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-4 shadow-sm">
         <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
@@ -339,15 +397,15 @@ export default function PricingTab({ lang }: PricingTabProps) {
         <div className="space-y-4">
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder={FL.namePlaceholder} className={inputClass} />
           </div>
 
-          <CostFieldEditor label={L.materialCost} labels={L} isRtl={isRtl} state={material} onChange={setMaterial} />
-          <CostFieldEditor label={L.packagingCost} labels={L} isRtl={isRtl} state={packaging} onChange={setPackaging} />
-          <CostFieldEditor label={L.otherCost} labels={L} isRtl={isRtl} state={other} onChange={setOther} />
+          <CostFieldEditor label={FL.cost1} labels={L} isRtl={isRtl} state={material} onChange={setMaterial} />
+          <CostFieldEditor label={FL.cost2} labels={L} isRtl={isRtl} state={packaging} onChange={setPackaging} />
+          <CostFieldEditor label={FL.cost3} labels={L} isRtl={isRtl} state={other} onChange={setOther} />
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.quantity}</label>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">{FL.quantity}</label>
             <input type="number" min="1" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} className={inputClass} dir="ltr" />
           </div>
         </div>
