@@ -1,21 +1,25 @@
 'use client';
 
-import { LayoutDashboard, List, Settings, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, List, Settings, BarChart2, Calculator } from 'lucide-react';
 import { Translations } from '@/lib/translations';
+import { Lang } from '@/lib/types';
 
-export type NavTab = 'dashboard' | 'transactions' | 'reports' | 'settings';
+export type NavTab = 'dashboard' | 'transactions' | 'reports' | 'pricing' | 'settings';
 
 interface NavBarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   tr: Translations;
+  lang?: Lang;
 }
 
-export default function NavBar({ activeTab, onTabChange, tr }: NavBarProps) {
+export default function NavBar({ activeTab, onTabChange, tr, lang }: NavBarProps) {
+  const pricingLabel = lang === 'FA' ? 'قیمت‌گذاری' : 'Pricing';
   const tabs: { id: NavTab; icon: React.ReactNode; label: string }[] = [
     { id: 'dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: tr.navDashboard },
     { id: 'transactions', icon: <List className="w-5 h-5" />, label: tr.navTransactions },
     { id: 'reports', icon: <BarChart2 className="w-5 h-5" />, label: 'Reports' },
+    { id: 'pricing', icon: <Calculator className="w-5 h-5" />, label: pricingLabel },
     { id: 'settings', icon: <Settings className="w-5 h-5" />, label: tr.navSettings },
   ];
 
