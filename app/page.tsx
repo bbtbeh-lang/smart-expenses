@@ -601,6 +601,8 @@ export default function Home() {
           transactionType={showAIReview.type}
           accountType={state.accountType || 'personal'}
           lang={state.lang}
+          customCategories={state.customCategories}
+          onAddCustomCategory={handleAddCustomCategory}
           onConfirm={handleConfirmAIReview}
           onClose={() => setShowAIReview(null)}
         />

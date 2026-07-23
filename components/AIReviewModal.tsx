@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Transaction, AccountType, Lang } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getOrCreateCategoryKey } from '@/lib/utils';
 
 interface AIReviewModalProps {
   tr: Translations;
@@ -12,6 +12,8 @@ interface AIReviewModalProps {
   transactionType: 'income' | 'expense';
   accountType: AccountType;
   lang: Lang;
+  customCategories?: Record<string, string>;
+  onAddCustomCategory?: (key: string, label: string) => void;
   onConfirm: (tx: Transaction) => void;
   onClose: () => void;
 }
@@ -24,14 +26,29 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export default function AIReviewModal({ tr, draftId, transactionType, accountType, lang, onConfirm, onClose }: AIReviewModalProps) {
+export default function AIReviewModal({ tr, draftId, transactionType, accountType, lang, customCategories = {}, onAddCustomCategory, onConfirm, onClose }: AIReviewModalProps) {
   const defaultCat = transactionType === 'income'
     ? 'catFreelance'
     : (accountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
 
   const [category, setCategory] = useState(defaultCat);
   const [txAccountType, setTxAccountType] = useState<AccountType>(accountType);
-  const cats = transactionType === 'income' ? INCOME_CATS : (txAccountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL);
+  const [showNewCatInput, setShowNewCatInput] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState('');
+  const customExpenseCatKeys = Object.keys(customCategories);
+  const cats = transactionType === 'income'
+    ? INCOME_CATS
+    : [...(txAccountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL), ...customExpenseCatKeys];
+
+  const handleConfirmNewCategory = () => {
+    const label = newCatLabel.trim();
+    if (!label) return;
+    const { key } = getOrCreateCategoryKey(label, customCategories);
+    onAddCustomCategory?.(key, label);
+    setCategory(key);
+    setNewCatLabel('');
+    setShowNewCatInput(false);
+  };
 
   const mockData = {
     merchant: 'Costco Wholesale',
@@ -133,18 +150,58 @@ export default function AIReviewModal({ tr, draftId, transactionType, accountTyp
               <div className="relative">
                 <select
                   value={category}
-                  onChange={e => setCategory(e.target.value)}
+                  onChange={e => {
+                    if (e.target.value === '__add_new__') {
+                      setShowNewCatInput(true);
+                      setCategory('');
+                    } else {
+                      setCategory(e.target.value);
+                    }
+                  }}
                   className="w-full px-4 py-3 bg-slate-50 border-2 border-emerald-300 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all appearance-none font-medium"
                 >
                   {cats.map(c => (
-                    <option key={c} value={c}>{(tr as any)[c]}</option>
+                    <option key={c} value={c}>{(tr as any)[c] ?? customCategories[c] ?? c}</option>
                   ))}
+                  {transactionType === 'expense' && (
+                    <option value="__add_new__">{tr.addNewCategory}</option>
+                  )}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                   <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
+
+                {showNewCatInput && (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newCatLabel}
+                      onChange={e => setNewCatLabel(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleConfirmNewCategory(); } if (e.key === 'Escape') { setShowNewCatInput(false); setNewCatLabel(''); } }}
+                      placeholder={tr.newCategoryLabel}
+                      className="flex-1 px-3 py-2 bg-teal-50 border border-teal-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition-all"
+                      dir="auto"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleConfirmNewCategory}
+                      disabled={!newCatLabel.trim()}
+                      className="px-3 py-2 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      OK
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowNewCatInput(false); setNewCatLabel(''); }}
+                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition-all"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

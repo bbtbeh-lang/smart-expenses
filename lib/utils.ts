@@ -23,3 +23,26 @@ export function formatCurrency(amount: number, _lang: Lang, decimals = 2): strin
   });
   return `$${formatted}`;
 }
+
+// Custom categories are stored as { key: label }. Every place that lets a
+// user type a new category name (TransactionModal, BudgetModal, the AI
+// review screen) must go through this, or the same label ends up minted
+// as multiple distinct keys — which then get double-counted separately
+// in reports and budgets. If a category with the same label (trimmed,
+// case-insensitive) already exists, its key is reused; only a genuinely
+// new label gets a new key.
+export function getOrCreateCategoryKey(
+  label: string,
+  existingCustomCategories: Record<string, string>
+): { key: string; isNew: boolean } {
+  const trimmed = label.trim();
+  const normalized = trimmed.toLowerCase();
+  const existingEntry = Object.entries(existingCustomCategories).find(
+    ([, existingLabel]) => existingLabel.trim().toLowerCase() === normalized
+  );
+  if (existingEntry) {
+    return { key: existingEntry[0], isNew: false };
+  }
+  const slug = trimmed.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_\u0600-\u06FF]/g, '');
+  return { key: `custom_${slug}_${Date.now()}`, isNew: true };
+}

@@ -5,6 +5,7 @@ import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriang
 import { Translations } from '@/lib/translations';
 import { TransactionType, AccountType, Tier, Transaction, ReceiptItem } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { getOrCreateCategoryKey } from '@/lib/utils';
 
 type ModalStep = 'type' | 'receipt' | 'manual' | 'ocr';
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
@@ -88,7 +89,7 @@ export default function TransactionModal({
   const handleConfirmNewCategory = () => {
     const label = newCatLabel.trim();
     if (!label) return;
-    const key = 'custom_' + label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_\u0600-\u06FF]/g, '') + '_' + Date.now();
+    const { key } = getOrCreateCategoryKey(label, customCategories);
     onAddCustomCategory?.(key, label);
     setCategory(key);
     setNewCatLabel('');

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { X, Wallet, Plus, Trash2 } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AccountType, Lang } from '@/lib/types';
+import { getOrCreateCategoryKey } from '@/lib/utils';
 
 const EXPENSE_CATS_PERSONAL = [
   'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
@@ -30,10 +31,6 @@ interface BudgetModalProps {
   onClose: () => void;
 }
 
-function makeKey(label: string) {
-  return 'custom_' + label.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_\u0600-\u06FF]/g, '') + '_' + Date.now();
-}
-
 export default function BudgetModal({ tr, accountType, lang, budgets, customCategories, onSave, onClose }: BudgetModalProps) {
   const cats = accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
 
@@ -57,7 +54,17 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
   const handleAddCustom = () => {
     const label = newLabel.trim();
     if (!label) return;
-    setCustomItems(prev => [...prev, { key: makeKey(label), label, amount: '' }]);
+    // Check both what's already saved and what's been added in this
+    // session but not saved yet, so typing the same label twice in a row
+    // doesn't create two rows either.
+    const sessionLabels = Object.fromEntries(customItems.map(i => [i.key, i.label]));
+    const { key, isNew } = getOrCreateCategoryKey(label, { ...customCategories, ...sessionLabels });
+    if (!isNew && customItems.some(i => i.key === key)) {
+      // Already in the list — just focus attention there instead of duplicating.
+      setNewLabel('');
+      return;
+    }
+    setCustomItems(prev => [...prev, { key, label, amount: '' }]);
     setNewLabel('');
   };
 
