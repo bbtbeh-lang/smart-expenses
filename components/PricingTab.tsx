@@ -1,11 +1,25 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Calculator, Sparkles, Save, Trash2, Package } from 'lucide-react';
+import { Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash } from 'lucide-react';
 import { Lang } from '@/lib/types';
 
 interface PricingTabProps {
   lang: Lang;
+}
+
+type CostMode = 'single' | 'items';
+
+interface CostItem {
+  id: string;
+  name: string;
+  price: string;
+}
+
+interface CostFieldState {
+  mode: CostMode;
+  single: string;
+  items: CostItem[];
 }
 
 interface SavedProduct {
@@ -48,6 +62,13 @@ const LABELS = {
     noSaved: 'No saved products yet. Fill in the numbers above and save your first one.',
     delete: 'Delete',
     perUnit: 'per unit',
+    modeSingle: 'One total',
+    modeItems: 'Item by item',
+    itemName: 'Item name',
+    itemPrice: 'Price',
+    addItem: 'Add item',
+    subtotal: 'Subtotal',
+    noItemsYet: 'No items added yet.',
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
@@ -75,6 +96,13 @@ const LABELS = {
     noSaved: 'هنوز محصولی ذخیره نشده. اعداد بالا را وارد کن و اولین مورد را ذخیره کن.',
     delete: 'حذف',
     perUnit: 'به ازای هر واحد',
+    modeSingle: 'یک عدد کلی',
+    modeItems: 'مورد به مورد',
+    itemName: 'نام مورد',
+    itemPrice: 'قیمت',
+    addItem: '+ افزودن مورد',
+    subtotal: 'جمع جزء',
+    noItemsYet: 'هنوز موردی اضافه نشده.',
   },
 };
 
@@ -96,14 +124,139 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+function num(s: string) {
+  const v = parseFloat(s);
+  return isNaN(v) || v < 0 ? 0 : v;
+}
+
+function emptyCostField(): CostFieldState {
+  return { mode: 'single', single: '', items: [] };
+}
+
+function costFieldTotal(f: CostFieldState) {
+  if (f.mode === 'single') return num(f.single);
+  return f.items.reduce((s, it) => s + num(it.price), 0);
+}
+
+// A cost input that can be toggled between "one total number" and
+// "item by item" (add a row per ingredient/material/fee, auto-summed).
+function CostFieldEditor({
+  label,
+  labels,
+  isRtl,
+  state,
+  onChange,
+}: {
+  label: string;
+  labels: typeof LABELS.EN;
+  isRtl: boolean;
+  state: CostFieldState;
+  onChange: (next: CostFieldState) => void;
+}) {
+  const inputClass = 'w-full py-2.5 px-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400';
+  const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+
+  const addItem = () => {
+    onChange({ ...state, items: [...state.items, { id: generateId(), name: '', price: '' }] });
+  };
+  const updateItem = (id: string, patch: Partial<CostItem>) => {
+    onChange({ ...state, items: state.items.map(it => (it.id === id ? { ...it, ...patch } : it)) });
+  };
+  const removeItem = (id: string) => {
+    onChange({ ...state, items: state.items.filter(it => it.id !== id) });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs font-semibold text-slate-600">{label}</label>
+        <div className="flex bg-slate-100 rounded-lg p-0.5">
+          <button
+            type="button"
+            onClick={() => onChange({ ...state, mode: 'single' })}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${state.mode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
+          >
+            <Hash className="w-3 h-3" />
+            {labels.modeSingle}
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...state, mode: 'items', items: state.items.length ? state.items : [{ id: generateId(), name: '', price: '' }] })}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${state.mode === 'items' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
+          >
+            <ListPlus className="w-3 h-3" />
+            {labels.modeItems}
+          </button>
+        </div>
+      </div>
+
+      {state.mode === 'single' ? (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={state.single}
+          onChange={e => onChange({ ...state, single: e.target.value })}
+          placeholder="0.00"
+          className={inputClass}
+          dir="ltr"
+        />
+      ) : (
+        <div className="space-y-2">
+          {state.items.length === 0 && <p className="text-[11px] text-slate-400">{labels.noItemsYet}</p>}
+          {state.items.map(it => (
+            <div key={it.id} className="flex items-center gap-2">
+              <input
+                value={it.name}
+                onChange={e => updateItem(it.id, { name: e.target.value })}
+                placeholder={labels.itemName}
+                className={`${inputClass} flex-1`}
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={it.price}
+                onChange={e => updateItem(it.id, { price: e.target.value })}
+                placeholder={labels.itemPrice}
+                className={`${inputClass} w-24`}
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() => removeItem(it.id)}
+                className="text-slate-300 hover:text-rose-500 transition-colors p-1 shrink-0"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addItem}
+            className="flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 py-1"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {labels.addItem}
+          </button>
+          <div className="flex justify-between text-xs pt-1 border-t border-slate-100">
+            <span className="text-slate-500">{labels.subtotal}</span>
+            <span className="font-bold text-slate-800" dir="ltr">{fmt(costFieldTotal(state))}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PricingTab({ lang }: PricingTabProps) {
   const isRtl = lang === 'FA';
   const L = isRtl ? LABELS.FA : LABELS.EN;
 
   const [name, setName] = useState('');
-  const [materialCost, setMaterialCost] = useState('');
-  const [packagingCost, setPackagingCost] = useState('');
-  const [otherCost, setOtherCost] = useState('');
+  const [material, setMaterial] = useState<CostFieldState>(emptyCostField);
+  const [packaging, setPackaging] = useState<CostFieldState>(emptyCostField);
+  const [other, setOther] = useState<CostFieldState>(emptyCostField);
   const [quantity, setQuantity] = useState('1');
   const [marginPct, setMarginPct] = useState('30');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
@@ -114,19 +267,14 @@ export default function PricingTab({ lang }: PricingTabProps) {
 
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
 
-  const num = (s: string) => {
-    const v = parseFloat(s);
-    return isNaN(v) || v < 0 ? 0 : v;
-  };
-
   const calc = useMemo(() => {
-    const material = num(materialCost);
-    const packaging = num(packagingCost);
-    const other = num(otherCost);
+    const materialTotal = costFieldTotal(material);
+    const packagingTotal = costFieldTotal(packaging);
+    const otherTotal = costFieldTotal(other);
     const qty = Math.max(1, Math.round(num(quantity)) || 1);
     const margin = Math.min(95, Math.max(0, num(marginPct)));
 
-    const totalCost = material + packaging + other;
+    const totalCost = materialTotal + packagingTotal + otherTotal;
     const costPerUnit = totalCost / qty;
 
     // Margin here is defined as % of the SELLING PRICE (standard "profit margin"),
@@ -137,6 +285,9 @@ export default function PricingTab({ lang }: PricingTabProps) {
     const markupPct = costPerUnit > 0 ? (netProfitPerUnit / costPerUnit) * 100 : 0;
 
     return {
+      materialTotal,
+      packagingTotal,
+      otherTotal,
       totalCost,
       costPerUnit,
       qty,
@@ -147,15 +298,15 @@ export default function PricingTab({ lang }: PricingTabProps) {
       totalRevenue: suggestedPrice * qty,
       totalProfit: netProfitPerUnit * qty,
     };
-  }, [materialCost, packagingCost, otherCost, quantity, marginPct]);
+  }, [material, packaging, other, quantity, marginPct]);
 
   const handleSave = () => {
     const entry: SavedProduct = {
       id: generateId(),
       name: name.trim() || (isRtl ? 'محصول بدون نام' : 'Untitled product'),
-      materialCost: num(materialCost),
-      packagingCost: num(packagingCost),
-      otherCost: num(otherCost),
+      materialCost: calc.materialTotal,
+      packagingCost: calc.packagingTotal,
+      otherCost: calc.otherTotal,
       quantity: calc.qty,
       marginPct: num(marginPct),
       createdAt: Date.now(),
@@ -185,23 +336,16 @@ export default function PricingTab({ lang }: PricingTabProps) {
           {L.costSection}
         </h3>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
           </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.materialCost}</label>
-            <input type="number" min="0" step="0.01" value={materialCost} onChange={e => setMaterialCost(e.target.value)} placeholder="0.00" className={inputClass} dir="ltr" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.packagingCost}</label>
-            <input type="number" min="0" step="0.01" value={packagingCost} onChange={e => setPackagingCost(e.target.value)} placeholder="0.00" className={inputClass} dir="ltr" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.otherCost}</label>
-            <input type="number" min="0" step="0.01" value={otherCost} onChange={e => setOtherCost(e.target.value)} placeholder="0.00" className={inputClass} dir="ltr" />
-          </div>
+
+          <CostFieldEditor label={L.materialCost} labels={L} isRtl={isRtl} state={material} onChange={setMaterial} />
+          <CostFieldEditor label={L.packagingCost} labels={L} isRtl={isRtl} state={packaging} onChange={setPackaging} />
+          <CostFieldEditor label={L.otherCost} labels={L} isRtl={isRtl} state={other} onChange={setOther} />
+
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.quantity}</label>
             <input type="number" min="1" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} className={inputClass} dir="ltr" />
