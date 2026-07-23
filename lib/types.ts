@@ -15,6 +15,7 @@ export interface ReceiptItem {
 export interface Transaction {
   id: string;
   type: TransactionType;
+  accountType: AccountType;
   amount: number;
   description: string;
   category: string;
