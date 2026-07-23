@@ -8,7 +8,6 @@ interface PricingTabProps {
   lang: Lang;
 }
 
-type OfferingType = 'product' | 'service' | 'trade';
 type CostMode = 'single' | 'items';
 
 interface CostItem {
@@ -17,36 +16,46 @@ interface CostItem {
   price: string;
 }
 
-interface CostFieldState {
+// A single cost bucket the person defines themselves — e.g. "Materials",
+// "Labor", "Packaging", "Travel", "Software"... whatever fits their work.
+// This is intentionally NOT tied to any business type (product/service/
+// trade): the person names it, so it works for a candle maker, a plumber,
+// a designer, or anything else without us guessing their industry.
+interface CostCategory {
+  id: string;
+  name: string;
   mode: CostMode;
   single: string;
   items: CostItem[];
 }
 
+interface SavedCategorySnapshot {
+  name: string;
+  total: number;
+}
+
 interface SavedProduct {
   id: string;
   name: string;
-  offeringType: OfferingType;
-  materialCost: number;
-  packagingCost: number;
-  otherCost: number;
+  categories: SavedCategorySnapshot[];
   quantity: number;
   marginPct: number;
   createdAt: number;
 }
 
-const STORAGE_KEY = 'finsnap_pricing_v1';
+const STORAGE_KEY = 'finsnap_pricing_v2';
 
 const LABELS = {
   EN: {
     title: '💰 Pricing & Profit Estimator',
-    subtitle: 'Work out what something really costs you, then get a smart suggested selling price.',
-    offeringLabel: 'What are you pricing?',
-    offeringProduct: 'Physical Product',
-    offeringService: 'Service / Freelance Work',
-    offeringTrade: 'Trade / Repair Work',
+    subtitle: 'Add whatever cost categories fit your work — materials, labor, packaging, travel, tools, anything — then get a smart suggested selling price.',
     costSection: 'Step 1 · Cost Breakdown',
     productName: 'Name',
+    productNamePlaceholder: 'e.g. Handmade candle, Logo design, Sink repair...',
+    categoryNamePlaceholder: 'e.g. Materials, Labor, Packaging, Travel...',
+    addCategory: '+ Add Cost Category',
+    removeCategory: 'Remove category',
+    quantity: 'Quantity (units, clients, or jobs)',
     totalCost: 'Total Cost',
     costPerUnit: 'Cost per Unit',
     priceSection: 'Step 2 · Smart Price Recommender',
@@ -73,13 +82,14 @@ const LABELS = {
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
-    subtitle: 'هزینه‌ی واقعی چیزی که می‌فروشی را محاسبه کن و قیمت فروش پیشنهادی هوشمند دریافت کن.',
-    offeringLabel: 'داری برای چی قیمت‌گذاری می‌کنی؟',
-    offeringProduct: 'محصول فیزیکی',
-    offeringService: 'خدمات / کار فریلنسری',
-    offeringTrade: 'خدمات فنی / تعمیراتی',
+    subtitle: 'هر دسته‌ی هزینه‌ای که با کارت جور در میاد اضافه کن — مواد، دستمزد، بسته‌بندی، رفت‌وآمد، ابزار، هرچی — بعد قیمت فروش پیشنهادی هوشمند بگیر.',
     costSection: 'مرحله ۱ · محاسبه هزینه‌ها',
     productName: 'نام',
+    productNamePlaceholder: 'مثلاً شمع دست‌ساز، طراحی لوگو، تعمیر سینک...',
+    categoryNamePlaceholder: 'مثلاً مواد اولیه، دستمزد، بسته‌بندی، رفت‌وآمد...',
+    addCategory: '+ افزودن دسته‌ی هزینه',
+    removeCategory: 'حذف دسته',
+    quantity: 'تعداد (واحد، مشتری، یا سرویس)',
     totalCost: 'مجموع هزینه',
     costPerUnit: 'هزینه هر واحد',
     priceSection: 'مرحله ۲ · پیشنهاد هوشمند قیمت',
@@ -106,58 +116,6 @@ const LABELS = {
   },
 };
 
-// Field labels/placeholders that change depending on whether the person is
-// pricing a physical product (materials, packaging...) or a service /
-// freelance job (time, tools...). Everything else in LABELS stays generic.
-const TYPE_LABELS = {
-  EN: {
-    product: {
-      namePlaceholder: 'e.g. Handmade candle - large',
-      cost1: 'Materials / Ingredients Cost',
-      cost2: 'Packaging Cost',
-      cost3: 'Other Costs (labor, shipping, fees...)',
-      quantity: 'Units Produced (batch size)',
-    },
-    service: {
-      namePlaceholder: 'e.g. Logo design package',
-      cost1: 'Time & Labor Cost',
-      cost2: 'Tools / Software / Subscriptions',
-      cost3: 'Other Costs (travel, fees...)',
-      quantity: 'Number of Clients / Projects',
-    },
-    trade: {
-      namePlaceholder: 'e.g. Kitchen sink repair',
-      cost1: 'Parts / Materials Cost',
-      cost2: 'Labor / Time Cost',
-      cost3: 'Other Costs (travel, tools, fees...)',
-      quantity: 'Number of Jobs / Visits',
-    },
-  },
-  FA: {
-    product: {
-      namePlaceholder: 'مثلاً شمع دست‌ساز - بزرگ',
-      cost1: 'هزینه مواد اولیه',
-      cost2: 'هزینه بسته‌بندی',
-      cost3: 'سایر هزینه‌ها (دستمزد، ارسال، کارمزد...)',
-      quantity: 'تعداد تولید شده (اندازه دسته)',
-    },
-    service: {
-      namePlaceholder: 'مثلاً پکیج طراحی لوگو',
-      cost1: 'هزینه زمان و دستمزد',
-      cost2: 'ابزار / نرم‌افزار / اشتراک‌ها',
-      cost3: 'سایر هزینه‌ها (رفت‌وآمد، کارمزد...)',
-      quantity: 'تعداد مشتری / پروژه',
-    },
-    trade: {
-      namePlaceholder: 'مثلاً تعمیر سینک ظرفشویی',
-      cost1: 'هزینه لوازم / قطعات مصرفی',
-      cost2: 'هزینه دستمزد و زمان',
-      cost3: 'سایر هزینه‌ها (رفت‌وآمد، ابزار، کارمزد...)',
-      quantity: 'تعداد سرویس / بازدید',
-    },
-  },
-};
-
 function loadSaved(): SavedProduct[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -181,60 +139,81 @@ function num(s: string) {
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
-function emptyCostField(): CostFieldState {
-  return { mode: 'single', single: '', items: [] };
+function newCategory(): CostCategory {
+  return { id: generateId(), name: '', mode: 'single', single: '', items: [] };
 }
 
-function costFieldTotal(f: CostFieldState) {
-  if (f.mode === 'single') return num(f.single);
-  return f.items.reduce((s, it) => s + num(it.price), 0);
+function categoryTotal(c: CostCategory) {
+  if (c.mode === 'single') return num(c.single);
+  return c.items.reduce((s, it) => s + num(it.price), 0);
 }
 
-// A cost input that can be toggled between "one total number" and
-// "item by item" (add a row per ingredient/material/fee, auto-summed).
-function CostFieldEditor({
-  label,
+// One free-form cost bucket: an editable name (so it can be "Materials",
+// "Labor", "Travel", or anything else) plus a value that can be either a
+// single total or an item-by-item breakdown.
+function CostCategoryEditor({
   labels,
   isRtl,
-  state,
+  category,
   onChange,
+  onRemove,
+  canRemove,
 }: {
-  label: string;
   labels: typeof LABELS.EN;
   isRtl: boolean;
-  state: CostFieldState;
-  onChange: (next: CostFieldState) => void;
+  category: CostCategory;
+  onChange: (next: CostCategory) => void;
+  onRemove: () => void;
+  canRemove: boolean;
 }) {
   const inputClass = 'w-full py-2.5 px-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400';
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
 
   const addItem = () => {
-    onChange({ ...state, items: [...state.items, { id: generateId(), name: '', price: '' }] });
+    onChange({ ...category, items: [...category.items, { id: generateId(), name: '', price: '' }] });
   };
   const updateItem = (id: string, patch: Partial<CostItem>) => {
-    onChange({ ...state, items: state.items.map(it => (it.id === id ? { ...it, ...patch } : it)) });
+    onChange({ ...category, items: category.items.map(it => (it.id === id ? { ...it, ...patch } : it)) });
   };
   const removeItem = (id: string) => {
-    onChange({ ...state, items: state.items.filter(it => it.id !== id) });
+    onChange({ ...category, items: category.items.filter(it => it.id !== id) });
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="text-xs font-semibold text-slate-600">{label}</label>
+    <div className="border border-slate-100 rounded-xl p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          value={category.name}
+          onChange={e => onChange({ ...category, name: e.target.value })}
+          placeholder={labels.categoryNamePlaceholder}
+          className={`${inputClass} flex-1 font-semibold`}
+        />
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            title={labels.removeCategory}
+            className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex justify-end mb-2">
         <div className="flex bg-slate-100 rounded-lg p-0.5">
           <button
             type="button"
-            onClick={() => onChange({ ...state, mode: 'single' })}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${state.mode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
+            onClick={() => onChange({ ...category, mode: 'single' })}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${category.mode === 'single' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
           >
             <Hash className="w-3 h-3" />
             {labels.modeSingle}
           </button>
           <button
             type="button"
-            onClick={() => onChange({ ...state, mode: 'items', items: state.items.length ? state.items : [{ id: generateId(), name: '', price: '' }] })}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${state.mode === 'items' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
+            onClick={() => onChange({ ...category, mode: 'items', items: category.items.length ? category.items : [{ id: generateId(), name: '', price: '' }] })}
+            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${category.mode === 'items' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
           >
             <ListPlus className="w-3 h-3" />
             {labels.modeItems}
@@ -242,21 +221,21 @@ function CostFieldEditor({
         </div>
       </div>
 
-      {state.mode === 'single' ? (
+      {category.mode === 'single' ? (
         <input
           type="number"
           min="0"
           step="0.01"
-          value={state.single}
-          onChange={e => onChange({ ...state, single: e.target.value })}
+          value={category.single}
+          onChange={e => onChange({ ...category, single: e.target.value })}
           placeholder="0.00"
           className={inputClass}
           dir="ltr"
         />
       ) : (
         <div className="space-y-2">
-          {state.items.length === 0 && <p className="text-[11px] text-slate-400">{labels.noItemsYet}</p>}
-          {state.items.map(it => (
+          {category.items.length === 0 && <p className="text-[11px] text-slate-400">{labels.noItemsYet}</p>}
+          {category.items.map(it => (
             <div key={it.id} className="flex items-center gap-2">
               <input
                 value={it.name}
@@ -293,7 +272,7 @@ function CostFieldEditor({
           </button>
           <div className="flex justify-between text-xs pt-1 border-t border-slate-100">
             <span className="text-slate-500">{labels.subtotal}</span>
-            <span className="font-bold text-slate-800" dir="ltr">{fmt(costFieldTotal(state))}</span>
+            <span className="font-bold text-slate-800" dir="ltr">{fmt(categoryTotal(category))}</span>
           </div>
         </div>
       )}
@@ -305,12 +284,8 @@ export default function PricingTab({ lang }: PricingTabProps) {
   const isRtl = lang === 'FA';
   const L = isRtl ? LABELS.FA : LABELS.EN;
 
-  const [offeringType, setOfferingType] = useState<OfferingType>('product');
-  const FL = (isRtl ? TYPE_LABELS.FA : TYPE_LABELS.EN)[offeringType];
   const [name, setName] = useState('');
-  const [material, setMaterial] = useState<CostFieldState>(emptyCostField);
-  const [packaging, setPackaging] = useState<CostFieldState>(emptyCostField);
-  const [other, setOther] = useState<CostFieldState>(emptyCostField);
+  const [categories, setCategories] = useState<CostCategory[]>(() => [newCategory(), newCategory()]);
   const [quantity, setQuantity] = useState('1');
   const [marginPct, setMarginPct] = useState('30');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
@@ -321,14 +296,17 @@ export default function PricingTab({ lang }: PricingTabProps) {
 
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
 
+  const updateCategory = (id: string, next: CostCategory) => {
+    setCategories(prev => prev.map(c => (c.id === id ? next : c)));
+  };
+  const addCategory = () => setCategories(prev => [...prev, newCategory()]);
+  const removeCategory = (id: string) => setCategories(prev => prev.filter(c => c.id !== id));
+
   const calc = useMemo(() => {
-    const materialTotal = costFieldTotal(material);
-    const packagingTotal = costFieldTotal(packaging);
-    const otherTotal = costFieldTotal(other);
     const qty = Math.max(1, Math.round(num(quantity)) || 1);
     const margin = Math.min(95, Math.max(0, num(marginPct)));
 
-    const totalCost = materialTotal + packagingTotal + otherTotal;
+    const totalCost = categories.reduce((s, c) => s + categoryTotal(c), 0);
     const costPerUnit = totalCost / qty;
 
     // Margin here is defined as % of the SELLING PRICE (standard "profit margin"),
@@ -339,9 +317,6 @@ export default function PricingTab({ lang }: PricingTabProps) {
     const markupPct = costPerUnit > 0 ? (netProfitPerUnit / costPerUnit) * 100 : 0;
 
     return {
-      materialTotal,
-      packagingTotal,
-      otherTotal,
       totalCost,
       costPerUnit,
       qty,
@@ -352,16 +327,15 @@ export default function PricingTab({ lang }: PricingTabProps) {
       totalRevenue: suggestedPrice * qty,
       totalProfit: netProfitPerUnit * qty,
     };
-  }, [material, packaging, other, quantity, marginPct]);
+  }, [categories, quantity, marginPct]);
 
   const handleSave = () => {
     const entry: SavedProduct = {
       id: generateId(),
       name: name.trim() || (isRtl ? 'مورد بدون نام' : 'Untitled item'),
-      offeringType,
-      materialCost: calc.materialTotal,
-      packagingCost: calc.packagingTotal,
-      otherCost: calc.otherTotal,
+      categories: categories
+        .filter(c => categoryTotal(c) > 0 || c.name.trim())
+        .map(c => ({ name: c.name.trim() || (isRtl ? 'بدون‌نام' : 'Unnamed'), total: categoryTotal(c) })),
       quantity: calc.qty,
       marginPct: num(marginPct),
       createdAt: Date.now(),
@@ -384,25 +358,6 @@ export default function PricingTab({ lang }: PricingTabProps) {
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
 
-      {/* Offering type: physical product vs service/freelance work — changes the wording below */}
-      <div className="mb-4">
-        <label className="text-xs font-semibold text-slate-600 mb-1.5 block">{L.offeringLabel}</label>
-        <div className="flex gap-1.5 bg-slate-100 rounded-xl p-1">
-          {(['product', 'service', 'trade'] as OfferingType[]).map(t => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setOfferingType(t)}
-              className={`flex-1 py-2 rounded-lg text-[11px] font-semibold transition-all ${
-                offeringType === t ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500'
-              }`}
-            >
-              {t === 'product' ? L.offeringProduct : t === 'service' ? L.offeringService : L.offeringTrade}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Step 1: Cost breakdown */}
       <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-4 shadow-sm">
         <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-1.5">
@@ -410,18 +365,35 @@ export default function PricingTab({ lang }: PricingTabProps) {
           {L.costSection}
         </h3>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder={FL.namePlaceholder} className={inputClass} />
+            <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
           </div>
 
-          <CostFieldEditor label={FL.cost1} labels={L} isRtl={isRtl} state={material} onChange={setMaterial} />
-          <CostFieldEditor label={FL.cost2} labels={L} isRtl={isRtl} state={packaging} onChange={setPackaging} />
-          <CostFieldEditor label={FL.cost3} labels={L} isRtl={isRtl} state={other} onChange={setOther} />
+          {categories.map(c => (
+            <CostCategoryEditor
+              key={c.id}
+              labels={L}
+              isRtl={isRtl}
+              category={c}
+              onChange={next => updateCategory(c.id, next)}
+              onRemove={() => removeCategory(c.id)}
+              canRemove={categories.length > 1}
+            />
+          ))}
+
+          <button
+            type="button"
+            onClick={addCategory}
+            className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-emerald-300 text-emerald-600 hover:bg-emerald-50 text-xs font-semibold rounded-xl transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {L.addCategory}
+          </button>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{FL.quantity}</label>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.quantity}</label>
             <input type="number" min="1" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} className={inputClass} dir="ltr" />
           </div>
         </div>
@@ -506,7 +478,7 @@ export default function PricingTab({ lang }: PricingTabProps) {
         </button>
       </div>
 
-      {/* Saved products */}
+      {/* Saved items */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
         <div className="p-4 border-b border-slate-100">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
@@ -519,7 +491,7 @@ export default function PricingTab({ lang }: PricingTabProps) {
         ) : (
           <div className="divide-y divide-slate-50">
             {saved.map(p => {
-              const totalCost = p.materialCost + p.packagingCost + p.otherCost;
+              const totalCost = p.categories.reduce((s, c) => s + c.total, 0);
               const costPerUnit = totalCost / p.quantity;
               const margin = Math.min(95, Math.max(0, p.marginPct));
               const price = margin >= 95 ? costPerUnit : costPerUnit / (1 - margin / 100);
