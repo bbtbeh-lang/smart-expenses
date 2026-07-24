@@ -14,7 +14,7 @@ interface NavBarProps {
 }
 
 export default function NavBar({ activeTab, onTabChange, tr, lang }: NavBarProps) {
-  const pricingLabel = lang === 'FA' ? 'قیمت‌گذاری' : 'Pricing';
+  const pricingLabel = lang === 'FA' ? 'قیمت‌گذاری و برآورد سود' : 'Pricing & Profit Estimator';
   const tabs: { id: NavTab; icon: React.ReactNode; label: string }[] = [
     { id: 'dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: tr.navDashboard },
     { id: 'transactions', icon: <List className="w-5 h-5" />, label: tr.navTransactions },
