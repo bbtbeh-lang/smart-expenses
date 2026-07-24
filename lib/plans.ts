@@ -17,7 +17,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
   basic: {
     id: 'basic',
     name: 'Basic',
-    scanLimit: 30,
+    scanLimit: 50,
     monthlyPriceId: 'price_1ToFJsQyfdnvMWfzwnEhY2GB',
     yearlyPriceId: 'price_1ToFPIQyfdnvMWfzdxGkn9Zn',
     monthlyPriceCAD: 6.99,
@@ -26,7 +26,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    scanLimit: 200,
+    scanLimit: 250,
     monthlyPriceId: 'price_1ToFR6QyfdnvMWfz3t79GkxA',
     yearlyPriceId: 'price_1ToFRrQyfdnvMWfz5RohddTE',
     monthlyPriceCAD: 19.99,
@@ -35,7 +35,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
   business: {
     id: 'business',
     name: 'Business',
-    scanLimit: 500,
+    scanLimit: 600,
     monthlyPriceId: 'price_1ToFSwQyfdnvMWfzvWKOTJBn',
     yearlyPriceId: 'price_1ToFTaQyfdnvMWfzPKRNZd5w',
     monthlyPriceCAD: 39.99,
