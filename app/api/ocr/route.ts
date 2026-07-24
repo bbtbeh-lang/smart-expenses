@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { computeReceiptHash, hammingDistance, DUPLICATE_THRESHOLD } from '@/lib/imageHash';
-import { consumeScan } from '@/lib/scanAccess';
+import { consumeScan, refundScan } from '@/lib/scanAccess';
 
 export const maxDuration = 30;
 
@@ -21,6 +21,10 @@ function getSupportedMimeType(mimeType: string): ImageMediaType {
 const DUPLICATE_LOOKBACK_DAYS = 180;
 
 export async function POST(req: Request) {
+  let userId: string | null = null;
+  let scanConsumed = false;
+  let scanResult: { scansUsed: number; scanLimit: number } = { scansUsed: 0, scanLimit: 0 };
+
   try {
     // Gate access BEFORE doing anything expensive: OCR is exclusive to
     // active, in-quota paid plans. This must happen before the Claude API
@@ -35,15 +39,20 @@ export async function POST(req: Request) {
     if (authError || !userData?.user) {
       return Response.json({ error: 'not_authenticated' }, { status: 401 });
     }
-    const userId = userData.user.id;
+    userId = userData.user.id;
 
-    const scanResult = await consumeScan(userId);
-    if (!scanResult.allowed) {
+    const consumeResult = await consumeScan(userId);
+    if (!consumeResult.allowed) {
       return Response.json(
-        { error: 'scan_not_allowed', scansUsed: scanResult.scansUsed, scanLimit: scanResult.scanLimit },
+        { error: 'scan_not_allowed', scansUsed: consumeResult.scansUsed, scanLimit: consumeResult.scanLimit },
         { status: 403 }
       );
     }
+    // From this point on, a scan has been counted against the user's quota.
+    // If anything below fails, the catch block refunds it, since the user
+    // hasn't actually received a result yet.
+    scanConsumed = true;
+    scanResult = consumeResult;
 
     const { image, mimeType } = await req.json();
     const safeMimeType = getSupportedMimeType(mimeType);
@@ -141,6 +150,9 @@ Return ONLY valid JSON, no markdown:
     });
   } catch (error) {
     console.error('OCR error:', error);
+    if (scanConsumed && userId) {
+      await refundScan(userId);
+    }
     return Response.json({ amount: '', description: '', date: '', merchant: '', tax: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
   }
 }

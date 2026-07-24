@@ -193,7 +193,7 @@ export default function TransactionModal({
       setOcrBanner('OCR failed — please enter details manually.');
       setTimeout(() => setStep('manual'), 1200);
     }
-  }, [tr.ocrScanning, tr.ocrReady]);
+  }, [tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed]);
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
