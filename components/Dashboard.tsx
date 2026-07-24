@@ -6,6 +6,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Pi
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
+import { PLANS } from '@/lib/plans';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
 
@@ -151,6 +152,15 @@ export default function Dashboard({
     else onOpenUpgrade();
   };
 
+  // In-app renewal reminder: only for active paid plans, shown within the
+  // final 3 days of the current billing period (mirrors the Stripe
+  // `invoice.upcoming` email reminder sent server-side).
+  const daysUntilRenewal = state.currentPeriodEnd
+    ? Math.ceil((new Date(state.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  const showRenewalBanner = state.tier === 'premium' && daysUntilRenewal !== null && daysUntilRenewal <= 3 && daysUntilRenewal >= 0;
+  const renewalDateLabel = state.currentPeriodEnd ? new Date(state.currentPeriodEnd).toLocaleDateString() : '';
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-5 pb-28 space-y-4">
 
@@ -194,6 +204,26 @@ export default function Dashboard({
           )}
         </div>
       </div>
+
+      {/* Renewal reminder — active paid plan, 3 days or fewer left */}
+      {showRenewalBanner && (
+        <button
+          onClick={onOpenPlanManager}
+          className="w-full text-left bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-rose-100 transition-colors"
+        >
+          <span className="text-lg leading-none mt-0.5">⏰</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-rose-700">{tr.renewalBannerTitle}</div>
+            <div className="text-xs text-rose-600 mt-0.5">
+              {tr.renewalBannerBody
+                .replace('{plan}', state.plan !== 'free' ? PLANS[state.plan].name : state.plan)
+                .replace('{date}', renewalDateLabel)
+                .replace('{days}', String(daysUntilRenewal))}
+            </div>
+          </div>
+          <span className="text-xs font-bold text-rose-700 whitespace-nowrap self-center">{tr.renewalBannerCta} →</span>
+        </button>
+      )}
 
       {/* YouTube Code Widget — unlocks Manual Entry ONLY, never OCR scanning */}
       {!state.hasManualAccess && (

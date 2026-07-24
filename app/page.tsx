@@ -383,9 +383,11 @@ export default function Home() {
     }
   };
 
-  // Opens the Stripe Customer Portal so an already-subscribed user can
-  // upgrade, downgrade, change billing period, or cancel — Stripe handles
-  // all of that natively, so we don't need to build it ourselves.
+  // Opens the Stripe Customer Portal for payment-method updates, invoice
+  // history, and cancellation. In-app plan upgrades/downgrades now go
+  // through UpgradeModal -> handleStartCheckout (see PlanModal's
+  // "changePlanBtn"), so users no longer have to leave FinSnap just to
+  // move to a higher tier.
   const handleManageSubscription = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
@@ -604,6 +606,7 @@ export default function Home() {
           currentPeriodEnd={state.currentPeriodEnd}
           onClose={() => setShowPlanManager(false)}
           onManageSubscription={handleManageSubscription}
+          onOpenUpgrade={() => { setShowPlanManager(false); setShowUpgrade(true); }}
         />
       )}
 

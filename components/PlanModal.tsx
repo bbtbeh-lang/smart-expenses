@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Zap, ExternalLink } from 'lucide-react';
+import { X, Zap, ExternalLink, ArrowUpCircle } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { PlanId, BillingPeriod } from '@/lib/types';
 import { PLANS } from '@/lib/plans';
@@ -13,9 +13,10 @@ interface PlanModalProps {
   currentPeriodEnd: string | null;
   onClose: () => void;
   onManageSubscription: () => Promise<void> | void;
+  onOpenUpgrade: () => void;
 }
 
-export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, onClose, onManageSubscription }: PlanModalProps) {
+export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, onClose, onManageSubscription, onOpenUpgrade }: PlanModalProps) {
   const [loading, setLoading] = useState(false);
 
   const handleManage = async () => {
@@ -29,6 +30,15 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
 
   const planConfig = plan !== 'free' ? PLANS[plan] : null;
   const renewalDate = currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString() : null;
+  const daysUntilRenewal = currentPeriodEnd
+    ? Math.ceil((new Date(currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  const renewalSoon = daysUntilRenewal !== null && daysUntilRenewal <= 3 && daysUntilRenewal >= 0;
+
+  const handleUpgradeClick = () => {
+    onClose();
+    onOpenUpgrade();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -66,18 +76,33 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
               <span className="ml-auto text-xs font-bold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">{tr.planActive}</span>
             </div>
             {renewalDate && (
-              <div className="text-xs text-amber-700 mt-3 border-t border-amber-200 pt-3">
+              <div className={`text-xs mt-3 border-t border-amber-200 pt-3 ${renewalSoon ? 'text-rose-600 font-semibold' : 'text-amber-700'}`}>
                 {tr.renewsOn}: {renewalDate}
+                {renewalSoon && (
+                  <span className="block mt-1 text-rose-600">
+                    {tr.renewalReminderSoon.replace('{days}', String(daysUntilRenewal))}
+                  </span>
+                )}
               </div>
             )}
           </div>
 
           <p className="text-sm text-slate-500 mb-4 leading-relaxed">{tr.manageSubscriptionDesc}</p>
 
+          {/* In-app plan change / upgrade — does NOT leave FinSnap */}
+          <button
+            onClick={handleUpgradeClick}
+            className="w-full py-3.5 mb-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
+            <ArrowUpCircle className="w-4 h-4" />
+            {tr.changePlanBtn}
+          </button>
+
+          {/* Stripe-hosted portal — payment method, invoices, cancellation */}
           <button
             onClick={handleManage}
             disabled={loading}
-            className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+            className="w-full py-3.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
           >
             {loading ? (
               <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
