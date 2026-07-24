@@ -337,14 +337,36 @@ export default function Home() {
     deleteTransactionRemote(id);
   };
 
-  // Redirects to Stripe Checkout for the chosen plan/billing period.
+  // Starts a brand-new Stripe subscription (free users) via Checkout, OR
+  // upgrades/downgrades an existing active subscription in-place with
+  // proration (no duplicate subscriptions, no double billing).
   const handleStartCheckout = async (plan: 'basic' | 'pro' | 'business', billingPeriod: 'monthly' | 'yearly') => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
       addToast(tr.signingOut, 'error');
       return;
     }
+
+    const hasActivePlan = state.plan && state.plan !== 'free';
+
     try {
+      if (hasActivePlan) {
+        const res = await fetch('/api/stripe/change-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ plan, billingPeriod }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          addToast(data.isUpgrade ? tr.planUpgraded : tr.planChanged, 'success');
+          setShowUpgrade(false);
+          await refreshSubscription();
+        } else {
+          addToast(data.error || 'Plan change failed', 'error');
+        }
+        return;
+      }
+
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
