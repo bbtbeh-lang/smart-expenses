@@ -41,15 +41,22 @@ export async function GET(req: NextRequest) {
     .from('subscriptions')
     .select('user_id, plan, billing_period, status, scans_used_this_period, current_period_end, stripe_customer_id');
 
+  const { data: profiles } = await supabaseAdmin
+    .from('user_profiles')
+    .select('user_id, birth_date');
+
   const subsByUserId = new Map((subs || []).map(s => [s.user_id, s]));
+  const profileByUserId = new Map((profiles || []).map(p => [p.user_id, p]));
 
   const customers = allUsers
     .map(u => {
       const sub = subsByUserId.get(u.id);
+      const profile = profileByUserId.get(u.id);
       return {
         userId: u.id,
         email: u.email,
         createdAt: u.created_at,
+        birthDate: profile?.birth_date ?? null,
         plan: sub?.plan ?? 'free',
         billingPeriod: sub?.billing_period ?? null,
         status: sub?.status ?? 'inactive',

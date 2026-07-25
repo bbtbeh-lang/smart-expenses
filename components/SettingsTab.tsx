@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Globe, Bell, Shield, ChevronRight, Moon, Sun, Smartphone, Briefcase, Home } from 'lucide-react';
+import { User, Globe, Bell, Shield, ChevronRight, Moon, Sun, Smartphone, Briefcase, Home, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AppState, Lang, AccountType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -28,12 +28,45 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [birthDate, setBirthDate] = useState('');
+  const [birthDateSaved, setBirthDateSaved] = useState('');
+  const [savingBirthDate, setSavingBirthDate] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserEmail(user?.email || null);
     });
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/profile', { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.birthDate) {
+        setBirthDate(data.birthDate);
+        setBirthDateSaved(data.birthDate);
+      }
+    })();
+  }, []);
+
+  const handleSaveBirthDate = async () => {
+    setSavingBirthDate(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ birthDate: birthDate || null }),
+      });
+      if (res.ok) setBirthDateSaved(birthDate);
+    } finally {
+      setSavingBirthDate(false);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     setDeleting(true);
@@ -75,6 +108,35 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors" />
+          </button>
+        </div>
+      </div>
+
+      {/* Personal Info */}
+      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-50">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-slate-400" />
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{tr.settingsPersonalInfo}</span>
+          </div>
+        </div>
+        <div className="px-5 py-4 flex items-center gap-3">
+          <div className="flex-1">
+            <label className="block text-xs text-slate-400 mb-1">{tr.settingsBirthDate}</label>
+            <input
+              type="date"
+              value={birthDate}
+              onChange={e => setBirthDate(e.target.value)}
+              dir="ltr"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+            />
+          </div>
+          <button
+            onClick={handleSaveBirthDate}
+            disabled={savingBirthDate || birthDate === birthDateSaved}
+            className="px-4 py-2.5 mt-5 bg-slate-900 text-white text-sm font-semibold rounded-xl disabled:opacity-40 transition-all active:scale-[0.98]"
+          >
+            {savingBirthDate ? '…' : tr.settingsSaveBirthDate}
           </button>
         </div>
       </div>

@@ -15,6 +15,7 @@ interface Customer {
   userId: string;
   email: string | null;
   createdAt: string;
+  birthDate: string | null;
   plan: 'free' | 'basic' | 'pro' | 'business';
   billingPeriod: 'monthly' | 'yearly' | null;
   status: 'inactive' | 'active' | 'past_due' | 'canceled';
@@ -275,6 +276,7 @@ export default function AdminPage() {
                 <thead>
                   <tr className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
                     <th className="pb-2 pr-3">Email</th>
+                    <th className="pb-2 pr-3">Birth date</th>
                     <th className="pb-2 pr-3">Plan</th>
                     <th className="pb-2 pr-3">Status</th>
                     <th className="pb-2 pr-3">Scans used</th>
@@ -287,6 +289,9 @@ export default function AdminPage() {
                     .map(c => (
                       <tr key={c.userId} className="border-b border-slate-50 last:border-0">
                         <td className="py-2.5 pr-3 text-slate-700 truncate max-w-[220px]">{c.email || '—'}</td>
+                        <td className="py-2.5 pr-3 text-slate-500 text-xs" dir="ltr">
+                          {c.birthDate ? new Date(c.birthDate + 'T00:00:00').toLocaleDateString() : '—'}
+                        </td>
                         <td className="py-2.5 pr-3">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${PLAN_BADGE_STYLE[c.plan]}`}>
                             {c.plan}{c.billingPeriod ? ` · ${c.billingPeriod}` : ''}
