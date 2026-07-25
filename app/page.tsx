@@ -573,14 +573,16 @@ export default function Home() {
 
       {/* Quick Scan fast-path: always-available shortcut so someone who
           just wants to fire off a tax receipt doesn't have to navigate
-          into the dashboard/menus first. Gated in handleQuickScanClick —
-          free users are sent straight to the plan picker instead of ever
+          into the dashboard/menus first. Pinned near the top (just under
+          the sticky header) so it's immediately visible on load, not
+          buried below the fold. Gated in handleQuickScanClick — free
+          users are sent straight to the plan picker instead of ever
           seeing the scanner. */}
       {state.screen === 'dashboard' && (
         <button
           onClick={handleQuickScanClick}
           title={tr.quickScanFabLabel}
-          className="fixed z-40 bottom-20 right-4 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-orange-300/50 active:scale-95 transition-transform"
+          className="fixed z-40 top-[68px] right-4 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-orange-300/50 active:scale-95 transition-transform"
         >
           <Zap className="w-4 h-4" fill="currentColor" />
           {tr.quickScanFabLabel}
