@@ -50,6 +50,8 @@ function freshState(lang: Lang = 'EN'): AppState {
     totalExpenses: 0,
     budgets: {},
     customCategories: {},
+    budgetDueDays: {},
+    budgetReminders: {},
   };
 }
 
@@ -407,8 +409,13 @@ export default function Home() {
     }
   };
 
-  const handleSaveBudgets = (budgets: Record<string, number>, customCategories: Record<string, string>) => {
-    setState(prev => ({ ...prev, budgets, customCategories }));
+  const handleSaveBudgets = (
+    budgets: Record<string, number>,
+    customCategories: Record<string, string>,
+    budgetDueDays: Record<string, number>,
+    budgetReminders: Record<string, boolean>
+  ) => {
+    setState(prev => ({ ...prev, budgets, customCategories, budgetDueDays, budgetReminders }));
     setShowBudget(false);
     addToast(tr.saveBudgets, 'success');
   };
@@ -617,6 +624,8 @@ export default function Home() {
           lang={state.lang}
           budgets={state.budgets}
           customCategories={state.customCategories}
+          budgetDueDays={state.budgetDueDays}
+          budgetReminders={state.budgetReminders}
           onSave={handleSaveBudgets}
           onClose={() => setShowBudget(false)}
         />

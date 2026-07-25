@@ -49,6 +49,12 @@ export interface AppState {
   totalExpenses: number;
   budgets: Record<string, number>;
   customCategories: Record<string, string>;
+  // Day of month (1-31) each recurring budget item is due — e.g. mortgage,
+  // car payment, a monthly bill. Optional per category key.
+  budgetDueDays: Record<string, number>;
+  // Whether an in-app reminder banner should fire within 3 days of the
+  // item's due date. Optional per category key, defaults to off.
+  budgetReminders: Record<string, boolean>;
 }
 
 export const INITIAL_STATE: AppState = {
@@ -72,6 +78,8 @@ export const INITIAL_STATE: AppState = {
   totalExpenses: 0,
   budgets: {},
   customCategories: {},
+  budgetDueDays: {},
+  budgetReminders: {},
 };
 
 // Hardcoded bypass codes were removed as a security fix — all code

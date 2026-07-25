@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
@@ -161,6 +161,32 @@ export default function Dashboard({
   const showRenewalBanner = state.tier === 'premium' && daysUntilRenewal !== null && daysUntilRenewal <= 3 && daysUntilRenewal >= 0;
   const renewalDateLabel = state.currentPeriodEnd ? new Date(state.currentPeriodEnd).toLocaleDateString() : '';
 
+  // Bill/installment due-date reminders: for each budget item with a due
+  // day + reminder enabled, find the next occurrence of that day (this
+  // month, or next month if it already passed) and flag it if it falls
+  // within the next 3 days.
+  const dueSoonItems = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const items: { key: string; label: string; day: number; daysUntil: number }[] = [];
+
+    Object.entries(state.budgetReminders || {}).forEach(([key, enabled]) => {
+      if (!enabled) return;
+      const day = state.budgetDueDays?.[key];
+      if (!day) return;
+
+      let due = new Date(today.getFullYear(), today.getMonth(), day);
+      if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, day);
+      const daysUntil = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntil >= 0 && daysUntil <= 3) {
+        const label = (tr as any)[key] || state.customCategories?.[key] || key;
+        items.push({ key, label, day, daysUntil });
+      }
+    });
+
+    return items.sort((a, b) => a.daysUntil - b.daysUntil);
+  }, [state.budgetReminders, state.budgetDueDays, state.customCategories, tr]);
+
   return (
     <div className="max-w-2xl mx-auto px-4 pt-5 pb-28 space-y-4">
 
@@ -222,6 +248,27 @@ export default function Dashboard({
             </div>
           </div>
           <span className="text-xs font-bold text-rose-700 whitespace-nowrap self-center">{tr.renewalBannerCta} →</span>
+        </button>
+      )}
+
+      {/* Bill/installment due-date reminders */}
+      {dueSoonItems.length > 0 && (
+        <button
+          onClick={onOpenBudget}
+          className="w-full text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-amber-100 transition-colors"
+        >
+          <Bell className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-amber-700">{tr.dueSoonBannerTitle}</div>
+            <div className="text-xs text-amber-700/90 mt-0.5">
+              {dueSoonItems.length === 1
+                ? tr.dueSoonBannerBodyOne
+                    .replace('{item}', dueSoonItems[0].label)
+                    .replace('{days}', String(dueSoonItems[0].daysUntil))
+                    .replace('{day}', String(dueSoonItems[0].day))
+                : tr.dueSoonBannerBodyMany.replace('{count}', String(dueSoonItems.length))}
+            </div>
+          </div>
         </button>
       )}
 
