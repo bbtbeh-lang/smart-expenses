@@ -15,6 +15,12 @@ function getSupportedMimeType(mimeType: string): ImageMediaType {
   return 'image/jpeg';
 }
 
+const VALID_OCR_CATEGORIES = new Set([
+  'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
+  'catHealth', 'catEntertainment', 'catBusinessMaterials', 'catOffice',
+  'catMarketing', 'catSoftware', 'catTravel', 'catOther',
+]);
+
 // How far back to look for a matching receipt. A receipt scanned months
 // apart is unlikely to be an accidental double-scan, so we don't need to
 // check the user's entire history — just recent activity.
@@ -109,9 +115,10 @@ Extract:
 3. items: EVERY line item with name and price (number only)
 4. amount: final TOTAL (number only, no currency symbol)
 5. tax: the sales tax amount shown on the receipt (e.g. a line labeled "GST", "HST", "QST", "TPS", "TVQ", or "Tax"). Sum multiple tax lines if there are several. Use "" if no tax line is shown.
+6. category: your single best guess at an expense category for this receipt, based on the merchant name and items. Pick EXACTLY ONE of: "catGroceries", "catRestaurant", "catTransport", "catUtilities", "catHealth", "catEntertainment", "catBusinessMaterials", "catOffice", "catMarketing", "catSoftware", "catTravel", "catOther". If you are not reasonably confident, use "catOther".
 
 Return ONLY valid JSON, no markdown:
-{"merchant":"","date":"YYYY-MM-DD","amount":"","tax":"","items":[{"name":"","price":""}]}`
+{"merchant":"","date":"YYYY-MM-DD","amount":"","tax":"","category":"","items":[{"name":"","price":""}]}`
           }
         ]
       }]
@@ -135,6 +142,11 @@ Return ONLY valid JSON, no markdown:
       date: parsed.date || '',
       merchant: parsed.merchant || '',
       tax: parsed.tax || '',
+      // Best-effort suggestion only — the user can always change it. Falls
+      // back to '' (meaning "no suggestion") if the model returned
+      // something outside our known category set, so the UI's existing
+      // default-category logic takes over unchanged.
+      category: VALID_OCR_CATEGORIES.has(parsed.category) ? parsed.category : '',
       items: (parsed.items || []).map((i: {name: string; price: string}) => ({
         name: i.name,
         price: parseFloat(i.price) || 0,
@@ -153,6 +165,6 @@ Return ONLY valid JSON, no markdown:
     if (scanConsumed && userId) {
       await refundScan(userId);
     }
-    return Response.json({ amount: '', description: '', date: '', merchant: '', tax: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
+    return Response.json({ amount: '', description: '', date: '', merchant: '', tax: '', category: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
   }
 }

@@ -174,6 +174,14 @@ export default function TransactionModal({
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
       if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
+      // Pre-fill the category from the AI's guess, but only if it's one of
+      // the categories currently shown for this account type (personal vs
+      // business use different lists) — otherwise leave whatever default
+      // was already set by handleTypeSelect, and the user picks manually
+      // exactly as before.
+      if (parsed.category && expenseCats.includes(parsed.category)) {
+        setCategory(parsed.category);
+      }
       if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
       if (parsed.duplicate?.isDuplicate) {
         setDuplicateWarning({
@@ -193,7 +201,7 @@ export default function TransactionModal({
       setOcrBanner('OCR failed — please enter details manually.');
       setTimeout(() => setStep('manual'), 1200);
     }
-  }, [tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed]);
+  }, [tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;

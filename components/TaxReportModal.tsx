@@ -28,6 +28,23 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
   const totalTax = transactions.filter(t => t.taxAmount).reduce((s, t) => s + (t.taxAmount || 0), 0);
   const netProfit = totalIncome - totalExpenses;
 
+  // Per-category breakdown for the Tax tab — purely a re-grouping of data
+  // the user already entered (amount + taxAmount per transaction). This
+  // does NOT calculate any GST/HST/QST remittance figure; it just makes
+  // the existing numbers easier for an accountant to work from, category
+  // by category, instead of one lump total.
+  const categoryBreakdown = (() => {
+    const map: Record<string, { amount: number; tax: number }> = {};
+    transactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        if (!map[t.category]) map[t.category] = { amount: 0, tax: 0 };
+        map[t.category].amount += t.amount;
+        map[t.category].tax += t.taxAmount || 0;
+      });
+    return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount);
+  })();
+
   const handleViewReceipt = async (tx: Transaction) => {
     if (!tx.receiptHash) return;
     setLoadingReceiptId(tx.id);
@@ -76,6 +93,15 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
     rows.push(['Total Income', '', '', '', '', '', String(totalIncome)]);
     rows.push(['Total Expenses', '', '', '', '', '', String(totalExpenses)]);
     rows.push(['Net Profit', '', '', '', '', '', String(netProfit)]);
+
+    if (categoryBreakdown.length > 0) {
+      rows.push([]);
+      rows.push(['TAX BY CATEGORY', '', '', '', '', '', '']);
+      rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '']);
+      categoryBreakdown.forEach(([cat, sums]) => {
+        rows.push([cat, String(sums.amount), String(sums.tax), '', '', '', '']);
+      });
+    }
 
     const NL = String.fromCharCode(10);
     const csvContent = rows.map(r => r.map(c => JSON.stringify(c)).join(',')).join(NL);
@@ -259,6 +285,27 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
                 <div className="h-px bg-slate-200" />
                 <p className="text-xs text-slate-400 leading-relaxed">{tr.taxLineExplainer}</p>
               </div>
+
+              {categoryBreakdown.length > 0 && (
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.taxByCategory}</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-0.5">
+                      <span>{tr.categoryColumn}</span>
+                      <span dir="ltr">{tr.totalExpenses} · {tr.totalTaxPaid}</span>
+                    </div>
+                    {categoryBreakdown.map(([cat, sums]) => (
+                      <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-3 py-2">
+                        <span className="text-xs font-medium text-slate-700">{(tr as any)[cat] || cat}</span>
+                        <span className="text-xs font-semibold text-slate-600" dir="ltr">
+                          {formatCurrency(sums.amount, lang, 2)} · {formatCurrency(sums.tax, lang, 2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
                 <Lock className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
                 <p className="text-xs text-amber-700 leading-relaxed">{tr.taxDisclaimer}</p>
