@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShieldCheck, RefreshCw, Copy, Check, Lock } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink } from 'lucide-react';
 
 interface CodeStatus {
   code: string | null;
@@ -153,6 +153,24 @@ export default function AdminPage() {
           This code unlocks <b>manual transaction entry only</b> for whoever redeems it today.
           It never grants OCR/receipt scanning — that's exclusive to paid plans.
         </p>
+
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-4">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            Quick links
+          </div>
+          <a
+            href="https://console.anthropic.com/settings/limits"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 text-slate-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-slate-800">Anthropic Console — API usage &amp; limits</div>
+              <div className="text-xs text-slate-400">Manage the API key and rate/spend limits behind OCR receipt scanning</div>
+            </div>
+          </a>
+        </div>
       </div>
     </div>
   );
