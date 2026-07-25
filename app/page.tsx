@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Zap } from 'lucide-react';
 import { AppState, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
@@ -76,6 +77,7 @@ export default function Home() {
   const [state, setState] = useState<AppState>(freshState);
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showQuickScan, setShowQuickScan] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showTaxReport, setShowTaxReport] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -462,6 +464,18 @@ export default function Home() {
   const isRtl = state.lang === 'FA';
   const isLoggedIn = state.screen !== 'auth';
 
+  // Quick Scan entry point (fast-path shortcut for tax-prep receipts):
+  // paid-plan users go straight into the OCR capture screen; anyone
+  // without scan access never sees the scanner at all — they're routed
+  // straight to the plan picker instead.
+  const handleQuickScanClick = () => {
+    if (state.hasScanAccess) {
+      setShowQuickScan(true);
+    } else {
+      setShowUpgrade(true);
+    }
+  };
+
   const transactionModalProps = {
     tr,
     accountType: state.accountType || 'personal' as const,
@@ -557,6 +571,22 @@ export default function Home() {
         <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} lang={state.lang} />
       )}
 
+      {/* Quick Scan fast-path: always-available shortcut so someone who
+          just wants to fire off a tax receipt doesn't have to navigate
+          into the dashboard/menus first. Gated in handleQuickScanClick —
+          free users are sent straight to the plan picker instead of ever
+          seeing the scanner. */}
+      {state.screen === 'dashboard' && (
+        <button
+          onClick={handleQuickScanClick}
+          title={tr.quickScanFabLabel}
+          className="fixed z-40 bottom-20 right-4 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-orange-300/50 active:scale-95 transition-transform"
+        >
+          <Zap className="w-4 h-4" fill="currentColor" />
+          {tr.quickScanFabLabel}
+        </button>
+      )}
+
       {state.screen === 'dashboard' && activeTab === 'dashboard' && (
         <div className="fixed bottom-20 left-4 right-4 z-30 max-w-sm mx-auto">
           <button
@@ -589,6 +619,16 @@ export default function Home() {
           {...transactionModalProps}
           onClose={() => setShowTransactionModal(false)}
           onSaveManual={handleSaveManual}
+        />
+      )}
+
+      {showQuickScan && (
+        <TransactionModal
+          {...transactionModalProps}
+          quickScan
+          onClose={() => setShowQuickScan(false)}
+          onSaveManual={tx => { handleSaveManual(tx); setShowQuickScan(false); }}
+          onOpenUpgrade={() => { setShowQuickScan(false); setShowUpgrade(true); }}
         />
       )}
 

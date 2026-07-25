@@ -28,6 +28,12 @@ interface TransactionModalProps {
   onScanConsumed: (scansUsed: number) => void;
   onOpenUpgrade: () => void;
   onScanBlocked: () => void;
+  // Quick Scan fast-path (tax-prep shortcut): skips straight to the camera/
+  // upload step as an expense, with the category pre-set to a standard
+  // business/tax bucket, instead of asking income-vs-expense and
+  // scan-vs-manual first. Gating (paid plan only) is enforced by the
+  // caller before this modal is ever opened with quickScan=true.
+  quickScan?: boolean;
 }
 
 const EXPENSE_CATEGORIES_PERSONAL = [
@@ -50,11 +56,11 @@ export default function TransactionModal({
   tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
   editTransaction, customCategories = {}, onAddCustomCategory,
   onClose, onSaveManual, onUpdate, onDelete,
-  onScanConsumed, onOpenUpgrade, onScanBlocked,
+  onScanConsumed, onOpenUpgrade, onScanBlocked, quickScan,
 }: TransactionModalProps) {
   const isEditMode = !!editTransaction;
 
-  const [step, setStep] = useState<ModalStep>(isEditMode ? 'manual' : 'type');
+  const [step, setStep] = useState<ModalStep>(isEditMode ? 'manual' : (quickScan ? 'ocr' : 'type'));
   const [txType, setTxType] = useState<TransactionType>(editTransaction?.type ?? 'expense');
   // Which "bucket" this specific transaction belongs to. Defaults to the
   // user's current global setting, but can be overridden per-transaction —
@@ -63,7 +69,13 @@ export default function TransactionModal({
   const [txAccountType, setTxAccountType] = useState<AccountType>(editTransaction?.accountType ?? accountType);
   const [amount, setAmount] = useState(editTransaction ? String(editTransaction.amount) : '');
   const [description, setDescription] = useState(editTransaction?.description ?? '');
-  const [category, setCategory] = useState(editTransaction?.category ?? '');
+  // Quick Scan pre-fills a standard business/tax category up front (least
+  // friction for a tax-prep receipt) instead of starting blank; the normal
+  // flow still sets this once the person picks income vs. expense.
+  const [category, setCategory] = useState(
+    editTransaction?.category
+      ?? (quickScan ? (accountType === 'business' ? 'catBusinessMaterials' : 'catOther') : '')
+  );
   const [date, setDate] = useState(editTransaction?.date ?? new Date().toISOString().slice(0, 10));
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>('idle');
   const [ocrProgress, setOcrProgress] = useState(0);
@@ -261,7 +273,7 @@ export default function TransactionModal({
     }
   };
 
-  const modalTitle = isEditMode ? tr.editTransaction : tr.addTransactionTitle;
+  const modalTitle = isEditMode ? tr.editTransaction : (quickScan ? tr.quickScanTitle : tr.addTransactionTitle);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
