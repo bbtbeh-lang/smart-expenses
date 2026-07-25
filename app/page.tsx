@@ -582,9 +582,9 @@ export default function Home() {
         <button
           onClick={handleQuickScanClick}
           title={tr.quickScanFabLabel}
-          className="fixed z-40 top-32 left-1/2 -translate-x-1/2 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-sm font-bold shadow-lg shadow-orange-300/50 active:scale-95 transition-transform"
+          className="fixed z-40 top-48 left-1/2 -translate-x-1/2 flex items-center gap-2.5 pl-5 pr-6 py-4 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-base font-bold shadow-xl shadow-orange-300/50 active:scale-95 transition-transform"
         >
-          <Zap className="w-4 h-4" fill="currentColor" />
+          <Zap className="w-5 h-5" fill="currentColor" />
           {tr.quickScanFabLabel}
         </button>
       )}
