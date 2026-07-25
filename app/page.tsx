@@ -578,7 +578,7 @@ export default function Home() {
           buried below the fold. Gated in handleQuickScanClick — free
           users are sent straight to the plan picker instead of ever
           seeing the scanner. */}
-      {state.screen === 'dashboard' && (
+      {(state.screen === 'dashboard' || state.screen === 'onboarding') && (
         <button
           onClick={handleQuickScanClick}
           title={tr.quickScanFabLabel}
