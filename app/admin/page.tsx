@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink, Users } from 'lucide-react';
 
 interface CodeStatus {
   code: string | null;
@@ -11,6 +11,32 @@ interface CodeStatus {
   validDate: string;
 }
 
+interface Customer {
+  userId: string;
+  email: string | null;
+  createdAt: string;
+  plan: 'free' | 'basic' | 'pro' | 'business';
+  billingPeriod: 'monthly' | 'yearly' | null;
+  status: 'inactive' | 'active' | 'past_due' | 'canceled';
+  scansUsed: number;
+  currentPeriodEnd: string | null;
+  stripeCustomerId: string | null;
+}
+
+const PLAN_BADGE_STYLE: Record<Customer['plan'], string> = {
+  free: 'bg-slate-100 text-slate-500',
+  basic: 'bg-sky-100 text-sky-700',
+  pro: 'bg-violet-100 text-violet-700',
+  business: 'bg-amber-100 text-amber-700',
+};
+
+const STATUS_BADGE_STYLE: Record<Customer['status'], string> = {
+  active: 'bg-emerald-100 text-emerald-700',
+  past_due: 'bg-rose-100 text-rose-700',
+  canceled: 'bg-slate-100 text-slate-500',
+  inactive: 'bg-slate-100 text-slate-400',
+};
+
 export default function AdminPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [forbidden, setForbidden] = useState(false);
@@ -18,6 +44,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  const [customers, setCustomers] = useState<Customer[] | null>(null);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState('');
+  const [customerFilter, setCustomerFilter] = useState<'all' | 'paying'>('all');
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -41,6 +71,31 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => { loadStatus(); }, [loadStatus]);
+
+  const loadCustomers = useCallback(async () => {
+    setCustomersLoading(true);
+    setCustomersError('');
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/customers', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setCustomersError(data.error || 'Failed to load customers');
+        return;
+      }
+      const data = await res.json();
+      setCustomers(data.customers);
+    } catch {
+      setCustomersError('Failed to load customers');
+    } finally {
+      setCustomersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authChecked && !forbidden) loadCustomers();
+  }, [authChecked, forbidden, loadCustomers]);
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -90,7 +145,8 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="max-w-md mx-auto">
+      <div className="max-w-3xl mx-auto">
+        <div className="max-w-md mx-auto">
         <div className="flex items-center gap-2 mb-6">
           <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center">
             <ShieldCheck className="w-4.5 h-4.5 text-white" />
@@ -170,6 +226,91 @@ export default function AdminPage() {
               <div className="text-xs text-slate-400">Manage the API key and rate/spend limits behind OCR receipt scanning</div>
             </div>
           </a>
+        </div>
+        </div>
+
+        {/* Customers */}
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-6">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-400" />
+              <h2 className="text-sm font-bold text-slate-800">
+                Customers {customers && <span className="text-slate-400 font-normal">({customers.length})</span>}
+              </h2>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="flex rounded-lg bg-slate-100 p-0.5">
+                <button
+                  onClick={() => setCustomerFilter('all')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${customerFilter === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setCustomerFilter('paying')}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${customerFilter === 'paying' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+                >
+                  Paying only
+                </button>
+              </div>
+              <button
+                onClick={loadCustomers}
+                disabled={customersLoading}
+                className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${customersLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {customersError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-3 py-2 mb-3">{customersError}</div>
+          )}
+
+          {customersLoading && !customers ? (
+            <p className="text-sm text-slate-400 py-6 text-center">Loading customers…</p>
+          ) : customers && customers.length > 0 ? (
+            <div className="overflow-x-auto -mx-5 px-5">
+              <table className="w-full text-sm min-w-[560px]">
+                <thead>
+                  <tr className="text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                    <th className="pb-2 pr-3">Email</th>
+                    <th className="pb-2 pr-3">Plan</th>
+                    <th className="pb-2 pr-3">Status</th>
+                    <th className="pb-2 pr-3">Scans used</th>
+                    <th className="pb-2 pr-3">Renews / signed up</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers
+                    .filter(c => customerFilter === 'all' || c.plan !== 'free')
+                    .map(c => (
+                      <tr key={c.userId} className="border-b border-slate-50 last:border-0">
+                        <td className="py-2.5 pr-3 text-slate-700 truncate max-w-[220px]">{c.email || '—'}</td>
+                        <td className="py-2.5 pr-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${PLAN_BADGE_STYLE[c.plan]}`}>
+                            {c.plan}{c.billingPeriod ? ` · ${c.billingPeriod}` : ''}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${STATUS_BADGE_STYLE[c.status]}`}>
+                            {c.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-2.5 pr-3 text-slate-500" dir="ltr">{c.scansUsed}</td>
+                        <td className="py-2.5 pr-3 text-slate-400 text-xs" dir="ltr">
+                          {c.currentPeriodEnd
+                            ? new Date(c.currentPeriodEnd).toLocaleDateString()
+                            : new Date(c.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 py-6 text-center">No customers yet.</p>
+          )}
         </div>
       </div>
     </div>
