@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell, Zap } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
@@ -19,6 +19,7 @@ interface DashboardProps {
   onApplyCode: (code: string) => Promise<{ success: boolean; message: string }>;
   onOpenPlanManager: () => void;
   onOpenBudget: () => void;
+  onQuickScan: () => void;
   onDemoReset: () => void;
 }
 
@@ -70,7 +71,7 @@ function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
 }
 
 export default function Dashboard({
-  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onOpenPlanManager, onOpenBudget, onDemoReset,
+  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onOpenPlanManager, onOpenBudget, onQuickScan, onDemoReset,
 }: DashboardProps) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -227,6 +228,15 @@ export default function Dashboard({
               <span className="text-xs font-semibold text-slate-500">{tr.scanRequiresPlan}</span>
             </button>
           )}
+
+          <button
+            onClick={onQuickScan}
+            title={tr.quickScanFabLabel}
+            className="flex items-center gap-1 rounded-full pl-2 pr-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white active:scale-95 transition-transform"
+          >
+            <Zap className="w-3 h-3" fill="currentColor" />
+            <span className="text-xs font-bold">{tr.quickScanFabLabel}</span>
+          </button>
         </div>
       </div>
 

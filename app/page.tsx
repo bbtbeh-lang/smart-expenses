@@ -529,6 +529,7 @@ export default function Home() {
                 onApplyCode={handleApplyCode}
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
+                onQuickScan={handleQuickScanClick}
                 onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, hasManualAccess: false, hasScanAccess: false, scansUsedToday: 0, tier: 'free' }))}
               />
             )}
@@ -578,13 +579,17 @@ export default function Home() {
           buried below the fold. Gated in handleQuickScanClick — free
           users are sent straight to the plan picker instead of ever
           seeing the scanner. */}
-      {(state.screen === 'dashboard' || state.screen === 'onboarding') && (
+      {/* Quick Scan fast-path shortcut. On the dashboard it lives inline in
+          the tier/scan-status row (see Dashboard.tsx); here we only need a
+          floating version for the onboarding screen, which doesn't have
+          that row yet. */}
+      {state.screen === 'onboarding' && (
         <button
           onClick={handleQuickScanClick}
           title={tr.quickScanFabLabel}
-          className="fixed z-40 top-48 left-1/2 -translate-x-1/2 flex items-center gap-2.5 pl-5 pr-6 py-4 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-base font-bold shadow-xl shadow-orange-300/50 active:scale-95 transition-transform"
+          className="fixed z-40 top-32 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pl-3 pr-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold shadow-lg shadow-orange-300/50 active:scale-95 transition-transform"
         >
-          <Zap className="w-5 h-5" fill="currentColor" />
+          <Zap className="w-3.5 h-3.5" fill="currentColor" />
           {tr.quickScanFabLabel}
         </button>
       )}
