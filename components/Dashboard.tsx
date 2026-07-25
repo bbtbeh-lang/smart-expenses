@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock,
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getNextDueDate } from '@/lib/utils';
 import { PLANS } from '@/lib/plans';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -162,30 +162,29 @@ export default function Dashboard({
   const renewalDateLabel = state.currentPeriodEnd ? new Date(state.currentPeriodEnd).toLocaleDateString() : '';
 
   // Bill/installment due-date reminders: for each budget item with a due
-  // day + reminder enabled, find the next occurrence of that day (this
-  // month, or next month if it already passed) and flag it if it falls
-  // within the next 3 days.
+  // date + reminder enabled, resolve the next occurrence (recurrence-aware)
+  // and flag it if it falls within the next 3 days.
   const dueSoonItems = useMemo(() => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const items: { key: string; label: string; day: number; daysUntil: number }[] = [];
+    const items: { key: string; label: string; date: Date; daysUntil: number }[] = [];
 
     Object.entries(state.budgetReminders || {}).forEach(([key, enabled]) => {
       if (!enabled) return;
-      const day = state.budgetDueDays?.[key];
-      if (!day) return;
+      const entry = state.budgetDueDates?.[key];
+      if (!entry?.date) return;
 
-      let due = new Date(today.getFullYear(), today.getMonth(), day);
-      if (due < today) due = new Date(today.getFullYear(), today.getMonth() + 1, day);
-      const daysUntil = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const next = getNextDueDate(entry.date, entry.recurrence, today);
+      if (!next) return;
+      const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const daysUntil = Math.round((next.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
       if (daysUntil >= 0 && daysUntil <= 3) {
         const label = (tr as any)[key] || state.customCategories?.[key] || key;
-        items.push({ key, label, day, daysUntil });
+        items.push({ key, label, date: next, daysUntil });
       }
     });
 
     return items.sort((a, b) => a.daysUntil - b.daysUntil);
-  }, [state.budgetReminders, state.budgetDueDays, state.customCategories, tr]);
+  }, [state.budgetReminders, state.budgetDueDates, state.customCategories, tr]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-5 pb-28 space-y-4">
@@ -265,7 +264,7 @@ export default function Dashboard({
                 ? tr.dueSoonBannerBodyOne
                     .replace('{item}', dueSoonItems[0].label)
                     .replace('{days}', String(dueSoonItems[0].daysUntil))
-                    .replace('{day}', String(dueSoonItems[0].day))
+                    .replace('{date}', dueSoonItems[0].date.toLocaleDateString(state.lang === 'FA' ? 'fa-IR' : undefined))
                 : tr.dueSoonBannerBodyMany.replace('{count}', String(dueSoonItems.length))}
             </div>
           </div>

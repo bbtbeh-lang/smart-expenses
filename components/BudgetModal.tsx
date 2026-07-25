@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown } from 'lucide-react';
+import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AccountType, Lang } from '@/lib/types';
-import { getOrCreateCategoryKey } from '@/lib/utils';
+import { getOrCreateCategoryKey, getNextDueDate } from '@/lib/utils';
 
 const EXPENSE_CATS_PERSONAL = [
   'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
@@ -14,6 +14,9 @@ const EXPENSE_CATS_BUSINESS = [
   'catBusinessMaterials', 'catOffice', 'catMarketing', 'catSoftware',
   'catTravel', 'catRestaurant', 'catTransport', 'catUtilities', 'catOther',
 ];
+
+type Recurrence = 'none' | 'weekly' | 'monthly' | 'yearly';
+interface DueDateEntry { date: string; recurrence: Recurrence }
 
 interface CustomItem {
   key: string;
@@ -27,18 +30,18 @@ interface BudgetModalProps {
   lang: Lang;
   budgets: Record<string, number>;
   customCategories: Record<string, string>;
-  budgetDueDays: Record<string, number>;
+  budgetDueDates: Record<string, DueDateEntry>;
   budgetReminders: Record<string, boolean>;
   onSave: (
     budgets: Record<string, number>,
     customCategories: Record<string, string>,
-    budgetDueDays: Record<string, number>,
+    budgetDueDates: Record<string, DueDateEntry>,
     budgetReminders: Record<string, boolean>
   ) => void;
   onClose: () => void;
 }
 
-export default function BudgetModal({ tr, accountType, lang, budgets, customCategories, budgetDueDays, budgetReminders, onSave, onClose }: BudgetModalProps) {
+export default function BudgetModal({ tr, accountType, lang, budgets, customCategories, budgetDueDates, budgetReminders, onSave, onClose }: BudgetModalProps) {
   const cats = accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
 
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -47,12 +50,9 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
     return init;
   });
 
-  // Due day (1-31) and reminder toggle per built-in category key.
-  const [dueDays, setDueDays] = useState<Record<string, string>>(() => {
-    const init: Record<string, string> = {};
-    cats.forEach(c => { init[c] = budgetDueDays[c] ? String(budgetDueDays[c]) : ''; });
-    return init;
-  });
+  // Due date (calendar date) + recurrence rule, and reminder toggle, per
+  // built-in category key.
+  const [dueDates, setDueDates] = useState<Record<string, DueDateEntry>>(() => ({ ...budgetDueDates }));
   const [reminders, setReminders] = useState<Record<string, boolean>>(() => ({ ...budgetReminders }));
   const [sortByDueDate, setSortByDueDate] = useState(false);
 
@@ -86,41 +86,44 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
 
   const handleRemoveCustom = (key: string) => {
     setCustomItems(prev => prev.filter(i => i.key !== key));
-    setDueDays(prev => { const next = { ...prev }; delete next[key]; return next; });
+    setDueDates(prev => { const next = { ...prev }; delete next[key]; return next; });
     setReminders(prev => { const next = { ...prev }; delete next[key]; return next; });
   };
 
-  const handleDueDayChange = (key: string, raw: string) => {
-    const digitsOnly = raw.replace(/[^0-9]/g, '');
-    if (digitsOnly === '') { setDueDays(prev => ({ ...prev, [key]: '' })); return; }
-    const n = Math.min(31, Math.max(1, parseInt(digitsOnly, 10)));
-    setDueDays(prev => ({ ...prev, [key]: String(n) }));
+  const setDueDate = (key: string, date: string) => {
+    setDueDates(prev => ({ ...prev, [key]: { date, recurrence: prev[key]?.recurrence || 'none' } }));
+  };
+  const setRecurrence = (key: string, recurrence: Recurrence) => {
+    setDueDates(prev => ({ ...prev, [key]: { date: prev[key]?.date || '', recurrence } }));
   };
 
   const toggleReminder = (key: string) => {
     setReminders(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Sorted display order for the built-in category list: by due day
-  // ascending when the toggle is on (items with no due day sink to the
+  // For sorting: the next occurrence date (recurrence-aware), or a far-
+  // future sentinel for items with no due date so they sink to the bottom.
+  const sortKey = (key: string) => {
+    const entry = dueDates[key];
+    if (!entry?.date) return Infinity;
+    const next = getNextDueDate(entry.date, entry.recurrence);
+    return next ? next.getTime() : Infinity;
+  };
+
+  // Sorted display order for the built-in category list: by next due date
+  // ascending when the toggle is on (items with no due date sink to the
   // bottom), otherwise the original fixed order.
   const sortedCats = useMemo(() => {
     if (!sortByDueDate) return cats;
-    return [...cats].sort((a, b) => {
-      const da = dueDays[a] ? parseInt(dueDays[a], 10) : 999;
-      const db = dueDays[b] ? parseInt(dueDays[b], 10) : 999;
-      return da - db;
-    });
-  }, [cats, sortByDueDate, dueDays]);
+    return [...cats].sort((a, b) => sortKey(a) - sortKey(b));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cats, sortByDueDate, dueDates]);
 
   const sortedCustomItems = useMemo(() => {
     if (!sortByDueDate) return customItems;
-    return [...customItems].sort((a, b) => {
-      const da = dueDays[a.key] ? parseInt(dueDays[a.key], 10) : 999;
-      const db = dueDays[b.key] ? parseInt(dueDays[b.key], 10) : 999;
-      return da - db;
-    });
-  }, [customItems, sortByDueDate, dueDays]);
+    return [...customItems].sort((a, b) => sortKey(a.key) - sortKey(b.key));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customItems, sortByDueDate, dueDates]);
 
   const handleSave = () => {
     const next: Record<string, number> = {};
@@ -137,22 +140,21 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
       if (item.label.trim()) nextCustom[item.key] = item.label.trim();
     });
 
-    // Due days / reminders only make sense for items that actually have a
+    // Due dates / reminders only make sense for items that actually have a
     // budget amount set — drop stale entries for anything that got zeroed
     // out or removed.
-    const nextDueDays: Record<string, number> = {};
+    const nextDueDates: Record<string, DueDateEntry> = {};
     const nextReminders: Record<string, boolean> = {};
-    Object.entries(dueDays).forEach(([k, v]) => {
-      if (next[k] === undefined) return;
-      const n = parseInt(v, 10);
-      if (!isNaN(n) && n >= 1 && n <= 31) nextDueDays[k] = n;
+    Object.entries(dueDates).forEach(([k, entry]) => {
+      if (next[k] === undefined || !entry.date) return;
+      nextDueDates[k] = entry;
     });
     Object.entries(reminders).forEach(([k, v]) => {
-      if (next[k] === undefined || nextDueDays[k] === undefined) return;
+      if (next[k] === undefined || nextDueDates[k] === undefined) return;
       if (v) nextReminders[k] = true;
     });
 
-    onSave(next, nextCustom, nextDueDays, nextReminders);
+    onSave(next, nextCustom, nextDueDates, nextReminders);
   };
 
   return (
@@ -204,22 +206,28 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
                   </div>
                 </div>
                 {values[cat] && parseFloat(values[cat]) > 0 && (
-                  <div className="flex items-center gap-2 mt-1.5 pl-0.5">
-                    <span className="text-[11px] text-slate-400">{tr.dueDayLabel}</span>
+                  <div className="flex items-center gap-2 mt-1.5 pl-0.5 flex-wrap" dir="ltr">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={31}
-                      value={dueDays[cat] ?? ''}
-                      onChange={e => handleDueDayChange(cat, e.target.value)}
-                      placeholder="—"
-                      dir="ltr"
-                      className="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                      type="date"
+                      value={dueDates[cat]?.date ?? ''}
+                      onChange={e => setDueDate(cat, e.target.value)}
+                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                     />
+                    <select
+                      value={dueDates[cat]?.recurrence ?? 'none'}
+                      onChange={e => setRecurrence(cat, e.target.value as Recurrence)}
+                      disabled={!dueDates[cat]?.date}
+                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-40"
+                    >
+                      <option value="none">{tr.recurrenceNone}</option>
+                      <option value="weekly">{tr.recurrenceWeekly}</option>
+                      <option value="monthly">{tr.recurrenceMonthly}</option>
+                      <option value="yearly">{tr.recurrenceYearly}</option>
+                    </select>
                     <button
                       onClick={() => toggleReminder(cat)}
-                      disabled={!dueDays[cat]}
+                      disabled={!dueDates[cat]?.date}
                       title={tr.reminderToggle}
                       className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[cat] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
                     >
@@ -269,22 +277,28 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
                     </button>
                   </div>
                   {item.amount && parseFloat(item.amount) > 0 && (
-                    <div className="flex items-center gap-2 mt-1.5 pl-7">
-                      <span className="text-[11px] text-slate-400">{tr.dueDayLabel}</span>
+                    <div className="flex items-center gap-2 mt-1.5 pl-7 flex-wrap" dir="ltr">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={31}
-                        value={dueDays[item.key] ?? ''}
-                        onChange={e => handleDueDayChange(item.key, e.target.value)}
-                        placeholder="—"
-                        dir="ltr"
-                        className="w-14 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-center text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                        type="date"
+                        value={dueDates[item.key]?.date ?? ''}
+                        onChange={e => setDueDate(item.key, e.target.value)}
+                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                       />
+                      <select
+                        value={dueDates[item.key]?.recurrence ?? 'none'}
+                        onChange={e => setRecurrence(item.key, e.target.value as Recurrence)}
+                        disabled={!dueDates[item.key]?.date}
+                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-40"
+                      >
+                        <option value="none">{tr.recurrenceNone}</option>
+                        <option value="weekly">{tr.recurrenceWeekly}</option>
+                        <option value="monthly">{tr.recurrenceMonthly}</option>
+                        <option value="yearly">{tr.recurrenceYearly}</option>
+                      </select>
                       <button
                         onClick={() => toggleReminder(item.key)}
-                        disabled={!dueDays[item.key]}
+                        disabled={!dueDates[item.key]?.date}
                         title={tr.reminderToggle}
                         className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[item.key] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
                       >

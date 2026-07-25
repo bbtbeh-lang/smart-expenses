@@ -49,11 +49,12 @@ export interface AppState {
   totalExpenses: number;
   budgets: Record<string, number>;
   customCategories: Record<string, string>;
-  // Day of month (1-31) each recurring budget item is due — e.g. mortgage,
-  // car payment, a monthly bill. Optional per category key.
-  budgetDueDays: Record<string, number>;
+  // Calendar due date + recurrence per budget item (category key). `date`
+  // is the anchor due date (YYYY-MM-DD); recurrence determines how the
+  // *next* occurrence is computed from that anchor.
+  budgetDueDates: Record<string, { date: string; recurrence: 'none' | 'weekly' | 'monthly' | 'yearly' }>;
   // Whether an in-app reminder banner should fire within 3 days of the
-  // item's due date. Optional per category key, defaults to off.
+  // item's (next) due date. Optional per category key, defaults to off.
   budgetReminders: Record<string, boolean>;
 }
 
@@ -78,7 +79,7 @@ export const INITIAL_STATE: AppState = {
   totalExpenses: 0,
   budgets: {},
   customCategories: {},
-  budgetDueDays: {},
+  budgetDueDates: {},
   budgetReminders: {},
 };
 
