@@ -79,6 +79,24 @@ export default function Home() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [showTaxReport, setShowTaxReport] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+
+  // Marketing / flyer QR codes point at ?upgrade=1 (see the QR code sent to
+  // the person). Once the user reaches the dashboard — whether they just
+  // signed up or were already logged in — pop the plan-picker straight
+  // away instead of making them go hunt for it, then strip the param so
+  // it doesn't reopen on every refresh/navigation.
+  const upgradeIntentHandled = useRef(false);
+  useEffect(() => {
+    if (state.screen !== 'dashboard' || upgradeIntentHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgrade') === '1') {
+      upgradeIntentHandled.current = true;
+      setShowUpgrade(true);
+      params.delete('upgrade');
+      const rest = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+  }, [state.screen]);
   const [showPlanManager, setShowPlanManager] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
