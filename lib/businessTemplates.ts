@@ -14,6 +14,21 @@ export interface BusinessTemplateItem {
   amount: number; // suggested monthly CAD
 }
 
+// A per-product/per-batch ingredient or cost line — e.g. "Flour: $2" for
+// one batch of pastries. Distinct from BusinessTemplateItem (which is a
+// *monthly overhead* figure like "$600/month on ingredients" for
+// BudgetModal). recipeCategories are what the Profit Calculator
+// (PricingTab) uses instead, since costing a single product needs
+// per-batch amounts, not a monthly aggregate.
+export interface RecipeCostItem {
+  name: { EN: string; FR: string; FA: string };
+  price: number; // CAD, for one batch/unit
+}
+export interface RecipeCategory {
+  name: { EN: string; FR: string; FA: string };
+  items: RecipeCostItem[];
+}
+
 export interface BusinessTemplate {
   id: string;
   icon: string;
@@ -23,6 +38,14 @@ export interface BusinessTemplate {
   // e.g. a bakery prices by weight, a tutor by the hour, a photographer
   // per project. Purely a starting-point suggestion; always changeable.
   defaultPricingBasis?: 'quantity' | 'weight' | 'hour' | 'project' | 'area';
+  // Optional per-product/per-batch cost breakdown for the Profit
+  // Calculator. When present, PricingTab uses THIS instead of `items`
+  // (which is monthly overhead, not a single product's cost). Only
+  // defined for hands-on-product businesses where itemized ingredient/
+  // material costs make sense (a home baker, tailor, jeweller...); for
+  // service/time-based businesses `items` alone is fine since there's no
+  // single "unit" to break materials down for.
+  recipeCategories?: RecipeCategory[];
 }
 
 export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
@@ -276,6 +299,37 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Home Kitchen Permit / Inspection', FR: 'Permis de cuisine à domicile / Inspection', FA: 'مجوز غذای خانگی و بازرسی بهداشت' }, amount: 100 },
       { label: { EN: 'Social Media Marketing', FR: 'Marketing sur les réseaux sociaux', FA: 'تبلیغات در شبکه‌های اجتماعی' }, amount: 100 },
       { label: { EN: 'Kitchen Equipment', FR: 'Équipement de cuisine', FA: 'تجهیزات آشپزخانه' }, amount: 150 },
+    ],
+    // Example: one batch of cream pastries (شیرینی خامه‌ای) yielding
+    // roughly 2kg — realistic Canadian grocery prices, per-batch (not
+    // monthly). The person edits every number to match their own recipe
+    // and local prices; this is just a sane, non-zero starting point.
+    recipeCategories: [
+      {
+        name: { EN: 'Ingredients', FR: 'Ingrédients', FA: 'مواد اولیه' },
+        items: [
+          { name: { EN: 'Flour', FR: 'Farine', FA: 'آرد' }, price: 1.5 },
+          { name: { EN: 'Sugar', FR: 'Sucre', FA: 'شکر' }, price: 1.2 },
+          { name: { EN: 'Butter', FR: 'Beurre', FA: 'کره' }, price: 3.5 },
+          { name: { EN: 'Whipping Cream', FR: 'Crème à fouetter', FA: 'خامه' }, price: 4.5 },
+          { name: { EN: 'Eggs', FR: 'Œufs', FA: 'تخم‌مرغ' }, price: 2.0 },
+          { name: { EN: 'Vanilla / Flavoring', FR: 'Vanille / Arôme', FA: 'وانیل / اسانس' }, price: 0.8 },
+        ],
+      },
+      {
+        name: { EN: 'Packaging', FR: 'Emballage', FA: 'بسته‌بندی' },
+        items: [
+          { name: { EN: 'Boxes', FR: 'Boîtes', FA: 'جعبه' }, price: 1.5 },
+          { name: { EN: 'Decorative Ribbon / Liner', FR: 'Ruban décoratif / Papier', FA: 'روبان / زیرکاغذی تزیین' }, price: 0.5 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Oven / Mixer (electricity share)', FR: 'Four / Batteur (part électricité)', FA: 'برق فر و همزن (سهمی)' }, price: 1.0 },
+          { name: { EN: 'Delivery / Your Travel Time', FR: 'Livraison / Temps de déplacement', FA: 'رفت‌وآمد یا هزینه‌ی ارسال' }, price: 2.0 },
+        ],
+      },
     ],
   },
   {

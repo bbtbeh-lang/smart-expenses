@@ -381,12 +381,31 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       const kept = base.filter(c => c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0);
       const existingNames = new Set(kept.map(c => c.name.trim().toLowerCase()));
       const additions: CostCategory[] = [];
-      template.items.forEach(item => {
-        const label = item.label[lang] || item.label.EN;
-        if (existingNames.has(label.trim().toLowerCase())) return;
-        existingNames.add(label.trim().toLowerCase());
-        additions.push({ ...newCategory(), name: label, single: String(item.amount) });
-      });
+
+      if (template.recipeCategories) {
+        // Per-batch ingredient/cost breakdown (item-by-item mode) — the
+        // right shape for costing a single product, unlike `items` below
+        // which is a monthly overhead figure.
+        template.recipeCategories.forEach(cat => {
+          const label = cat.name[lang] || cat.name.EN;
+          if (existingNames.has(label.trim().toLowerCase())) return;
+          existingNames.add(label.trim().toLowerCase());
+          additions.push({
+            ...newCategory(),
+            name: label,
+            mode: 'items',
+            items: cat.items.map(it => ({ id: generateId(), name: it.name[lang] || it.name.EN, price: String(it.price) })),
+          });
+        });
+      } else {
+        template.items.forEach(item => {
+          const label = item.label[lang] || item.label.EN;
+          if (existingNames.has(label.trim().toLowerCase())) return;
+          existingNames.add(label.trim().toLowerCase());
+          additions.push({ ...newCategory(), name: label, single: String(item.amount) });
+        });
+      }
+
       const next = [...kept, ...additions];
       setLastTemplateSnapshot(JSON.stringify(next));
       return next;
