@@ -550,6 +550,7 @@ export default function Home() {
             {activeTab === 'pricing' && (
               <PricingTab
                 lang={state.lang}
+                accountType={state.accountType || 'personal'}
               />
             )}
             {activeTab === 'settings' && (
