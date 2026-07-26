@@ -84,6 +84,19 @@ const LABELS = {
     templatesButton: 'Start from a business template',
     templatesHint: 'Pick your type of business to prefill typical monthly cost categories — edit any amount after.',
     templateOther: "My business isn't listed",
+    pricingBasisLabel: 'How do you price this?',
+    basisQuantity: 'Per unit',
+    basisWeight: 'Per weight',
+    basisHour: 'Per hour',
+    basisProject: 'Per project (fixed job)',
+    basisArea: 'Per area (sq ft/m²)',
+    batchWeightLabel: 'Total batch weight (whole recipe/production run)',
+    unitWeightLabel: 'Weight of one unit you sell',
+    weightYields: 'This batch yields',
+    weightUnitsLabel: 'sellable units',
+    hoursLabel: 'Hours worked (this job/period)',
+    areaLabel: 'Total area (sq ft or m²)',
+    projectNote: 'Total cost = the full project price. Quantity is fixed at 1.',
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
@@ -121,6 +134,19 @@ const LABELS = {
     templatesButton: 'شروع از یک قالب کسب‌وکار',
     templatesHint: 'نوع کسب‌وکارت رو انتخاب کن تا دسته‌های هزینه‌ی معمول ماهانه از قبل پر بشن — بعداً هر مبلغی رو می‌تونی ویرایش کنی.',
     templateOther: 'کسب‌وکار من توی لیست نیست',
+    pricingBasisLabel: 'قیمت‌گذاری بر چه اساسیه؟',
+    basisQuantity: 'بر اساس تعداد',
+    basisWeight: 'بر اساس وزن',
+    basisHour: 'بر اساس ساعت',
+    basisProject: 'بر اساس پروژه (مبلغ ثابت)',
+    basisArea: 'بر اساس متراژ',
+    batchWeightLabel: 'وزن کل دستور/تولید (کل بچ)',
+    unitWeightLabel: 'وزن هر واحدی که می‌فروشی',
+    weightYields: 'این مقدار تولید می‌کنه:',
+    weightUnitsLabel: 'واحد قابل‌فروش',
+    hoursLabel: 'ساعت کار (این پروژه/دوره)',
+    areaLabel: 'مساحت کل (متر مربع یا فوت مربع)',
+    projectNote: 'مجموع هزینه = کل قیمت پروژه. تعداد روی ۱ ثابته.',
   },
 };
 
@@ -295,6 +321,15 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   const [name, setName] = useState('');
   const [categories, setCategories] = useState<CostCategory[]>(() => [newCategory(), newCategory()]);
   const [quantity, setQuantity] = useState('1');
+  type PricingBasis = 'quantity' | 'weight' | 'hour' | 'project' | 'area';
+  const [pricingBasis, setPricingBasis] = useState<PricingBasis>('quantity');
+  // Weight mode needs two numbers (how much the whole batch makes vs. how
+  // big one sellable unit is) to derive an effective quantity; hour/area
+  // modes just need one continuous number; project mode has no input at
+  // all — its quantity is always exactly 1 (total cost = total price).
+  const [batchWeight, setBatchWeight] = useState('');
+  const [unitWeight, setUnitWeight] = useState('');
+  const [hoursOrArea, setHoursOrArea] = useState('');
   const [marginPct, setMarginPct] = useState('30');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -357,11 +392,35 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       return next;
     });
     if (!name.trim()) setName(template.name[lang] || template.name.EN);
+    if (template.defaultPricingBasis) setPricingBasis(template.defaultPricingBasis);
     setShowTemplates(false);
   };
 
+  // How many "sellable units" the batch/project/job amounts to, depending
+  // on the chosen pricing basis. This is the ONLY thing that changes per
+  // basis — once we have this number, the cost/margin math below is
+  // identical for all five modes.
+  const effectiveQty = useMemo(() => {
+    switch (pricingBasis) {
+      case 'weight': {
+        const batch = num(batchWeight);
+        const unit = num(unitWeight);
+        if (batch <= 0 || unit <= 0) return 0;
+        return batch / unit;
+      }
+      case 'hour':
+      case 'area':
+        return Math.max(0, num(hoursOrArea));
+      case 'project':
+        return 1;
+      case 'quantity':
+      default:
+        return Math.max(1, Math.round(num(quantity)) || 1);
+    }
+  }, [pricingBasis, quantity, batchWeight, unitWeight, hoursOrArea]);
+
   const calc = useMemo(() => {
-    const qty = Math.max(1, Math.round(num(quantity)) || 1);
+    const qty = effectiveQty > 0 ? effectiveQty : 1;
     const margin = Math.min(95, Math.max(0, num(marginPct)));
 
     const totalCost = categories.reduce((s, c) => s + categoryTotal(c), 0);
@@ -385,7 +444,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       totalRevenue: suggestedPrice * qty,
       totalProfit: netProfitPerUnit * qty,
     };
-  }, [categories, quantity, marginPct]);
+  }, [categories, effectiveQty, marginPct]);
 
   const handleSave = () => {
     const entry: SavedProduct = {
@@ -494,8 +553,62 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           </button>
 
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.quantity}</label>
-            <input type="number" min="1" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} className={inputClass} dir="ltr" />
+            <label className="text-xs font-semibold text-slate-600 mb-1.5 block">{L.pricingBasisLabel}</label>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {([
+                ['quantity', L.basisQuantity],
+                ['weight', L.basisWeight],
+                ['hour', L.basisHour],
+                ['area', L.basisArea],
+                ['project', L.basisProject],
+              ] as [PricingBasis, string][]).map(([basis, label]) => (
+                <button
+                  key={basis}
+                  type="button"
+                  onClick={() => setPricingBasis(basis)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${pricingBasis === basis ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {pricingBasis === 'quantity' && (
+              <input type="number" min="1" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} className={inputClass} dir="ltr" placeholder={L.quantity} />
+            )}
+
+            {pricingBasis === 'weight' && (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[11px] text-slate-500 mb-1 block">{L.batchWeightLabel}</label>
+                  <input type="number" min="0" step="any" value={batchWeight} onChange={e => setBatchWeight(e.target.value)} className={inputClass} dir="ltr" placeholder="e.g. 2000 (g)" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-500 mb-1 block">{L.unitWeightLabel}</label>
+                  <input type="number" min="0" step="any" value={unitWeight} onChange={e => setUnitWeight(e.target.value)} className={inputClass} dir="ltr" placeholder="e.g. 500 (g)" />
+                </div>
+                {effectiveQty > 0 && (
+                  <p className="text-[11px] text-emerald-600 font-semibold">
+                    {L.weightYields} {effectiveQty.toLocaleString(undefined, { maximumFractionDigits: 1 })} {L.weightUnitsLabel}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {(pricingBasis === 'hour' || pricingBasis === 'area') && (
+              <input
+                type="number" min="0" step="any"
+                value={hoursOrArea}
+                onChange={e => setHoursOrArea(e.target.value)}
+                className={inputClass}
+                dir="ltr"
+                placeholder={pricingBasis === 'hour' ? L.hoursLabel : L.areaLabel}
+              />
+            )}
+
+            {pricingBasis === 'project' && (
+              <p className="text-[11px] text-slate-400 italic">{L.projectNote}</p>
+            )}
           </div>
         </div>
 

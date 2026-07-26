@@ -19,11 +19,16 @@ export interface BusinessTemplate {
   icon: string;
   name: { EN: string; FR: string; FA: string };
   items: BusinessTemplateItem[];
+  // Suggested pricing basis for PricingTab's Smart Price Recommender —
+  // e.g. a bakery prices by weight, a tutor by the hour, a photographer
+  // per project. Purely a starting-point suggestion; always changeable.
+  defaultPricingBasis?: 'quantity' | 'weight' | 'hour' | 'project' | 'area';
 }
 
 export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   {
     id: 'restaurant',
+    defaultPricingBasis: 'quantity',
     icon: '🍽️',
     name: { EN: 'Restaurant / Food Service', FR: 'Restaurant / Service alimentaire', FA: 'رستوران / خدمات غذایی' },
     items: [
@@ -37,6 +42,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'mobile_car_wash',
+    defaultPricingBasis: 'quantity',
     icon: '🚗',
     name: { EN: 'Mobile Car Wash / Detailing', FR: 'Lavage auto mobile / Detailing', FA: 'کارواش سیار / دیتیلینگ خودرو' },
     items: [
@@ -50,6 +56,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'freelancer',
+    defaultPricingBasis: 'hour',
     icon: '💻',
     name: { EN: 'Freelancer / Consultant', FR: 'Pigiste / Consultant', FA: 'فریلنسر / مشاور' },
     items: [
@@ -63,6 +70,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'real_estate',
+    defaultPricingBasis: 'project',
     icon: '🏠',
     name: { EN: 'Real Estate Agent', FR: 'Agent immobilier', FA: 'مشاور املاک' },
     items: [
@@ -76,6 +84,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'rideshare_delivery',
+    defaultPricingBasis: 'hour',
     icon: '🚕',
     name: { EN: 'Rideshare / Delivery Driver', FR: 'Covoiturage / Livreur', FA: 'راننده اسنپ/دلیوری (Uber/Lyft/DoorDash)' },
     items: [
@@ -89,6 +98,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'cleaning_service',
+    defaultPricingBasis: 'hour',
     icon: '🧹',
     name: { EN: 'Cleaning Service (Residential/Commercial)', FR: 'Service de nettoyage', FA: 'خدمات نظافتی (منزل/تجاری)' },
     items: [
@@ -102,6 +112,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'trucking',
+    defaultPricingBasis: 'project',
     icon: '🚛',
     name: { EN: 'Trucking / Owner-Operator', FR: 'Camionnage / Propriétaire-exploitant', FA: 'کامیون‌داری / راننده مستقل' },
     items: [
@@ -115,6 +126,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'construction',
+    defaultPricingBasis: 'project',
     icon: '🔨',
     name: { EN: 'Construction / Renovation Contractor', FR: 'Construction / Rénovation', FA: 'ساخت‌وساز / بازسازی' },
     items: [
@@ -128,6 +140,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'hair_salon',
+    defaultPricingBasis: 'quantity',
     icon: '💈',
     name: { EN: 'Hair Salon / Barber', FR: 'Salon de coiffure / Barbier', FA: 'آرایشگاه / سلمانی' },
     items: [
@@ -141,6 +154,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'nail_salon',
+    defaultPricingBasis: 'quantity',
     icon: '💅',
     name: { EN: 'Nail Salon / Esthetics', FR: 'Salon de manucure / Esthétique', FA: 'سالن ناخن / زیبایی' },
     items: [
@@ -154,6 +168,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'convenience_store',
+    defaultPricingBasis: 'quantity',
     icon: '🏪',
     name: { EN: 'Convenience Store / Retail Shop', FR: 'Dépanneur / Commerce de détail', FA: 'سوپرمارکت / مغازه خرده‌فروشی' },
     items: [
@@ -167,6 +182,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'import_export',
+    defaultPricingBasis: 'quantity',
     icon: '📦',
     name: { EN: 'Import / Export Trading', FR: 'Commerce import/export', FA: 'واردات و صادرات' },
     items: [
@@ -180,6 +196,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'it_consulting',
+    defaultPricingBasis: 'hour',
     icon: '🖥️',
     name: { EN: 'IT / Software Consulting', FR: 'Consultation informatique/logicielle', FA: 'مشاوره IT / نرم‌افزار' },
     items: [
@@ -193,6 +210,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'photography',
+    defaultPricingBasis: 'project',
     icon: '📷',
     name: { EN: 'Photography / Videography', FR: 'Photographie / Vidéographie', FA: 'عکاسی / فیلم‌برداری' },
     items: [
@@ -206,6 +224,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'childcare',
+    defaultPricingBasis: 'hour',
     icon: '🧸',
     name: { EN: 'Childcare / Daycare Provider', FR: 'Garderie', FA: 'مهدکودک / نگهداری کودک' },
     items: [
@@ -219,6 +238,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'landscaping',
+    defaultPricingBasis: 'area',
     icon: '🌿',
     name: { EN: 'Landscaping / Lawn Care', FR: 'Aménagement paysager', FA: 'باغبانی / نگهداری چمن' },
     items: [
@@ -232,6 +252,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'handyman',
+    defaultPricingBasis: 'project',
     icon: '🛠️',
     name: { EN: 'Handyman / Repair Services', FR: 'Bricoleur / Services de réparation', FA: 'تعمیرکار / خدمات فنی' },
     items: [
@@ -245,6 +266,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'home_based_food',
+    defaultPricingBasis: 'weight',
     icon: '🍰',
     name: { EN: 'Home-Based Food / Homemade Sweets', FR: 'Cuisine maison / Pâtisseries artisanales', FA: 'غذا و شیرینی خانگی' },
     items: [
@@ -258,6 +280,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'home_tailoring',
+    defaultPricingBasis: 'quantity',
     icon: '🧵',
     name: { EN: 'Alterations / Home Tailoring', FR: 'Retouches / Couture à domicile', FA: 'خیاطی و تعمیرات لباس خانگی' },
     items: [
@@ -271,6 +294,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'private_tutor',
+    defaultPricingBasis: 'hour',
     icon: '📚',
     name: { EN: 'Private Tutor / Language & Music Teacher', FR: 'Tuteur privé / Professeur de langue et musique', FA: 'معلم خصوصی / تدریس زبان و موسیقی' },
     items: [
@@ -284,6 +308,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'bridal_makeup',
+    defaultPricingBasis: 'project',
     icon: '💄',
     name: { EN: 'Bridal / Event Makeup & Henna Artist', FR: 'Maquillage de mariage/événement et henné', FA: 'آرایشگری عروس و مجالس / حنا' },
     items: [
