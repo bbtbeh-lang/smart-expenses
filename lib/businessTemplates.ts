@@ -62,6 +62,33 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Delivery App Fees', FR: "Frais d'applications de livraison", FA: 'کارمزد اپلیکیشن‌های تحویل' }, amount: 400 },
       { label: { EN: 'Licensing & Food Safety', FR: 'Permis et salubrité alimentaire', FA: 'مجوز و بهداشت مواد غذایی' }, amount: 100 },
     ],
+    // Example: one plate/dish (adjust to your actual menu item and portions).
+    recipeCategories: [
+      {
+        name: { EN: 'Ingredients (per dish)', FR: 'Ingrédients (par plat)', FA: 'مواد اولیه (هر پرس)' },
+        items: [
+          { name: { EN: 'Protein (meat/chicken/fish)', FR: 'Protéine (viande/poulet/poisson)', FA: 'پروتئین (گوشت/مرغ/ماهی)' }, price: 4.5 },
+          { name: { EN: 'Rice / Bread / Starch', FR: 'Riz / Pain / Féculent', FA: 'برنج/نان/نشاسته' }, price: 1.2 },
+          { name: { EN: 'Vegetables & Garnish', FR: 'Légumes et garniture', FA: 'سبزیجات و تزیین' }, price: 1.0 },
+          { name: { EN: 'Sauces & Spices', FR: 'Sauces et épices', FA: 'سس و ادویه' }, price: 0.7 },
+        ],
+      },
+      {
+        name: { EN: 'Packaging / Disposables', FR: 'Emballage / Jetables', FA: 'بسته‌بندی و ظروف یک‌بارمصرف' },
+        items: [
+          { name: { EN: 'Takeout Container', FR: 'Contenant pour emporter', FA: 'ظرف بیرون‌بر' }, price: 0.6 },
+          { name: { EN: 'Cutlery & Napkins', FR: 'Ustensiles et serviettes', FA: 'قاشق‌چنگال و دستمال' }, price: 0.3 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Kitchen Utilities (gas/electric share)', FR: "Services publics de cuisine (part)", FA: 'سهم گاز و برق آشپزخانه' }, price: 0.8 },
+          { name: { EN: 'Card Processing Fee (~2.5%)', FR: 'Frais de traitement carte (~2,5 %)', FA: 'کارمزد کارت اعتباری (حدود ۲.۵٪)' }, price: 0.5 },
+          { name: { EN: 'Food Waste / Spoilage Allowance', FR: 'Provision pour perte alimentaire', FA: 'ضایعات و دورریز غذا' }, price: 0.6 },
+        ],
+      },
+    ],
   },
   {
     id: 'mobile_car_wash',
@@ -75,6 +102,31 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Equipment Maintenance', FR: 'Entretien de l\'équipement', FA: 'نگهداری تجهیزات' }, amount: 200 },
       { label: { EN: 'Commercial Auto Insurance', FR: 'Assurance auto commerciale', FA: 'بیمه خودروی تجاری' }, amount: 250 },
       { label: { EN: 'Marketing / Flyers', FR: 'Marketing / Dépliants', FA: 'تبلیغات و بروشور' }, amount: 100 },
+    ],
+    recipeCategories: [
+      {
+        name: { EN: 'Cleaning Supplies (per wash)', FR: 'Produits de nettoyage (par lavage)', FA: 'مواد شست‌وشو (هر شستشو)' },
+        items: [
+          { name: { EN: 'Soap / Shampoo', FR: 'Savon / Shampoing', FA: 'مایع شست‌وشو' }, price: 2.0 },
+          { name: { EN: 'Wax / Polish', FR: 'Cire / Lustrant', FA: 'واکس/پولیش' }, price: 2.5 },
+          { name: { EN: 'Interior Cleaner / Air Freshener', FR: 'Nettoyant intérieur / Désodorisant', FA: 'اسپری داخل خودرو و خوشبوکننده' }, price: 1.0 },
+        ],
+      },
+      {
+        name: { EN: 'Consumables', FR: 'Consommables', FA: 'ملزومات مصرفی' },
+        items: [
+          { name: { EN: 'Microfiber Towels (wear)', FR: 'Serviettes microfibres (usure)', FA: 'حوله میکروفایبر (استهلاک)' }, price: 1.5 },
+          { name: { EN: 'Gloves & Applicator Pads', FR: 'Gants et tampons applicateurs', FA: 'دستکش و اسفنج' }, price: 0.5 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Water (per wash)', FR: "Eau (par lavage)", FA: 'آب مصرفی (هر شستشو)' }, price: 1.0 },
+          { name: { EN: 'Fuel to Reach Client', FR: 'Carburant pour se rendre au client', FA: 'سوخت رفت‌وآمد به مشتری' }, price: 3.0 },
+          { name: { EN: 'Equipment Depreciation (pressure washer, etc.)', FR: "Amortissement de l'équipement", FA: 'استهلاک تجهیزات (واتردار و غیره)' }, price: 2.0 },
+        ],
+      },
     ],
   },
   {
@@ -90,6 +142,32 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Professional Development', FR: 'Développement professionnel', FA: 'آموزش و توسعه حرفه‌ای' }, amount: 100 },
       { label: { EN: 'Accounting / Bookkeeping', FR: 'Comptabilité', FA: 'حسابداری' }, amount: 150 },
     ],
+    // "Per unit" here = one billable hour. Freelancers often price only on
+    // what they'll charge, without accounting for overhead per hour —
+    // this breaks that out explicitly.
+    recipeCategories: [
+      {
+        name: { EN: 'Tools Allocated Per Hour', FR: "Outils alloués par heure", FA: 'سهم ابزار به ازای هر ساعت' },
+        items: [
+          { name: { EN: 'Software Subscriptions (per billable hour)', FR: 'Abonnements logiciels (par heure facturable)', FA: 'اشتراک نرم‌افزار (هر ساعت قابل‌فاکتور)' }, price: 1.5 },
+          { name: { EN: 'Cloud / Storage (per hour)', FR: 'Infonuagique / stockage (par heure)', FA: 'فضای ابری (هر ساعت)' }, price: 0.5 },
+        ],
+      },
+      {
+        name: { EN: 'Overhead Per Hour', FR: 'Frais généraux par heure', FA: 'سربار به ازای هر ساعت' },
+        items: [
+          { name: { EN: 'Internet & Phone (allocated)', FR: 'Internet et téléphone (alloué)', FA: 'سهم اینترنت و تلفن' }, price: 1.0 },
+          { name: { EN: 'Home Office Space (allocated)', FR: "Espace de bureau à domicile (alloué)", FA: 'سهم فضای دفتر خانگی' }, price: 1.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Unbillable Admin Time (emails, invoicing)', FR: 'Temps administratif non facturable', FA: 'زمان اداری غیرقابل‌فاکتور (ایمیل، فاکتور)' }, price: 3.0 },
+          { name: { EN: 'CPP Self-Employed Contribution (~11.9%)', FR: 'Cotisation RPC travailleur autonome (~11,9 %)', FA: 'حق بیمه CPP شغل آزاد (حدود ۱۱.۹٪)' }, price: 6.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'real_estate',
@@ -103,6 +181,31 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Professional Photography', FR: 'Photographie professionnelle', FA: 'عکاسی حرفه‌ای' }, amount: 200 },
       { label: { EN: 'Brokerage Fees', FR: 'Frais de courtage', FA: 'کارمزد بروکراژ' }, amount: 300 },
       { label: { EN: 'Client Gifts / Closing Costs', FR: 'Cadeaux clients / Frais de clôture', FA: 'هدایای مشتری و هزینه‌های تسویه' }, amount: 150 },
+    ],
+    // "Per unit" here = one closed listing/deal.
+    recipeCategories: [
+      {
+        name: { EN: 'Marketing Per Listing', FR: 'Marketing par inscription', FA: 'تبلیغات هر ملک' },
+        items: [
+          { name: { EN: 'Professional Photos / Video Tour', FR: 'Photos professionnelles / visite vidéo', FA: 'عکاسی حرفه‌ای و تور ویدیویی' }, price: 250 },
+          { name: { EN: 'Online Listing Boost / Ads', FR: 'Promotion en ligne / publicités', FA: 'تبلیغ آنلاین آگهی' }, price: 100 },
+          { name: { EN: 'Signage & Printed Flyers', FR: 'Affichage et dépliants imprimés', FA: 'تابلو و بروشور چاپی' }, price: 80 },
+        ],
+      },
+      {
+        name: { EN: 'Client Costs Per Deal', FR: 'Frais client par transaction', FA: 'هزینه‌های مشتری هر معامله' },
+        items: [
+          { name: { EN: 'Closing Gift', FR: 'Cadeau de clôture', FA: 'هدیه تسویه معامله' }, price: 100 },
+          { name: { EN: 'MLS / Board Fee Share', FR: 'Part des frais MLS', FA: 'سهم هزینه عضویت MLS' }, price: 40 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Brokerage Split (~30-50% of commission)', FR: 'Partage avec le courtage (~30-50 % de la commission)', FA: 'سهم بروکراژ (حدود ۳۰ تا ۵۰٪ کمیسیون)' }, price: 800 },
+          { name: { EN: 'Mileage / Gas for Showings', FR: 'Kilométrage / essence pour visites', FA: 'کیلومتراژ و بنزین بازدیدها' }, price: 60 },
+        ],
+      },
     ],
   },
   {
@@ -118,6 +221,29 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Phone Plan / Data', FR: 'Forfait téléphonique / Données', FA: 'خط تلفن و اینترنت موبایل' }, amount: 60 },
       { label: { EN: 'Car Wash / Cleaning', FR: 'Lavage / Nettoyage', FA: 'کارواش و نظافت خودرو' }, amount: 60 },
     ],
+    recipeCategories: [
+      {
+        name: { EN: 'Vehicle Operating Cost (per hour driving)', FR: "Coût d'exploitation du véhicule (par heure)", FA: 'هزینه بهره‌برداری خودرو (هر ساعت)' },
+        items: [
+          { name: { EN: 'Fuel', FR: 'Carburant', FA: 'سوخت' }, price: 4.0 },
+          { name: { EN: 'Vehicle Depreciation / Wear', FR: 'Amortissement du véhicule', FA: 'استهلاک خودرو' }, price: 2.5 },
+        ],
+      },
+      {
+        name: { EN: 'Consumables Per Hour', FR: 'Consommables par heure', FA: 'ملزومات به ازای هر ساعت' },
+        items: [
+          { name: { EN: 'Phone Data Plan (allocated)', FR: 'Forfait de données (alloué)', FA: 'سهم بسته اینترنت موبایل' }, price: 0.5 },
+          { name: { EN: 'Car Wash / Interior Cleaning (allocated)', FR: 'Lavage auto (alloué)', FA: 'سهم کارواش' }, price: 0.5 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'CPP Self-Employed Contribution (~11.9%)', FR: 'Cotisation RPC travailleur autonome (~11,9 %)', FA: 'حق بیمه CPP شغل آزاد (حدود ۱۱.۹٪)' }, price: 2.5 },
+          { name: { EN: 'Idle Time Between Rides (unpaid)', FR: 'Temps mort entre les courses (non payé)', FA: 'زمان بیکاری بین سفرها (بدون درآمد)' }, price: 3.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'cleaning_service',
@@ -131,6 +257,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Staff Wages', FR: 'Salaires du personnel', FA: 'حقوق کارکنان' }, amount: 2000 },
       { label: { EN: 'Insurance / Bonding', FR: 'Assurance / Cautionnement', FA: 'بیمه و ضمانت' }, amount: 150 },
       { label: { EN: 'Marketing', FR: 'Marketing', FA: 'تبلیغات' }, amount: 100 },
+    ],
+    recipeCategories: [
+      {
+        name: { EN: 'Supplies Per Job', FR: 'Fournitures par contrat', FA: 'مواد مصرفی هر کار' },
+        items: [
+          { name: { EN: 'Cleaning Chemicals', FR: 'Produits chimiques de nettoyage', FA: 'مواد شیمیایی نظافتی' }, price: 3.0 },
+          { name: { EN: 'Disposables (gloves, cloths, garbage bags)', FR: 'Jetables (gants, chiffons, sacs)', FA: 'یک‌بارمصرف (دستکش، پارچه، کیسه زباله)' }, price: 2.0 },
+        ],
+      },
+      {
+        name: { EN: 'Equipment Wear Per Job', FR: "Usure de l'équipement par contrat", FA: 'استهلاک تجهیزات هر کار' },
+        items: [
+          { name: { EN: 'Vacuum / Mop Wear', FR: 'Usure aspirateur / vadrouille', FA: 'استهلاک جاروبرقی و تی' }, price: 2.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Travel Time Between Jobs', FR: 'Temps de déplacement entre contrats', FA: 'زمان رفت‌وآمد بین کارها' }, price: 8.0 },
+          { name: { EN: 'Liability Insurance (per job share)', FR: 'Assurance responsabilité (part par contrat)', FA: 'سهم بیمه مسئولیت هر کار' }, price: 4.0 },
+        ],
+      },
     ],
   },
   {
@@ -146,6 +294,29 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Permits & Licensing', FR: 'Permis et licences', FA: 'مجوزها و لایسنس' }, amount: 200 },
       { label: { EN: 'ELD / Dispatch Software', FR: 'Logiciel ELD / Répartition', FA: 'نرم‌افزار ELD و دیسپچ' }, amount: 100 },
     ],
+    // "Per unit" here = one long-haul trip/load.
+    recipeCategories: [
+      {
+        name: { EN: 'Fuel & Road Costs (per trip)', FR: 'Carburant et frais de route (par voyage)', FA: 'سوخت و هزینه‌های جاده (هر سفر)' },
+        items: [
+          { name: { EN: 'Diesel Fuel', FR: 'Carburant diesel', FA: 'گازوئیل' }, price: 600 },
+          { name: { EN: 'Tolls / Weigh Scale Fees', FR: 'Péages / frais de pesée', FA: 'عوارض جاده و ترازوی وزن' }, price: 40 },
+        ],
+      },
+      {
+        name: { EN: 'Maintenance Reserve (per trip)', FR: "Réserve d'entretien (par voyage)", FA: 'ذخیره تعمیر و نگهداری (هر سفر)' },
+        items: [
+          { name: { EN: 'Tire Wear / Oil Reserve', FR: "Usure des pneus / réserve d'huile", FA: 'استهلاک لاستیک و ذخیره روغن' }, price: 80 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Driver Meals / Lodging', FR: "Repas / hébergement du chauffeur", FA: 'غذا و اقامت راننده' }, price: 60 },
+          { name: { EN: 'Empty Return / Deadhead Miles', FR: 'Retour à vide', FA: 'کیلومتراژ بازگشت خالی' }, price: 100 },
+        ],
+      },
+    ],
   },
   {
     id: 'construction',
@@ -159,6 +330,30 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Vehicle & Fuel', FR: 'Véhicule et carburant', FA: 'خودرو و سوخت' }, amount: 500 },
       { label: { EN: 'Insurance & WSIB', FR: 'Assurance et CSPAAT', FA: 'بیمه و WSIB' }, amount: 400 },
       { label: { EN: 'Permits', FR: 'Permis', FA: 'مجوزها' }, amount: 200 },
+    ],
+    // "Per unit" here = one renovation job (e.g. a bathroom reno).
+    recipeCategories: [
+      {
+        name: { EN: 'Materials Per Job', FR: 'Matériaux par contrat', FA: 'مصالح هر پروژه' },
+        items: [
+          { name: { EN: 'Lumber / Drywall / Framing', FR: 'Bois / Placoplâtre / Charpente', FA: 'چوب، گچ‌بری و اسکلت‌بندی' }, price: 800 },
+          { name: { EN: 'Fixtures & Finishing Materials', FR: 'Accessoires et matériaux de finition', FA: 'شیرآلات و مصالح نازک‌کاری' }, price: 600 },
+        ],
+      },
+      {
+        name: { EN: 'Labour Per Job', FR: "Main-d'œuvre par contrat", FA: 'نیروی کار هر پروژه' },
+        items: [
+          { name: { EN: 'Subcontractor (electrician/plumber)', FR: 'Sous-traitant (électricien/plombier)', FA: 'پیمانکار فرعی (برق‌کار/لوله‌کش)' }, price: 1200 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Permit Fee', FR: 'Frais de permis', FA: 'هزینه مجوز شهرداری' }, price: 150 },
+          { name: { EN: 'Waste Disposal / Dumpster', FR: 'Élimination des déchets / conteneur', FA: 'دفع نخاله و کانتینر زباله' }, price: 200 },
+          { name: { EN: 'Tool Wear / Depreciation', FR: 'Usure des outils', FA: 'استهلاک ابزار' }, price: 100 },
+        ],
+      },
     ],
   },
   {
@@ -174,6 +369,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Licensing', FR: 'Permis', FA: 'مجوز کسب' }, amount: 80 },
       { label: { EN: 'Equipment Maintenance', FR: 'Entretien de l\'équipement', FA: 'نگهداری تجهیزات' }, amount: 100 },
     ],
+    recipeCategories: [
+      {
+        name: { EN: 'Product Usage Per Service', FR: 'Produits utilisés par service', FA: 'مصرف مواد هر سرویس' },
+        items: [
+          { name: { EN: 'Shampoo & Conditioner', FR: 'Shampoing et revitalisant', FA: 'شامپو و نرم‌کننده' }, price: 1.5 },
+          { name: { EN: 'Styling Product / Color', FR: 'Produit coiffant / Couleur', FA: 'محصول حالت‌دهنده یا رنگ' }, price: 3.0 },
+        ],
+      },
+      {
+        name: { EN: 'Consumables', FR: 'Consommables', FA: 'ملزومات مصرفی' },
+        items: [
+          { name: { EN: 'Cape, Towels & Gloves (laundering/wear)', FR: 'Cape, serviettes et gants (usure)', FA: 'روپوش، حوله و دستکش (استهلاک)' }, price: 1.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Chair Rental Share (per service)', FR: 'Part de location de chaise (par service)', FA: 'سهم اجاره صندلی (هر سرویس)' }, price: 4.0 },
+          { name: { EN: 'Sanitation Supplies', FR: 'Fournitures de désinfection', FA: 'لوازم استریل و بهداشتی' }, price: 0.8 },
+        ],
+      },
+    ],
   },
   {
     id: 'nail_salon',
@@ -187,6 +404,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Sanitation Supplies', FR: 'Fournitures de désinfection', FA: 'لوازم استریل و بهداشتی' }, amount: 100 },
       { label: { EN: 'Marketing', FR: 'Marketing', FA: 'تبلیغات' }, amount: 100 },
       { label: { EN: 'Licensing', FR: 'Permis', FA: 'مجوز کسب' }, amount: 80 },
+    ],
+    recipeCategories: [
+      {
+        name: { EN: 'Product Usage Per Service', FR: 'Produits utilisés par service', FA: 'مصرف مواد هر سرویس' },
+        items: [
+          { name: { EN: 'Polish / Gel / Acrylic', FR: 'Vernis / Gel / Acrylique', FA: 'لاک / ژل / آکریلیک' }, price: 4.0 },
+          { name: { EN: 'Cuticle Oil & Lotion', FR: 'Huile et lotion pour cuticules', FA: 'روغن و لوسیون پوست ناخن' }, price: 0.8 },
+        ],
+      },
+      {
+        name: { EN: 'Consumables', FR: 'Consommables', FA: 'ملزومات مصرفی' },
+        items: [
+          { name: { EN: 'Files, Buffers & Disposable Liners', FR: 'Limes, polissoirs et protections jetables', FA: 'سوهان، بافر و روکش یک‌بارمصرف' }, price: 1.5 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Sterilization / Sanitation', FR: 'Stérilisation / désinfection', FA: 'استریل و ضدعفونی' }, price: 1.0 },
+          { name: { EN: 'Rent Share (per service)', FR: 'Part du loyer (par service)', FA: 'سهم اجاره (هر سرویس)' }, price: 3.5 },
+        ],
+      },
     ],
   },
   {
@@ -202,6 +441,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'POS / Software', FR: 'Point de vente / Logiciel', FA: 'دستگاه و نرم‌افزار فروش (POS)' }, amount: 100 },
       { label: { EN: 'Insurance', FR: 'Assurance', FA: 'بیمه' }, amount: 200 },
     ],
+    // "Per unit" here = one typical item sold (adjust to your actual product mix).
+    recipeCategories: [
+      {
+        name: { EN: 'Cost of Goods (per unit sold)', FR: 'Coût des marchandises (par unité vendue)', FA: 'بهای تمام‌شده کالا (هر واحد فروش)' },
+        items: [
+          { name: { EN: 'Wholesale Purchase Price', FR: "Prix d'achat en gros", FA: 'قیمت خرید عمده' }, price: 2.0 },
+        ],
+      },
+      {
+        name: { EN: 'Packaging', FR: 'Emballage', FA: 'بسته‌بندی' },
+        items: [
+          { name: { EN: 'Bags / Receipt Paper', FR: 'Sacs / papier de reçu', FA: 'کیسه و رول فیش' }, price: 0.1 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Card Processing Fee (~2.5%)', FR: 'Frais de traitement carte (~2,5 %)', FA: 'کارمزد کارت اعتباری (حدود ۲.۵٪)' }, price: 0.1 },
+          { name: { EN: 'Shrinkage / Theft Allowance', FR: 'Provision pour freinte / vol', FA: 'ضایعات و کسری انبار' }, price: 0.15 },
+        ],
+      },
+    ],
   },
   {
     id: 'import_export',
@@ -215,6 +476,29 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Warehousing', FR: 'Entreposage', FA: 'انبارداری' }, amount: 800 },
       { label: { EN: 'Cargo Insurance', FR: 'Assurance cargaison', FA: 'بیمه محموله' }, amount: 300 },
       { label: { EN: 'Marketing / Trade Shows', FR: 'Marketing / Salons professionnels', FA: 'تبلیغات و نمایشگاه‌های تجاری' }, amount: 300 },
+    ],
+    // "Per unit" here = one imported unit/case of goods.
+    recipeCategories: [
+      {
+        name: { EN: 'Product Cost Per Unit', FR: 'Coût du produit par unité', FA: 'بهای کالا هر واحد' },
+        items: [
+          { name: { EN: 'Supplier / Factory Price', FR: "Prix du fournisseur / de l'usine", FA: 'قیمت تأمین‌کننده/کارخانه' }, price: 5.0 },
+        ],
+      },
+      {
+        name: { EN: 'Shipping & Customs Per Unit', FR: 'Expédition et douanes par unité', FA: 'حمل و گمرک هر واحد' },
+        items: [
+          { name: { EN: 'Freight (allocated)', FR: 'Fret (alloué)', FA: 'سهم هزینه حمل' }, price: 1.5 },
+          { name: { EN: 'Customs Duty / Brokerage Fee', FR: 'Droits de douane / frais de courtage', FA: 'عوارض گمرکی و کارمزد ترخیص' }, price: 0.8 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Currency Exchange Fee', FR: 'Frais de change', FA: 'کارمزد تبدیل ارز' }, price: 0.3 },
+          { name: { EN: 'Warehousing (allocated)', FR: 'Entreposage (alloué)', FA: 'سهم انبارداری' }, price: 0.5 },
+        ],
+      },
     ],
   },
   {
@@ -230,6 +514,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Professional Development / Certs', FR: 'Développement professionnel / Certifications', FA: 'آموزش و مدارک تخصصی' }, amount: 150 },
       { label: { EN: 'Subcontractor Fees', FR: 'Frais de sous-traitance', FA: 'هزینه پیمانکار فرعی' }, amount: 500 },
     ],
+    recipeCategories: [
+      {
+        name: { EN: 'Tools Allocated Per Hour', FR: "Outils alloués par heure", FA: 'سهم ابزار به ازای هر ساعت' },
+        items: [
+          { name: { EN: 'Software Licenses (per hour)', FR: 'Licences logicielles (par heure)', FA: 'لایسنس نرم‌افزار (هر ساعت)' }, price: 1.5 },
+          { name: { EN: 'Cloud Hosting / Servers (per hour)', FR: 'Hébergement infonuagique (par heure)', FA: 'سهم هاست و سرور (هر ساعت)' }, price: 1.0 },
+        ],
+      },
+      {
+        name: { EN: 'Overhead Per Hour', FR: 'Frais généraux par heure', FA: 'سربار به ازای هر ساعت' },
+        items: [
+          { name: { EN: 'Internet & Equipment (allocated)', FR: 'Internet et équipement (alloué)', FA: 'سهم اینترنت و تجهیزات' }, price: 1.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Unbillable Admin Time', FR: 'Temps administratif non facturable', FA: 'زمان اداری غیرقابل‌فاکتور' }, price: 3.0 },
+          { name: { EN: 'Professional Liability (E&O) Insurance', FR: 'Assurance responsabilité professionnelle', FA: 'بیمه مسئولیت حرفه‌ای' }, price: 2.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'photography',
@@ -243,6 +549,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Marketing / Portfolio Site', FR: 'Marketing / Site portfolio', FA: 'تبلیغات و سایت نمونه‌کار' }, amount: 100 },
       { label: { EN: 'Vehicle & Travel', FR: 'Véhicule et déplacements', FA: 'خودرو و رفت‌وآمد' }, amount: 200 },
       { label: { EN: 'Equipment Insurance', FR: 'Assurance équipement', FA: 'بیمه تجهیزات' }, amount: 100 },
+    ],
+    recipeCategories: [
+      {
+        name: { EN: 'Equipment Wear Per Shoot', FR: "Usure de l'équipement par séance", FA: 'استهلاک تجهیزات هر جلسه' },
+        items: [
+          { name: { EN: 'Camera / Lens Depreciation', FR: "Amortissement caméra / objectif", FA: 'استهلاک دوربین و لنز' }, price: 15.0 },
+          { name: { EN: 'Memory Cards / Backup Storage', FR: 'Cartes mémoire / stockage de sauvegarde', FA: 'کارت حافظه و بک‌آپ' }, price: 3.0 },
+        ],
+      },
+      {
+        name: { EN: 'Post-Production Per Shoot', FR: 'Post-production par séance', FA: 'ویرایش پس از جلسه' },
+        items: [
+          { name: { EN: 'Editing Software (allocated)', FR: 'Logiciel de montage (alloué)', FA: 'سهم نرم‌افزار ویرایش' }, price: 10.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Travel / Mileage to Venue', FR: 'Déplacement / kilométrage', FA: 'رفت‌وآمد به محل مراسم' }, price: 25.0 },
+          { name: { EN: 'Equipment Insurance (per-shoot share)', FR: 'Assurance équipement (part par séance)', FA: 'سهم بیمه تجهیزات (هر جلسه)' }, price: 8.0 },
+        ],
+      },
     ],
   },
   {
@@ -258,6 +586,29 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Facility Rent / Utilities', FR: 'Loyer / Services publics', FA: 'اجاره و قبوض محل' }, amount: 800 },
       { label: { EN: 'Marketing', FR: 'Marketing', FA: 'تبلیغات' }, amount: 50 },
     ],
+    // "Per unit" here = one child, one day.
+    recipeCategories: [
+      {
+        name: { EN: 'Food & Supplies Per Child Per Day', FR: "Nourriture et fournitures par enfant par jour", FA: 'غذا و لوازم هر کودک در روز' },
+        items: [
+          { name: { EN: 'Meals & Snacks', FR: 'Repas et collations', FA: 'غذا و میان‌وعده' }, price: 6.0 },
+          { name: { EN: 'Craft / Activity Supplies', FR: "Fournitures d'activités", FA: 'لوازم بازی و فعالیت' }, price: 1.5 },
+        ],
+      },
+      {
+        name: { EN: 'Consumables', FR: 'Consommables', FA: 'ملزومات مصرفی' },
+        items: [
+          { name: { EN: 'Diapers / Wipes (if applicable)', FR: 'Couches / lingettes (le cas échéant)', FA: 'پوشک و دستمال (در صورت نیاز)' }, price: 3.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Liability Insurance (per child share)', FR: 'Assurance responsabilité (part par enfant)', FA: 'سهم بیمه مسئولیت (هر کودک)' }, price: 2.0 },
+          { name: { EN: 'Facility Utilities (allocated)', FR: 'Services publics (alloués)', FA: 'سهم قبوض محل' }, price: 3.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'landscaping',
@@ -272,6 +623,29 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Insurance', FR: 'Assurance', FA: 'بیمه' }, amount: 200 },
       { label: { EN: 'Marketing / Flyers', FR: 'Marketing / Dépliants', FA: 'تبلیغات و بروشور' }, amount: 100 },
     ],
+    // "Per unit" here = a typical residential lawn job.
+    recipeCategories: [
+      {
+        name: { EN: 'Materials Per Job', FR: 'Matériaux par contrat', FA: 'مصالح هر کار' },
+        items: [
+          { name: { EN: 'Fuel (mower/trimmer)', FR: 'Carburant (tondeuse/taille-bordures)', FA: 'سوخت (چمن‌زن/تریمر)' }, price: 5.0 },
+          { name: { EN: 'Seed / Mulch / Fertilizer', FR: 'Semences / paillis / engrais', FA: 'بذر، کود و مالچ' }, price: 8.0 },
+        ],
+      },
+      {
+        name: { EN: 'Equipment Wear Per Job', FR: "Usure de l'équipement par contrat", FA: 'استهلاک تجهیزات هر کار' },
+        items: [
+          { name: { EN: 'Blade Sharpening / Line Trimmer String', FR: 'Affûtage des lames / fil de coupe-bordures', FA: 'تیزکردن تیغه و نخ تریمر' }, price: 2.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Vehicle & Trailer Fuel/Wear', FR: 'Carburant et usure du véhicule/remorque', FA: 'سوخت و استهلاک خودرو/تریلر' }, price: 6.0 },
+          { name: { EN: 'Yard Waste Disposal', FR: 'Élimination des déchets verts', FA: 'دفع ضایعات باغبانی' }, price: 4.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'handyman',
@@ -285,6 +659,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Liability Insurance', FR: 'Assurance responsabilité', FA: 'بیمه مسئولیت' }, amount: 200 },
       { label: { EN: 'Marketing', FR: 'Marketing', FA: 'تبلیغات' }, amount: 100 },
       { label: { EN: 'Licensing / Permits', FR: 'Permis', FA: 'مجوزها' }, amount: 80 },
+    ],
+    recipeCategories: [
+      {
+        name: { EN: 'Materials & Parts Per Job', FR: 'Matériaux et pièces par contrat', FA: 'قطعات و مصالح هر کار' },
+        items: [
+          { name: { EN: 'Replacement Parts / Hardware', FR: 'Pièces de rechange / quincaillerie', FA: 'قطعات یدکی و لوازم' }, price: 40.0 },
+          { name: { EN: 'Fasteners, Sealant, Small Materials', FR: 'Fixations, scellant, petits matériaux', FA: 'پیچ و مهره، درزگیر و مواد جزئی' }, price: 10.0 },
+        ],
+      },
+      {
+        name: { EN: 'Tool Wear Per Job', FR: 'Usure des outils par contrat', FA: 'استهلاک ابزار هر کار' },
+        items: [
+          { name: { EN: 'Power Tool Depreciation', FR: 'Amortissement des outils électriques', FA: 'استهلاک ابزار برقی' }, price: 8.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Travel / Gas Per Job', FR: 'Déplacement / essence par contrat', FA: 'رفت‌وآمد و بنزین هر کار' }, price: 15.0 },
+          { name: { EN: 'Liability Insurance (per job share)', FR: 'Assurance responsabilité (part par contrat)', FA: 'سهم بیمه مسئولیت هر کار' }, price: 10.0 },
+        ],
+      },
     ],
   },
   {
@@ -345,6 +741,29 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Marketing (Social Media / Flyers)', FR: 'Marketing (réseaux sociaux / dépliants)', FA: 'تبلیغات (شبکه‌های اجتماعی و بروشور)' }, amount: 80 },
       { label: { EN: 'Home Business Permit', FR: "Permis d'entreprise à domicile", FA: 'مجوز کسب‌وکار خانگی' }, amount: 60 },
     ],
+    // "Per unit" here = one garment/alteration job.
+    recipeCategories: [
+      {
+        name: { EN: 'Materials Per Garment', FR: 'Matériaux par vêtement', FA: 'مواد اولیه هر لباس' },
+        items: [
+          { name: { EN: 'Fabric (if supplied by you)', FR: 'Tissu (si fourni par vous)', FA: 'پارچه (در صورت تأمین توسط شما)' }, price: 8.0 },
+          { name: { EN: 'Thread, Zippers, Buttons', FR: 'Fil, fermetures éclair, boutons', FA: 'نخ، زیپ و دکمه' }, price: 2.0 },
+        ],
+      },
+      {
+        name: { EN: 'Consumables', FR: 'Consommables', FA: 'ملزومات مصرفی' },
+        items: [
+          { name: { EN: 'Interfacing / Lining', FR: 'Entoilage / doublure', FA: 'چسب و آستری' }, price: 1.5 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Machine Wear & Electricity', FR: 'Usure de la machine et électricité', FA: 'استهلاک چرخ و برق مصرفی' }, price: 1.0 },
+          { name: { EN: 'Delivery / Pickup Trip', FR: 'Livraison / collecte', FA: 'رفت‌وآمد تحویل کار' }, price: 3.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'private_tutor',
@@ -359,6 +778,27 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Instrument Maintenance', FR: "Entretien de l'instrument", FA: 'نگهداری ساز موسیقی' }, amount: 50 },
       { label: { EN: 'Professional Development / Certification', FR: 'Développement professionnel / Certification', FA: 'آموزش و مدرک حرفه‌ای' }, amount: 100 },
     ],
+    recipeCategories: [
+      {
+        name: { EN: 'Materials Per Lesson', FR: 'Matériel par leçon', FA: 'منابع هر جلسه' },
+        items: [
+          { name: { EN: 'Worksheets / Printed Materials', FR: "Fiches d'exercices / matériel imprimé", FA: 'برگه تمرین و منابع چاپی' }, price: 1.0 },
+        ],
+      },
+      {
+        name: { EN: 'Platform Cost Per Hour', FR: 'Coût de la plateforme par heure', FA: 'هزینه پلتفرم به ازای هر ساعت' },
+        items: [
+          { name: { EN: 'Video Platform Subscription (allocated)', FR: 'Abonnement plateforme vidéo (alloué)', FA: 'سهم اشتراک پلتفرم ویدیویی' }, price: 0.8 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Lesson Prep Time (unbilled)', FR: 'Temps de préparation (non facturé)', FA: 'زمان آماده‌سازی درس (بدون فاکتور)' }, price: 5.0 },
+          { name: { EN: 'Travel (in-person lessons)', FR: 'Déplacement (leçons en personne)', FA: 'رفت‌وآمد (کلاس حضوری)' }, price: 4.0 },
+        ],
+      },
+    ],
   },
   {
     id: 'bridal_makeup',
@@ -372,6 +812,28 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Marketing (Instagram / Portfolio)', FR: 'Marketing (Instagram / Portfolio)', FA: 'تبلیغات (اینستاگرام و نمونه‌کار)' }, amount: 150 },
       { label: { EN: 'Equipment (Lighting, Mirrors, Kits)', FR: "Équipement (éclairage, miroirs, trousses)", FA: 'تجهیزات (نورپردازی، آینه، کیف کار)' }, amount: 150 },
       { label: { EN: 'Licensing / Insurance', FR: 'Permis / Assurance', FA: 'مجوز و بیمه' }, amount: 100 },
+    ],
+    // "Per unit" here = one client/event (e.g. one bride or one guest).
+    recipeCategories: [
+      {
+        name: { EN: 'Makeup Products Per Face', FR: 'Produits de maquillage par visage', FA: 'مواد آرایشی هر چهره' },
+        items: [
+          { name: { EN: 'Foundation, Eyeshadow, Lashes, etc.', FR: 'Fond de teint, ombre à paupières, cils, etc.', FA: 'کرم پودر، سایه، مژه مصنوعی و غیره' }, price: 15.0 },
+        ],
+      },
+      {
+        name: { EN: 'Henna Supplies Per Client (if applicable)', FR: 'Fournitures de henné par client', FA: 'مواد حنا هر مشتری (در صورت نیاز)' },
+        items: [
+          { name: { EN: 'Henna Cones / Paste', FR: 'Cônes / pâte de henné', FA: 'کیسه و خمیر حنا' }, price: 5.0 },
+        ],
+      },
+      {
+        name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
+        items: [
+          { name: { EN: 'Disposable Applicators / Sanitation', FR: 'Applicateurs jetables / désinfection', FA: 'ابزار یک‌بارمصرف و ضدعفونی' }, price: 4.0 },
+          { name: { EN: 'Travel to Venue (mobile service)', FR: 'Déplacement au lieu (service mobile)', FA: 'رفت‌وآمد به محل مراسم' }, price: 20.0 },
+        ],
+      },
     ],
   },
 ];
