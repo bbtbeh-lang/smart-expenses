@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash } from 'lucide-react';
-import { Lang } from '@/lib/types';
+import { Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash, LayoutGrid, ChevronDown } from 'lucide-react';
+import { Lang, AccountType } from '@/lib/types';
+import { BUSINESS_TEMPLATES, BusinessTemplate } from '@/lib/businessTemplates';
 
 interface PricingTabProps {
   lang: Lang;
+  accountType: AccountType;
 }
 
 type CostMode = 'single' | 'items';
@@ -79,6 +81,9 @@ const LABELS = {
     addItem: 'Add item',
     subtotal: 'Subtotal',
     noItemsYet: 'No items added yet.',
+    templatesButton: 'Start from a business template',
+    templatesHint: 'Pick your type of business to prefill typical monthly cost categories — edit any amount after.',
+    templateOther: "My business isn't listed",
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
@@ -113,6 +118,9 @@ const LABELS = {
     addItem: '+ افزودن مورد',
     subtotal: 'جمع جزء',
     noItemsYet: 'هنوز موردی اضافه نشده.',
+    templatesButton: 'شروع از یک قالب کسب‌وکار',
+    templatesHint: 'نوع کسب‌وکارت رو انتخاب کن تا دسته‌های هزینه‌ی معمول ماهانه از قبل پر بشن — بعداً هر مبلغی رو می‌تونی ویرایش کنی.',
+    templateOther: 'کسب‌وکار من توی لیست نیست',
   },
 };
 
@@ -280,7 +288,7 @@ function CostCategoryEditor({
   );
 }
 
-export default function PricingTab({ lang }: PricingTabProps) {
+export default function PricingTab({ lang, accountType }: PricingTabProps) {
   const isRtl = lang === 'FA';
   const L = isRtl ? LABELS.FA : LABELS.EN;
 
@@ -289,6 +297,7 @@ export default function PricingTab({ lang }: PricingTabProps) {
   const [quantity, setQuantity] = useState('1');
   const [marginPct, setMarginPct] = useState('30');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
     setSaved(loadSaved());
@@ -301,6 +310,27 @@ export default function PricingTab({ lang }: PricingTabProps) {
   };
   const addCategory = () => setCategories(prev => [...prev, newCategory()]);
   const removeCategory = (id: string) => setCategories(prev => prev.filter(c => c.id !== id));
+
+  // Applying a template prefills typical monthly cost categories for the
+  // chosen business type. It never overwrites a category the person has
+  // already named (matched case-insensitively), and it clears out the
+  // still-blank starter rows first so they don't linger as empty clutter.
+  const handleApplyTemplate = (template: BusinessTemplate) => {
+    setCategories(prev => {
+      const kept = prev.filter(c => c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0);
+      const existingNames = new Set(kept.map(c => c.name.trim().toLowerCase()));
+      const additions: CostCategory[] = [];
+      template.items.forEach(item => {
+        const label = item.label[lang] || item.label.EN;
+        if (existingNames.has(label.trim().toLowerCase())) return;
+        existingNames.add(label.trim().toLowerCase());
+        additions.push({ ...newCategory(), name: label, single: String(item.amount) });
+      });
+      return [...kept, ...additions];
+    });
+    if (!name.trim()) setName(template.name[lang] || template.name.EN);
+    setShowTemplates(false);
+  };
 
   const calc = useMemo(() => {
     const qty = Math.max(1, Math.round(num(quantity)) || 1);
@@ -370,6 +400,49 @@ export default function PricingTab({ lang }: PricingTabProps) {
             <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
           </div>
+
+          {accountType === 'business' && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowTemplates(s => !s)}
+                className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-all"
+              >
+                <span className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4" />
+                  {L.templatesButton}
+                </span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showTemplates && (
+                <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <p className="text-xs text-slate-400 mb-3">{L.templatesHint}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {BUSINESS_TEMPLATES.map(template => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => handleApplyTemplate(template)}
+                        className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                      >
+                        <span className="text-lg shrink-0">{template.icon}</span>
+                        <span className="text-xs font-medium text-slate-700 leading-tight">{template.name[lang] || template.name.EN}</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplates(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                    >
+                      <span className="text-lg shrink-0">✏️</span>
+                      <span className="text-xs font-medium text-slate-700 leading-tight">{L.templateOther}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {categories.map(c => (
             <CostCategoryEditor
