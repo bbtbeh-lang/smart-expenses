@@ -1,4 +1,4 @@
-// 18 ready-made budget templates for common immigrant-run small businesses
+// 21 ready-made budget templates for common immigrant-run small businesses
 // in Canada. Each template is a set of expense categories with a
 // suggested monthly amount in CAD — a realistic starting point, not a
 // guarantee. Applying a template in BudgetModal adds these as *custom*
@@ -254,6 +254,45 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Home Kitchen Permit / Inspection', FR: 'Permis de cuisine à domicile / Inspection', FA: 'مجوز غذای خانگی و بازرسی بهداشت' }, amount: 100 },
       { label: { EN: 'Social Media Marketing', FR: 'Marketing sur les réseaux sociaux', FA: 'تبلیغات در شبکه‌های اجتماعی' }, amount: 100 },
       { label: { EN: 'Kitchen Equipment', FR: 'Équipement de cuisine', FA: 'تجهیزات آشپزخانه' }, amount: 150 },
+    ],
+  },
+  {
+    id: 'home_tailoring',
+    icon: '🧵',
+    name: { EN: 'Alterations / Home Tailoring', FR: 'Retouches / Couture à domicile', FA: 'خیاطی و تعمیرات لباس خانگی' },
+    items: [
+      { label: { EN: 'Fabric & Sewing Supplies', FR: 'Tissus et fournitures de couture', FA: 'پارچه و لوازم خیاطی' }, amount: 300 },
+      { label: { EN: 'Sewing Machine Maintenance', FR: 'Entretien de la machine à coudre', FA: 'تعمیر و نگهداری چرخ خیاطی' }, amount: 80 },
+      { label: { EN: 'Thread / Notions / Zippers', FR: 'Fil / Accessoires / Fermetures éclair', FA: 'نخ، زیپ و لوازم جانبی' }, amount: 100 },
+      { label: { EN: 'Delivery / Transport', FR: 'Livraison / Transport', FA: 'ارسال و رفت‌وآمد' }, amount: 100 },
+      { label: { EN: 'Marketing (Social Media / Flyers)', FR: 'Marketing (réseaux sociaux / dépliants)', FA: 'تبلیغات (شبکه‌های اجتماعی و بروشور)' }, amount: 80 },
+      { label: { EN: 'Home Business Permit', FR: "Permis d'entreprise à domicile", FA: 'مجوز کسب‌وکار خانگی' }, amount: 60 },
+    ],
+  },
+  {
+    id: 'private_tutor',
+    icon: '📚',
+    name: { EN: 'Private Tutor / Language & Music Teacher', FR: 'Tuteur privé / Professeur de langue et musique', FA: 'معلم خصوصی / تدریس زبان و موسیقی' },
+    items: [
+      { label: { EN: 'Teaching Materials & Books', FR: "Matériel pédagogique et livres", FA: 'منابع آموزشی و کتاب' }, amount: 100 },
+      { label: { EN: 'Online Platform / Software', FR: 'Plateforme / logiciel en ligne', FA: 'نرم‌افزار و پلتفرم آنلاین (زوم و غیره)' }, amount: 50 },
+      { label: { EN: 'Marketing / Website', FR: 'Marketing / Site web', FA: 'تبلیغات و وب‌سایت' }, amount: 80 },
+      { label: { EN: 'Transport (In-Person Lessons)', FR: 'Transport (leçons en personne)', FA: 'رفت‌وآمد (کلاس حضوری)' }, amount: 150 },
+      { label: { EN: 'Instrument Maintenance', FR: "Entretien de l'instrument", FA: 'نگهداری ساز موسیقی' }, amount: 50 },
+      { label: { EN: 'Professional Development / Certification', FR: 'Développement professionnel / Certification', FA: 'آموزش و مدرک حرفه‌ای' }, amount: 100 },
+    ],
+  },
+  {
+    id: 'bridal_makeup',
+    icon: '💄',
+    name: { EN: 'Bridal / Event Makeup & Henna Artist', FR: 'Maquillage de mariage/événement et henné', FA: 'آرایشگری عروس و مجالس / حنا' },
+    items: [
+      { label: { EN: 'Makeup & Beauty Products', FR: 'Produits de maquillage et de beauté', FA: 'لوازم آرایش و زیبایی' }, amount: 400 },
+      { label: { EN: 'Henna Supplies', FR: 'Fournitures de henné', FA: 'مواد و لوازم حنا' }, amount: 80 },
+      { label: { EN: 'Travel / Mobile Service Transport', FR: 'Déplacement / Service mobile', FA: 'رفت‌وآمد و خدمات سیار' }, amount: 200 },
+      { label: { EN: 'Marketing (Instagram / Portfolio)', FR: 'Marketing (Instagram / Portfolio)', FA: 'تبلیغات (اینستاگرام و نمونه‌کار)' }, amount: 150 },
+      { label: { EN: 'Equipment (Lighting, Mirrors, Kits)', FR: "Équipement (éclairage, miroirs, trousses)", FA: 'تجهیزات (نورپردازی، آینه، کیف کار)' }, amount: 150 },
+      { label: { EN: 'Licensing / Insurance', FR: 'Permis / Assurance', FA: 'مجوز و بیمه' }, amount: 100 },
     ],
   },
 ];
