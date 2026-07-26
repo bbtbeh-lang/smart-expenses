@@ -298,6 +298,11 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   const [marginPct, setMarginPct] = useState('30');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  // Snapshot of `categories` exactly as it looked right after the most
+  // recently applied template — used to detect whether the person has
+  // touched anything since. `null` once they edit something (or before
+  // any template has ever been applied).
+  const [lastTemplateSnapshot, setLastTemplateSnapshot] = useState<string | null>(null);
 
   useEffect(() => {
     setSaved(loadSaved());
@@ -307,17 +312,38 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
 
   const updateCategory = (id: string, next: CostCategory) => {
     setCategories(prev => prev.map(c => (c.id === id ? next : c)));
+    setLastTemplateSnapshot(null);
   };
-  const addCategory = () => setCategories(prev => [...prev, newCategory()]);
-  const removeCategory = (id: string) => setCategories(prev => prev.filter(c => c.id !== id));
+  const addCategory = () => {
+    setCategories(prev => [...prev, newCategory()]);
+    setLastTemplateSnapshot(null);
+  };
+  const removeCategory = (id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    setLastTemplateSnapshot(null);
+  };
 
   // Applying a template prefills typical monthly cost categories for the
-  // chosen business type. It never overwrites a category the person has
-  // already named (matched case-insensitively), and it clears out the
-  // still-blank starter rows first so they don't linger as empty clutter.
+  // chosen business type.
+  //
+  // If nothing has been edited since the last template was applied (i.e.
+  // `categories` still matches `lastTemplateSnapshot` exactly), picking a
+  // different template REPLACES the previous one wholesale — otherwise,
+  // switching templates while just browsing would silently leave the old
+  // template's categories sitting there untouched.
+  //
+  // Once the person has actually changed something (edited an amount,
+  // renamed a category, added/removed one), `lastTemplateSnapshot` is
+  // null and we fall back to merging: keep everything they've filled in,
+  // and only add the new template's items that don't already match an
+  // existing category name.
   const handleApplyTemplate = (template: BusinessTemplate) => {
     setCategories(prev => {
-      const kept = prev.filter(c => c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0);
+      const untouchedSinceLastTemplate =
+        lastTemplateSnapshot !== null && JSON.stringify(prev) === lastTemplateSnapshot;
+
+      const base = untouchedSinceLastTemplate ? [] : prev;
+      const kept = base.filter(c => c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0);
       const existingNames = new Set(kept.map(c => c.name.trim().toLowerCase()));
       const additions: CostCategory[] = [];
       template.items.forEach(item => {
@@ -326,7 +352,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         existingNames.add(label.trim().toLowerCase());
         additions.push({ ...newCategory(), name: label, single: String(item.amount) });
       });
-      return [...kept, ...additions];
+      const next = [...kept, ...additions];
+      setLastTemplateSnapshot(JSON.stringify(next));
+      return next;
     });
     if (!name.trim()) setName(template.name[lang] || template.name.EN);
     setShowTemplates(false);
