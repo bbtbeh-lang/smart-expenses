@@ -298,30 +298,32 @@ function CostCategoryEditor({
         <div className="space-y-2">
           {category.items.length === 0 && <p className="text-[11px] text-slate-400">{labels.noItemsYet}</p>}
           {category.items.map(it => (
-            <div key={it.id} className="flex items-center gap-2">
+            <div key={it.id} className="border border-slate-100 rounded-lg p-2">
               <input
                 value={it.name}
                 onChange={e => updateItem(it.id, { name: e.target.value })}
                 placeholder={labels.itemName}
-                className={`${inputClass} flex-1`}
+                className={`${inputClass} mb-2`}
               />
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={it.price}
-                onChange={e => updateItem(it.id, { price: e.target.value })}
-                placeholder={labels.itemPrice}
-                className={`${inputClass} w-24`}
-                dir="ltr"
-              />
-              <button
-                type="button"
-                onClick={() => removeItem(it.id)}
-                className="text-slate-300 hover:text-rose-500 transition-colors p-1 shrink-0"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={it.price}
+                  onChange={e => updateItem(it.id, { price: e.target.value })}
+                  placeholder={labels.itemPrice}
+                  className={`${inputClass} flex-1`}
+                  dir="ltr"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeItem(it.id)}
+                  className="text-slate-300 hover:text-rose-500 transition-colors p-1 shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
           <button
