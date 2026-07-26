@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown, Calendar, LayoutGrid, ChevronDown } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AccountType, Lang } from '@/lib/types';
@@ -67,6 +67,19 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
   );
 
   const [newLabel, setNewLabel] = useState('');
+  const newLabelInputRef = useRef<HTMLInputElement>(null);
+
+  // "My business isn't in this list" — closes the template panel and
+  // sends focus straight to the existing free-form custom-category input
+  // (the same one used to add any category by hand), rather than
+  // building a second, parallel way to add a category.
+  const handleJumpToCustomAdd = () => {
+    setShowTemplates(false);
+    requestAnimationFrame(() => {
+      newLabelInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      newLabelInputRef.current?.focus();
+    });
+  };
 
   // Business budget templates — 21 ready-made category sets for common
   // immigrant-run small businesses (restaurant, mobile car wash,
@@ -248,6 +261,13 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
                         <span className="text-xs font-medium text-slate-700 leading-tight">{template.name[lang] || template.name.EN}</span>
                       </button>
                     ))}
+                    <button
+                      onClick={handleJumpToCustomAdd}
+                      className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                    >
+                      <span className="text-lg shrink-0">✏️</span>
+                      <span className="text-xs font-medium text-slate-700 leading-tight">{tr.budgetTemplateOther}</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -383,6 +403,7 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
             <p className="text-xs text-slate-400">{tr.customItemName}</p>
             <div className="flex gap-2">
               <input
+                ref={newLabelInputRef}
                 type="text"
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
