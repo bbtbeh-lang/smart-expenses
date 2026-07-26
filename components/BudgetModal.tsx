@@ -68,7 +68,7 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
 
   const [newLabel, setNewLabel] = useState('');
 
-  // Business budget templates — 17 ready-made category sets for common
+  // Business budget templates — 18 ready-made category sets for common
   // immigrant-run small businesses (restaurant, mobile car wash,
   // freelancer, etc.), each with a suggested CAD monthly amount per
   // category. Business accounts only; personal budgets don't get this.
@@ -218,7 +218,7 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
             </div>
           </div>
 
-          {/* Business budget templates — 17 ready-made category sets for
+          {/* Business budget templates — 18 ready-made category sets for
               common immigrant-run small businesses. Personal budgets
               don't get this; it only makes sense for business accounts. */}
           {accountType === 'business' && (

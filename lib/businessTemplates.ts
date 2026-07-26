@@ -1,4 +1,4 @@
-// 17 ready-made budget templates for common immigrant-run small businesses
+// 18 ready-made budget templates for common immigrant-run small businesses
 // in Canada. Each template is a set of expense categories with a
 // suggested monthly amount in CAD — a realistic starting point, not a
 // guarantee. Applying a template in BudgetModal adds these as *custom*
@@ -241,6 +241,19 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       { label: { EN: 'Liability Insurance', FR: 'Assurance responsabilité', FA: 'بیمه مسئولیت' }, amount: 200 },
       { label: { EN: 'Marketing', FR: 'Marketing', FA: 'تبلیغات' }, amount: 100 },
       { label: { EN: 'Licensing / Permits', FR: 'Permis', FA: 'مجوزها' }, amount: 80 },
+    ],
+  },
+  {
+    id: 'home_based_food',
+    icon: '🍰',
+    name: { EN: 'Home-Based Food / Homemade Sweets', FR: 'Cuisine maison / Pâtisseries artisanales', FA: 'غذا و شیرینی خانگی' },
+    items: [
+      { label: { EN: 'Ingredients & Raw Materials', FR: 'Ingrédients et matières premières', FA: 'مواد اولیه' }, amount: 600 },
+      { label: { EN: 'Packaging & Containers', FR: 'Emballage et contenants', FA: 'بسته‌بندی و ظروف' }, amount: 150 },
+      { label: { EN: 'Delivery & Transport', FR: 'Livraison et transport', FA: 'ارسال و پیک' }, amount: 150 },
+      { label: { EN: 'Home Kitchen Permit / Inspection', FR: 'Permis de cuisine à domicile / Inspection', FA: 'مجوز غذای خانگی و بازرسی بهداشت' }, amount: 100 },
+      { label: { EN: 'Social Media Marketing', FR: 'Marketing sur les réseaux sociaux', FA: 'تبلیغات در شبکه‌های اجتماعی' }, amount: 100 },
+      { label: { EN: 'Kitchen Equipment', FR: 'Équipement de cuisine', FA: 'تجهیزات آشپزخانه' }, amount: 150 },
     ],
   },
 ];
