@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
-import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown, Calendar, LayoutGrid, ChevronDown } from 'lucide-react';
+import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AccountType, Lang } from '@/lib/types';
 import { getOrCreateCategoryKey, getNextDueDate } from '@/lib/utils';
-import { BUSINESS_TEMPLATES, BusinessTemplate } from '@/lib/businessTemplates';
 
 const EXPENSE_CATS_PERSONAL = [
   'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
@@ -42,7 +41,7 @@ interface BudgetModalProps {
   onClose: () => void;
 }
 
-export default function BudgetModal({ tr, accountType, lang, budgets, customCategories, budgetDueDates, budgetReminders, onSave, onClose }: BudgetModalProps) {
+export default function BudgetModal({ tr, accountType, budgets, customCategories, budgetDueDates, budgetReminders, onSave, onClose }: BudgetModalProps) {
   const cats = accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
 
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -68,48 +67,6 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
 
   const [newLabel, setNewLabel] = useState('');
   const newLabelInputRef = useRef<HTMLInputElement>(null);
-
-  // "My business isn't in this list" — closes the template panel and
-  // sends focus straight to the existing free-form custom-category input
-  // (the same one used to add any category by hand), rather than
-  // building a second, parallel way to add a category.
-  const handleJumpToCustomAdd = () => {
-    setShowTemplates(false);
-    requestAnimationFrame(() => {
-      newLabelInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      newLabelInputRef.current?.focus();
-    });
-  };
-
-  // Business budget templates — 21 ready-made category sets for common
-  // immigrant-run small businesses (restaurant, mobile car wash,
-  // freelancer, etc.), each with a suggested CAD monthly amount per
-  // category. Business accounts only; personal budgets don't get this.
-  const [showTemplates, setShowTemplates] = useState(false);
-
-  const handleApplyTemplate = (template: BusinessTemplate) => {
-    // Track labels seen so far (already-saved + this session, INCLUDING
-    // items we're about to add from this same template) so applying a
-    // template never creates two rows for the same category, and never
-    // clobbers an amount the user already typed for a matching label.
-    const merged: Record<string, string> = {
-      ...customCategories,
-      ...Object.fromEntries(customItems.map(i => [i.key, i.label])),
-    };
-    const alreadyPresentKeys = new Set(customItems.map(i => i.key));
-    const additions: CustomItem[] = [];
-
-    template.items.forEach(item => {
-      const label = item.label[lang] || item.label.EN;
-      const { key, isNew } = getOrCreateCategoryKey(label, merged);
-      if (!isNew && alreadyPresentKeys.has(key)) return; // leave the existing row (and its amount) untouched
-      merged[key] = label;
-      additions.push({ key, label, amount: String(item.amount) });
-    });
-
-    setCustomItems(prev => [...prev, ...additions]);
-    setShowTemplates(false);
-  };
 
   const handleAddCustom = () => {
     const label = newLabel.trim();
@@ -230,49 +187,6 @@ export default function BudgetModal({ tr, accountType, lang, budgets, customCate
               </button>
             </div>
           </div>
-
-          {/* Business budget templates — 21 ready-made category sets for
-              common immigrant-run small businesses. Personal budgets
-              don't get this; it only makes sense for business accounts. */}
-          {accountType === 'business' && (
-            <div className="mb-5">
-              <button
-                onClick={() => setShowTemplates(s => !s)}
-                className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-all"
-              >
-                <span className="flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4" />
-                  {tr.budgetTemplatesButton}
-                </span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showTemplates && (
-                <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <p className="text-xs text-slate-400 mb-3">{tr.budgetTemplatesHint}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {BUSINESS_TEMPLATES.map(template => (
-                      <button
-                        key={template.id}
-                        onClick={() => handleApplyTemplate(template)}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                      >
-                        <span className="text-lg shrink-0">{template.icon}</span>
-                        <span className="text-xs font-medium text-slate-700 leading-tight">{template.name[lang] || template.name.EN}</span>
-                      </button>
-                    ))}
-                    <button
-                      onClick={handleJumpToCustomAdd}
-                      className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                    >
-                      <span className="text-lg shrink-0">✏️</span>
-                      <span className="text-xs font-medium text-slate-700 leading-tight">{tr.budgetTemplateOther}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Built-in categories */}
           <div className="space-y-3 mb-5">
