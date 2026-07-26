@@ -23,12 +23,22 @@ interface CostItem {
 // This is intentionally NOT tied to any business type (product/service/
 // trade): the person names it, so it works for a candle maker, a plumber,
 // a designer, or anything else without us guessing their industry.
+// Fixed grouping used ONLY for categories that came from a business
+// template's `recipeCategories` (see businessTemplates.ts): every
+// template's per-batch breakdown follows the same 3-part shape —
+// direct consumables, then supplies/equipment, then hidden/overhead
+// costs — so we can label each one automatically without the person
+// typing anything. Categories the person adds themselves have no
+// group and render exactly as before (free-form, no header).
+type RecipeGroup = 'direct' | 'supplies' | 'hidden';
+
 interface CostCategory {
   id: string;
   name: string;
   mode: CostMode;
   single: string;
   items: CostItem[];
+  group?: RecipeGroup;
 }
 
 interface SavedCategorySnapshot {
@@ -97,6 +107,9 @@ const LABELS = {
     hoursLabel: 'Hours worked (this job/period)',
     areaLabel: 'Total area (sq ft or m²)',
     projectNote: 'Total cost = the full project price. Quantity is fixed at 1.',
+    groupDirect: 'Direct Consumables',
+    groupSupplies: 'Supplies & Equipment',
+    groupHidden: 'Hidden & Overhead Costs',
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
@@ -147,6 +160,9 @@ const LABELS = {
     hoursLabel: 'ساعت کار (این پروژه/دوره)',
     areaLabel: 'مساحت کل (متر مربع یا فوت مربع)',
     projectNote: 'مجموع هزینه = کل قیمت پروژه. تعداد روی ۱ ثابته.',
+    groupDirect: 'مواد مصرفی مستقیم',
+    groupSupplies: 'ملزومات و تجهیزات',
+    groupHidden: 'هزینه‌های پنهان و سربار',
   },
 };
 
@@ -175,6 +191,18 @@ function num(s: string) {
 
 function newCategory(): CostCategory {
   return { id: generateId(), name: '', mode: 'single', single: '', items: [] };
+}
+
+// Maps a recipeCategories position to its fixed group. Templates
+// consistently ship exactly 3 categories in this order (direct
+// consumables → supplies/equipment → hidden costs), but this stays
+// correct even if a template ever has a different count: first is
+// always the direct cost, last is always hidden/overhead, anything
+// in between is supplies & equipment.
+function recipeGroupForIndex(index: number, total: number): RecipeGroup {
+  if (index === 0) return 'direct';
+  if (index === total - 1) return 'hidden';
+  return 'supplies';
 }
 
 function categoryTotal(c: CostCategory) {
@@ -386,7 +414,8 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         // Per-batch ingredient/cost breakdown (item-by-item mode) — the
         // right shape for costing a single product, unlike `items` below
         // which is a monthly overhead figure.
-        template.recipeCategories.forEach(cat => {
+        const totalRecipeCats = template.recipeCategories.length;
+        template.recipeCategories.forEach((cat, idx) => {
           const label = cat.name[lang] || cat.name.EN;
           if (existingNames.has(label.trim().toLowerCase())) return;
           existingNames.add(label.trim().toLowerCase());
@@ -395,6 +424,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             name: label,
             mode: 'items',
             items: cat.items.map(it => ({ id: generateId(), name: it.name[lang] || it.name.EN, price: String(it.price) })),
+            group: recipeGroupForIndex(idx, totalRecipeCats),
           });
         });
       } else {
@@ -550,17 +580,36 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             </div>
           )}
 
-          {categories.map(c => (
-            <CostCategoryEditor
-              key={c.id}
-              labels={L}
-              isRtl={isRtl}
-              category={c}
-              onChange={next => updateCategory(c.id, next)}
-              onRemove={() => removeCategory(c.id)}
-              canRemove={categories.length > 1}
-            />
-          ))}
+          {categories.map((c, idx) => {
+            const groupLabels: Record<RecipeGroup, string> = {
+              direct: L.groupDirect,
+              supplies: L.groupSupplies,
+              hidden: L.groupHidden,
+            };
+            // Show the fixed header only once per group, right above the
+            // first category that belongs to it — so a template's 3-part
+            // breakdown reads as 3 clearly-labeled sections instead of
+            // repeating the same header on every card.
+            const showGroupHeader = !!c.group && categories[idx - 1]?.group !== c.group;
+
+            return (
+              <div key={c.id}>
+                {showGroupHeader && (
+                  <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide mb-1.5 mt-3 first:mt-0">
+                    {groupLabels[c.group as RecipeGroup]}
+                  </div>
+                )}
+                <CostCategoryEditor
+                  labels={L}
+                  isRtl={isRtl}
+                  category={c}
+                  onChange={next => updateCategory(c.id, next)}
+                  onRemove={() => removeCategory(c.id)}
+                  canRemove={categories.length > 1}
+                />
+              </div>
+            );
+          })}
 
           <button
             type="button"
