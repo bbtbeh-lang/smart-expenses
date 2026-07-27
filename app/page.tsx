@@ -139,10 +139,46 @@ export default function Home() {
     setState(prev => ({ ...prev, transactions: merged }));
   }, []);
 
+  // Custom category labels (key -> user-typed name) used to live only in
+  // localStorage, which sign-out wipes — after signing back in, transactions
+  // still referenced the right key but nothing could translate it back to
+  // a label, so the raw key (e.g. "custom_suger_1784775632372") showed up
+  // in the UI. Now the mapping is persisted server-side (user_profiles),
+  // fetched on sign-in, and merged with whatever's live in memory so a
+  // category minted seconds ago (not yet pushed) is never lost either way.
+  const syncUserCustomCategories = useCallback(async (userId: string, localCustomCategories: Record<string, string>) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/profile', { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      const serverCustomCategories = (data.customCategories ?? {}) as Record<string, string>;
+      const merged = { ...serverCustomCategories, ...localCustomCategories };
+      setState(prev => ({ ...prev, customCategories: merged }));
+      // Push back so any locally-minted-but-unsynced categories reach the
+      // server too (the PATCH endpoint merges, so this can't clobber
+      // labels another device added in the meantime).
+      if (Object.keys(merged).length > 0) {
+        await fetch('/api/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ customCategories: merged }),
+        });
+      }
+    } catch {
+      // Network error — keep whatever's already in local state; next
+      // sign-in (or the next edit, via the save effect below) will retry.
+    }
+  }, []);
+
   // Always reflects the latest in-memory transactions, so a resync never
   // has to guess whether localStorage has caught up with the newest edit.
   const transactionsRef = useRef<Transaction[]>(state.transactions);
   useEffect(() => { transactionsRef.current = state.transactions; }, [state.transactions]);
+
+  const customCategoriesRef = useRef<Record<string, string>>(state.customCategories);
+  useEffect(() => { customCategoriesRef.current = state.customCategories; }, [state.customCategories]);
 
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
@@ -152,6 +188,7 @@ export default function Home() {
         setState(prev => ({ ...loaded, screen: 'onboarding', lang: prev.lang }));
         refreshSubscription();
         syncUserTransactions(session.user.id, loaded.transactions);
+        syncUserCustomCategories(session.user.id, loaded.customCategories);
       }
     });
 
@@ -173,6 +210,8 @@ export default function Home() {
         // after the user adds a transaction can never make it disappear.
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           syncUserTransactions(session.user.id, transactionsRef.current.length > 0 ? transactionsRef.current : loaded.transactions);
+          const localCats = Object.keys(customCategoriesRef.current).length > 0 ? customCategoriesRef.current : loaded.customCategories;
+          syncUserCustomCategories(session.user.id, localCats);
         }
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
@@ -217,6 +256,33 @@ export default function Home() {
       saveState(state);
     }
   }, [state]);
+
+  // Also persist custom category labels to Supabase whenever they change
+  // (debounced) so a category minted mid-session survives even if the
+  // sign-out happens before the next sign-in resync would have caught it.
+  // The PATCH endpoint merges server-side, so this can't clobber labels
+  // another device added since our last fetch.
+  const customCategoriesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (state.screen === 'auth' || Object.keys(state.customCategories).length === 0) return;
+    if (customCategoriesSaveTimer.current) clearTimeout(customCategoriesSaveTimer.current);
+    customCategoriesSaveTimer.current = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ customCategories: state.customCategories }),
+      }).catch(() => {
+        // Best-effort — the next sign-in's syncUserCustomCategories call
+        // will retry with whatever's in memory or localStorage by then.
+      });
+    }, 800);
+    return () => {
+      if (customCategoriesSaveTimer.current) clearTimeout(customCategoriesSaveTimer.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.customCategories, state.screen]);
 
   const tr = t[state.lang];
 
