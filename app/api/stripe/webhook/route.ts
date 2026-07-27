@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { upsertSubscriptionFromStripe } from '@/lib/subscriptionSync';
 import { planFromPriceId } from '@/lib/plans';
 import { sendRenewalReminderEmail } from '@/lib/email';
 import Stripe from 'stripe';
@@ -69,36 +70,6 @@ export async function POST(req: NextRequest) {
     console.error('Webhook handler error:', err);
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
-}
-
-async function upsertSubscriptionFromStripe(userId: string, subscription: Stripe.Subscription) {
-  const priceId = subscription.items.data[0]?.price.id;
-  const planInfo = priceId ? planFromPriceId(priceId) : null;
-
-  const status = subscription.status === 'active' || subscription.status === 'trialing'
-    ? 'active'
-    : subscription.status === 'past_due'
-    ? 'past_due'
-    : 'canceled';
-
-  await supabaseAdmin
-    .from('subscriptions')
-    .upsert(
-      {
-        user_id: userId,
-        plan: planInfo?.plan || 'free',
-        billing_period: planInfo?.billingPeriod || null,
-        status,
-        stripe_customer_id: subscription.customer as string,
-        stripe_subscription_id: subscription.id,
-        current_period_end: new Date(subscription.items.data[0].current_period_end * 1000).toISOString(),
-        // Reset the monthly scan counter whenever a new plan starts or renews.
-        scans_used_this_period: 0,
-        scan_period_start: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' }
-    );
 }
 
 // Resolves who the invoice belongs to and emails them a renewal reminder.

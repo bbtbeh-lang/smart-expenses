@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { upsertSubscriptionFromStripe } from '@/lib/subscriptionSync';
 import { PLANS, PlanId, BillingPeriod } from '@/lib/plans';
 
 // Changes the plan/billing period on a user's EXISTING active Stripe
@@ -9,9 +10,13 @@ import { PLANS, PlanId, BillingPeriod } from '@/lib/plans';
 //   - Upgrades are charged immediately (the prorated difference is invoiced
 //     and charged to the customer's saved payment method right away).
 //   - Downgrades are credited as a balance applied to the next invoice.
-// The `subscriptions` table itself is NOT written here — the Stripe webhook
-// (customer.subscription.updated) is the single source of truth and updates
-// Supabase once Stripe confirms the change.
+// The `subscriptions` table is written here too (not just via the
+// customer.subscription.updated webhook): webhook delivery has enough
+// latency that a client refetching its plan right after this call would
+// often still see the pre-change plan. Writing synchronously here makes
+// the UI update instantly; the webhook remains the source of truth for
+// changes that don't originate from this endpoint (renewals, dashboard-
+// initiated changes, dunning, etc.) and simply upserts the same row again.
 export async function POST(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization') || '';
@@ -78,6 +83,8 @@ export async function POST(req: NextRequest) {
         billing_period: billingPeriod,
       },
     });
+
+    await upsertSubscriptionFromStripe(user.id, updated);
 
     return NextResponse.json({ success: true, status: updated.status, isUpgrade });
   } catch (err: any) {
