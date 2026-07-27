@@ -55,6 +55,7 @@ export const t = {
     aiParsing: 'AI parsing your receipt in background...',
     tapToReview: 'Tap to review',
     monthlyTrend: 'Monthly Overview',
+    monthlyTrendSubtitle: 'Last 6 months — not affected by the filter above',
     // Transaction Modal
     addTransactionTitle: 'Add Transaction',
     quickScanTitle: 'Quick Scan',
@@ -291,6 +292,7 @@ export const t = {
     aiParsing: "L'IA analyse votre reçu en arrière-plan...",
     tapToReview: 'Appuyer pour réviser',
     monthlyTrend: 'Aperçu Mensuel',
+    monthlyTrendSubtitle: 'Les 6 derniers mois — non affecté par le filtre ci-dessus',
     addTransactionTitle: 'Ajouter une Transaction',
     quickScanTitle: 'Scan Rapide',
     quickScanFabLabel: 'Scan Rapide',
@@ -518,6 +520,7 @@ export const t = {
     aiParsing: 'در حال تجزیه رسید شما...',
     tapToReview: 'برای بررسی ضربه بزنید',
     monthlyTrend: 'نمای ماهانه',
+    monthlyTrendSubtitle: '۶ ماه اخیر — مستقل از فیلتر بالا',
     addTransactionTitle: 'افزودن تراکنش',
     quickScanTitle: 'اسکن سریع',
     quickScanFabLabel: 'اسکن سریع',

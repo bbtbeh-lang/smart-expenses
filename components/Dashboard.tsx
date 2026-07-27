@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell, Zap } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
 import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate } from '@/lib/utils';
@@ -373,9 +373,11 @@ export default function Dashboard({
 
       {/* Monthly Trend Chart */}
       <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">{tr.monthlyTrend}</div>
+        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{tr.monthlyTrend}</div>
+        <div className="text-[11px] text-slate-400 mb-3">{tr.monthlyTrendSubtitle}</div>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={monthlyData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+            <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 12 }} labelStyle={{ fontWeight: 700, color: '#1e293b' }} />
