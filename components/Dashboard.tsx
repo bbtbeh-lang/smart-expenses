@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock,
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
-import { formatCurrency, getNextDueDate } from '@/lib/utils';
+import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate } from '@/lib/utils';
 import { PLANS } from '@/lib/plans';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -65,7 +65,7 @@ function getDateRange(filter: DateFilter): { from: Date; to: Date } {
 function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
   const { from, to } = getDateRange(filter);
   return txs.filter(t => {
-    const d = new Date(t.date);
+    const d = parseLocalDate(t.date);
     return d >= from && d <= to;
   });
 }
@@ -95,7 +95,7 @@ export default function Dashboard({
       const d = new Date();
       d.setDate(1);
       d.setMonth(d.getMonth() - i);
-      const ym = d.toISOString().slice(0, 7);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleString('default', { month: 'short' });
       const txs = state.transactions.filter((t: Transaction) => t.date.startsWith(ym));
       result.push({
@@ -120,7 +120,7 @@ export default function Dashboard({
   }, [filteredTxs, tr, state.customCategories]);
 
   // Category spending vs budget
-  const currentYm = new Date().toISOString().slice(0, 7);
+  const currentYm = currentLocalYearMonth();
   const allCategorySpending = useMemo(() => [
     ...expenseCatKeys.map(cat => ({
       cat,

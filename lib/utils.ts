@@ -6,6 +6,33 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// `new Date().toISOString()` is always UTC. For a user west of UTC (e.g.
+// Toronto, UTC-4/-5), that rolls over to tomorrow's date hours before
+// midnight local time — a transaction added at 9pm was silently dated one
+// day ahead. These use the local calendar date/month instead, matching
+// what the user actually sees on their clock.
+export function todayLocalDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+export function currentLocalYearMonth(): string {
+  return todayLocalDate().slice(0, 7);
+}
+
+// `new Date("2026-07-27")` parses a date-only string as UTC midnight, not
+// local midnight — the classic JS date gotcha. For a user west of UTC that
+// shifts every stored transaction date backward by several hours when
+// compared against local day/week/month boundaries. This constructs the
+// Date from the parts directly, so it lands on local midnight instead.
+export function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
 // FinSnap is a Canadian-dollar product for the Canadian market — the
 // currency never changes with the UI language. Only the surrounding text
 // (labels, categories, etc.) is translated; showing amounts in Iranian

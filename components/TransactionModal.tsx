@@ -5,7 +5,7 @@ import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriang
 import { Translations } from '@/lib/translations';
 import { TransactionType, AccountType, Tier, Transaction, ReceiptItem } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import { getOrCreateCategoryKey } from '@/lib/utils';
+import { getOrCreateCategoryKey, todayLocalDate } from '@/lib/utils';
 
 type ModalStep = 'type' | 'receipt' | 'manual' | 'ocr';
 type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
@@ -76,7 +76,7 @@ export default function TransactionModal({
     editTransaction?.category
       ?? (quickScan ? (accountType === 'business' ? 'catBusinessMaterials' : 'catOther') : '')
   );
-  const [date, setDate] = useState(editTransaction?.date ?? new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(editTransaction?.date ?? todayLocalDate());
   const [ocrStatus, setOcrStatus] = useState<OcrStatus>('idle');
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrBanner, setOcrBanner] = useState('');
