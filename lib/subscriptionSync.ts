@@ -21,7 +21,16 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
     ? 'past_due'
     : 'canceled';
 
-  await supabaseAdmin
+  // Stripe moved current_period_end from the subscription object to each
+  // line item in newer API versions; fall back to the subscription-level
+  // field (older/other API versions, or if the item is ever missing it)
+  // rather than passing `undefined * 1000` into `new Date()`, which
+  // produces an Invalid Date and throws on .toISOString().
+  const periodEndSeconds =
+    subscription.items.data[0]?.current_period_end ??
+    (subscription as unknown as { current_period_end?: number }).current_period_end;
+
+  const { error } = await supabaseAdmin
     .from('subscriptions')
     .upsert(
       {
@@ -31,7 +40,7 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
         status,
         stripe_customer_id: subscription.customer as string,
         stripe_subscription_id: subscription.id,
-        current_period_end: new Date(subscription.items.data[0].current_period_end * 1000).toISOString(),
+        current_period_end: periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null,
         // Reset the monthly scan counter whenever a new plan starts or renews.
         scans_used_this_period: 0,
         scan_period_start: new Date().toISOString(),
@@ -39,4 +48,14 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
       },
       { onConflict: 'user_id' }
     );
+
+  // This previously went unchecked: a failed write (constraint violation,
+  // schema mismatch, etc.) would leave the DB row stale while every caller
+  // — the webhook handler and the change-plan route alike — still reported
+  // success to the client. Surface it instead so the plan-change endpoint
+  // returns a real error and the webhook handler's retry/logging kicks in.
+  if (error) {
+    console.error('[subscriptionSync] upsert failed:', error, { userId, subscriptionId: subscription.id });
+    throw new Error(`Failed to save subscription: ${error.message}`);
+  }
 }

@@ -64,10 +64,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Subscription item not found' }, { status: 500 });
     }
 
+    // Monthly-equivalent price for each side, so a yearly plan compares
+    // fairly against a monthly one. This previously divided monthlyPriceCAD
+    // by 12 for a yearly plan instead of annualizing yearlyPriceCAD — e.g.
+    // Business yearly ($399/yr, ~$33.25/mo-equivalent) was computed as
+    // $39.99/12 = $3.33, which made almost any other plan look like an
+    // "upgrade" even when it was strictly cheaper.
+    const monthlyEquivalent = (p: PlanId, period: BillingPeriod) =>
+      period === 'yearly' ? PLANS[p].yearlyPriceCAD / 12 : PLANS[p].monthlyPriceCAD;
+
     const isUpgrade =
-      PLANS[plan].monthlyPriceCAD * (billingPeriod === 'yearly' ? 1 / 12 : 1) >
+      monthlyEquivalent(plan, billingPeriod) >
       (sub.plan && sub.plan !== 'free'
-        ? PLANS[sub.plan as PlanId].monthlyPriceCAD * (sub.billing_period === 'yearly' ? 1 / 12 : 1)
+        ? monthlyEquivalent(sub.plan as PlanId, (sub.billing_period as BillingPeriod) || 'monthly')
         : 0);
 
     const updated = await stripe.subscriptions.update(sub.stripe_subscription_id, {
