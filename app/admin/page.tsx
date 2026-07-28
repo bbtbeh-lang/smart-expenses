@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink, Users } from 'lucide-react';
+import { PLANS, PlanId } from '@/lib/plans';
+import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink, Users, TrendingUp } from 'lucide-react';
 
 interface CodeStatus {
   code: string | null;
@@ -144,6 +145,23 @@ export default function AdminPage() {
 
   const usagePercent = status?.maxUses ? Math.min(100, (status.uses / status.maxUses) * 100) : 0;
 
+  // Monthly-equivalent revenue per active paid subscriber — yearly plans
+  // are annualized (yearlyPriceCAD / 12), matching the fix already applied
+  // to the upgrade/downgrade comparison in /api/stripe/change-plan.
+  const { mrr, activeSubscribers } = useMemo(() => {
+    if (!customers) return { mrr: 0, activeSubscribers: 0 };
+    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free');
+    const total = paying.reduce((sum, c) => {
+      const plan = PLANS[c.plan as PlanId];
+      if (!plan) return sum;
+      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : plan.monthlyPriceCAD);
+    }, 0);
+    return { mrr: total, activeSubscribers: paying.length };
+  }, [customers]);
+
+  const formatCAD = (n: number) =>
+    n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 });
+
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10">
       <div className="max-w-3xl mx-auto">
@@ -228,6 +246,29 @@ export default function AdminPage() {
             </div>
           </a>
         </div>
+        </div>
+
+        {/* Revenue snapshot */}
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-slate-400" />
+            <h2 className="text-sm font-bold text-slate-800">Revenue snapshot</h2>
+          </div>
+          {customers ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-xs text-slate-400 mb-1">Estimated MRR</div>
+                <div className="text-2xl font-bold text-slate-900" dir="ltr">{formatCAD(mrr)}</div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Yearly plans counted at 1/12 their price</div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 mb-1">Active paying subscribers</div>
+                <div className="text-2xl font-bold text-slate-900" dir="ltr">{activeSubscribers}</div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 py-2 text-center">Loading…</p>
+          )}
         </div>
 
         {/* Customers */}
