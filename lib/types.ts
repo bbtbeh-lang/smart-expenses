@@ -82,6 +82,10 @@ export const INITIAL_STATE: AppState = {
   budgetDueDates: {},
   budgetReminders: {},
 };
+export const INCOME_OCR_CATEGORIES = [
+  'catSalesRevenue', 'catServiceRevenue', 'catConsulting',
+  'catCommission', 'catRental', 'catOtherIncome',
+] as const;
 
 // Hardcoded bypass codes were removed as a security fix — all code
 // redemption now goes through the atomic, rate-limited, one-per-user
