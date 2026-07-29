@@ -51,6 +51,7 @@ function freshState(lang: Lang = 'EN'): AppState {
     totalExpenses: 0,
     budgets: {},
     customCategories: {},
+    customIncomeCategories: {},
     budgetDueDates: {},
     budgetReminders: {},
   };
