@@ -9,6 +9,7 @@ export type AppScreen = 'auth' | 'onboarding' | 'dashboard';
 export interface ReceiptItem {
   name: string;
   price: number;
+  quantity?: number;
 }
 
 export interface Transaction {
@@ -82,9 +83,14 @@ export const INITIAL_STATE: AppState = {
   budgetDueDates: {},
   budgetReminders: {},
 };
+
 export const INCOME_OCR_CATEGORIES = [
-  'catSalesRevenue', 'catServiceRevenue', 'catConsulting',
-  'catCommission', 'catRental', 'catOtherIncome',
+  'catSalesRevenue',
+  'catServiceRevenue',
+  'catConsulting',
+  'catCommission',
+  'catRental',
+  'catOtherIncome',
 ] as const;
 
 // Hardcoded bypass codes were removed as a security fix — all code
