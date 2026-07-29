@@ -1,721 +1,363 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
-import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react';
 import { Translations } from '@/lib/translations';
-import { TransactionType, AccountType, Tier, Transaction, ReceiptItem } from '@/lib/types';
+import { Tier, Transaction, Lang } from '@/lib/types';
+import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import { getOrCreateCategoryKey, todayLocalDate } from '@/lib/utils';
 
-type ModalStep = 'type' | 'receipt' | 'manual' | 'ocr';
-type OcrStatus = 'idle' | 'scanning' | 'done' | 'error';
-
-interface TransactionModalProps {
+interface TaxReportModalProps {
   tr: Translations;
-  accountType: AccountType;
   tier: Tier;
-  hasManualAccess: boolean;
-  hasScanAccess: boolean;
-  scansUsedToday: number;
-  maxDailyScans: number;
-  editTransaction?: Transaction;
-  customCategories?: Record<string, string>;
-  onAddCustomCategory?: (key: string, label: string) => void;
+  lang: Lang;
+  transactions: Transaction[];
   onClose: () => void;
-  onSaveManual: (tx: Transaction) => void;
-  onUpdate?: (tx: Transaction) => void;
-  onDelete?: (id: string) => void;
-  onScanConsumed: (scansUsed: number) => void;
   onOpenUpgrade: () => void;
-  onScanBlocked: () => void;
-  // Quick Scan fast-path (tax-prep shortcut): skips straight to the camera/
-  // upload step as an expense, with the category pre-set to a standard
-  // business/tax bucket, instead of asking income-vs-expense and
-  // scan-vs-manual first. Gating (paid plan only) is enforced by the
-  // caller before this modal is ever opened with quickScan=true.
-  quickScan?: boolean;
 }
 
-const EXPENSE_CATEGORIES_PERSONAL = [
-  'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
-  'catHealth', 'catEntertainment', 'catOther',
-];
-const EXPENSE_CATEGORIES_BUSINESS = [
-  'catBusinessMaterials', 'catOffice', 'catMarketing', 'catSoftware',
-  'catTravel', 'catRestaurant', 'catTransport', 'catUtilities', 'catOther',
-];
-const INCOME_CATEGORIES = ['catSalary', 'catFreelance', 'catInvestments', 'catRental', 'catOtherIncome'];
+type Tab = 'summary' | 'ledger' | 'tax';
 
-function generateId() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
+export default function TaxReportModal({ tr, tier, lang, transactions: allTransactions, onClose, onOpenUpgrade }: TaxReportModalProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('summary');
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
 
+  const currentYear = new Date().getFullYear();
+  // Transactions store dates as plain 'YYYY-MM-DD' strings (see
+  // todayLocalDate in lib/utils.ts) specifically to avoid the
+  // new Date("2026-07-27") UTC-midnight parsing bug — so we compare
+  // the year as a string slice here too, instead of re-parsing with
+  // `new Date(t.date)`, to stay consistent with that fix.
+  const transactions = allTransactions.filter(t => t.date.slice(0, 4) === String(currentYear));
 
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const totalTax = transactions.filter(t => t.taxAmount).reduce((s, t) => s + (t.taxAmount || 0), 0);
+  const netProfit = totalIncome - totalExpenses;
 
-export default function TransactionModal({
-  tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
-  editTransaction, customCategories = {}, onAddCustomCategory,
-  onClose, onSaveManual, onUpdate, onDelete,
-  onScanConsumed, onOpenUpgrade, onScanBlocked, quickScan,
-}: TransactionModalProps) {
-  const isEditMode = !!editTransaction;
+  // Per-category breakdown for the Tax tab — purely a re-grouping of data
+  // the user already entered (amount + taxAmount per transaction). This
+  // does NOT calculate any GST/HST/QST remittance figure; it just makes
+  // the existing numbers easier for an accountant to work from, category
+  // by category, instead of one lump total.
+  const categoryBreakdown = (() => {
+    const map: Record<string, { amount: number; tax: number }> = {};
+    transactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        if (!map[t.category]) map[t.category] = { amount: 0, tax: 0 };
+        map[t.category].amount += t.amount;
+        map[t.category].tax += t.taxAmount || 0;
+      });
+    return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount);
+  })();
 
-  const [step, setStep] = useState<ModalStep>(isEditMode ? 'manual' : (quickScan ? 'ocr' : 'type'));
-  const [txType, setTxType] = useState<TransactionType>(editTransaction?.type ?? 'expense');
-  // Which "bucket" this specific transaction belongs to. Defaults to the
-  // user's current global setting, but can be overridden per-transaction —
-  // e.g. someone in "Business" mode still occasionally logs a personal
-  // expense, and shouldn't have to leave the modal to do it.
-  const [txAccountType, setTxAccountType] = useState<AccountType>(editTransaction?.accountType ?? accountType);
-  const [amount, setAmount] = useState(editTransaction ? String(editTransaction.amount) : '');
-  const [description, setDescription] = useState(editTransaction?.description ?? '');
-  // Quick Scan pre-fills a standard business/tax category up front (least
-  // friction for a tax-prep receipt) instead of starting blank; the normal
-  // flow still sets this once the person picks income vs. expense.
-  const [category, setCategory] = useState(
-    editTransaction?.category
-      ?? (quickScan ? (accountType === 'business' ? 'catBusinessMaterials' : 'catOther') : '')
-  );
-  const [date, setDate] = useState(editTransaction?.date ?? todayLocalDate());
-  const [ocrStatus, setOcrStatus] = useState<OcrStatus>('idle');
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [ocrBanner, setOcrBanner] = useState('');
-  const [dragging, setDragging] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showNewCatInput, setShowNewCatInput] = useState(false);
-  const [newCatLabel, setNewCatLabel] = useState('');
-  const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
-  const [taxAmount, setTaxAmount] = useState<number | undefined>(editTransaction?.taxAmount);
-  const [receiptHash, setReceiptHash] = useState<string | null>(null);
-  const [receiptImageBase64, setReceiptImageBase64] = useState<string | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
-  const scanExhausted = scansLeft <= 0;
-  const expenseCats = txAccountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
-  const customExpenseCatKeys = Object.keys(customCategories);
-  const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
-
-  const handleConfirmNewCategory = () => {
-    const label = newCatLabel.trim();
-    if (!label) return;
-    const { key } = getOrCreateCategoryKey(label, customCategories);
-    onAddCustomCategory?.(key, label);
-    setCategory(key);
-    setNewCatLabel('');
-    setShowNewCatInput(false);
-  };
-
-  const handleTypeSelect = (type: TransactionType) => {
-    setTxType(type);
-    setCategory(type === 'income' ? 'catSalary' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries'));
-    setStep('receipt');
-  };
-
-  const handleReceiptYes = async () => {
-    if (scanExhausted) {
-      onScanBlocked();
-      return;
-    }
-    // The actual, authoritative check-and-consume now happens atomically
-    // inside /api/ocr right before it spends money on the Claude API call
-    // — see runOcr's 403 handling below. This client-side check is just a
-    // fast, friendly guard to avoid an unnecessary round trip when we
-    // already know the answer.
-    setStep('ocr');
-  };
-
-  const runOcr = useCallback(async (file: File) => {
-    setOcrStatus('scanning');
-    setOcrProgress(30);
-    setOcrBanner(tr.ocrScanning);
+  const handleViewReceipt = async (tx: Transaction) => {
+    if (!tx.receiptHash) return;
+    setLoadingReceiptId(tx.id);
     try {
-      // Resize image before sending to reduce size
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const img = new Image();
-        const url = URL.createObjectURL(file);
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX = 1200;
-          let w = img.width, h = img.height;
-          if (w > MAX || h > MAX) {
-            if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-            else { w = Math.round(w * MAX / h); h = MAX; }
-          }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(img, 0, 0, w, h);
-          URL.revokeObjectURL(url);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          resolve(dataUrl.split(',')[1]);
-        };
-        img.onerror = () => reject(new Error('Failed to load image'));
-        img.src = url;
-      });
-      setOcrProgress(60);
-      setReceiptImageBase64(base64);
       const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch('/api/ocr', {
+      if (!session?.access_token) return;
+      const res = await fetch('/api/receipts/signed-url', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ image: base64, mimeType: 'image/jpeg' }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ receiptHash: tx.receiptHash }),
       });
+      const data = await res.json();
+      if (data.url) window.open(data.url, '_blank');
+    } finally {
+      setLoadingReceiptId(null);
+    }
+  };
 
-      if (!response.ok) {
-        if (response.status === 403) {
-          onScanBlocked();
-          setStep('receipt');
-          return;
-        }
-        const errText = await response.text().catch(() => 'Unknown error');
-        console.error('OCR API error:', response.status, errText);
-        throw new Error(`OCR API returned ${response.status}`);
-      }
-
-      const parsed = await response.json();
-      setOcrProgress(100);
-
-      if (parsed.amount) setAmount(String(parsed.amount));
-      if (parsed.description) setDescription(parsed.description);
-      if (parsed.date) setDate(parsed.date);
-      if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
-      if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
-      if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
-      // A scanned receipt is, by definition, an expense — nobody scans a
-      // receipt to prove they received income. The type toggle stays
-      // selectable earlier in the flow (Income/Expense step) purely for
-      // manual entries, but once OCR actually returns a result we correct
-      // it here so a receipt scanned while "Income" was still selected
-      // doesn't get saved as income with the catSalary default.
-      if (txType !== 'expense') setTxType('expense');
-      // Pre-fill the category from the AI's guess, but only if it's one of
-      // the categories currently shown for this account type (personal vs
-      // business use different lists) — otherwise leave whatever default
-      // was already set by handleTypeSelect, and the user picks manually
-      // exactly as before.
-      if (parsed.category && expenseCats.includes(parsed.category)) {
-        setCategory(parsed.category);
-      } else if (!expenseCats.includes(category)) {
-        // The previously-selected category was an income one (e.g.
-        // catSalary, left over from before the type flip above) and the AI
-        // wasn't confident enough to give us a replacement — fall back to
-        // the normal expense default instead of saving an income category
-        // on an expense transaction.
-        setCategory(txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
-      }
-      if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
-      if (parsed.duplicate?.isDuplicate) {
-        setDuplicateWarning({
-          matchedMerchant: parsed.duplicate.matchedMerchant,
-          matchedDate: parsed.duplicate.matchedDate,
+  const handleDownloadExcel = () => {
+    const rows: string[][] = [];
+    
+    // Header
+    rows.push(['Date', 'Type', 'Merchant/Description', 'Category', 'Item', 'Item Price', 'Total Amount']);
+    
+    transactions.slice().reverse().forEach(tx => {
+      if (tx.items && tx.items.length > 0) {
+        tx.items.forEach((item, i) => {
+          rows.push([
+            i === 0 ? tx.date : '',
+            i === 0 ? tx.type : '',
+            i === 0 ? tx.description : '',
+            i === 0 ? tx.category : '',
+            item.name,
+            String(item.price),
+            i === 0 ? String(tx.amount) : '',
+          ]);
         });
       } else {
-        setDuplicateWarning(null);
+        rows.push([tx.date, tx.type, tx.description, tx.category, '', '', String(tx.amount)]);
       }
+    });
 
-      setOcrStatus('done');
-      setOcrBanner(tr.ocrReady);
-      setTimeout(() => setStep('manual'), 600);
-    } catch (err) {
-      console.error('OCR failed:', err);
-      setOcrStatus('error');
-      setOcrBanner('OCR failed — please enter details manually.');
-      setTimeout(() => setStep('manual'), 1200);
-    }
-  }, [tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats, txType, category, txAccountType]);
+    // Summary rows
+    rows.push([]);
+    rows.push(['SUMMARY', '', '', '', '', '', '']);
+    rows.push(['Total Income', '', '', '', '', '', String(totalIncome)]);
+    rows.push(['Total Expenses', '', '', '', '', '', String(totalExpenses)]);
+    rows.push(['Net Profit', '', '', '', '', '', String(netProfit)]);
 
-  const handleFileChange = (file: File | null) => {
-    if (!file) return;
-    runOcr(file);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) runOcr(file);
-  };
-
-  const handleSave = () => {
-    if (!amount || !description) return;
-    const tx: Transaction = {
-      id: editTransaction?.id ?? generateId(),
-      type: txType,
-      accountType: txAccountType,
-      amount: parseFloat(amount),
-      description,
-      category,
-      date,
-      hasReceipt: editTransaction?.hasReceipt ?? (step === 'manual' && ocrStatus !== 'idle'),
-      items: receiptItems.length > 0 ? receiptItems : undefined,
-      taxAmount,
-      receiptHash: receiptHash || undefined,
-    };
-    if (isEditMode && onUpdate) {
-      onUpdate(tx);
-    } else {
-      onSaveManual(tx);
-    }
-    // Only receipts that actually went through OCR get a fingerprint —
-    // manually-entered transactions have nothing to compare against.
-    if (receiptHash) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session?.access_token) return;
-        fetch('/api/receipts/record-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({
-            receiptHash,
-            merchant: description,
-            amount: parseFloat(amount),
-            date,
-            image: receiptImageBase64,
-          }),
-        }).catch(() => { /* non-critical — a missed fingerprint just means one fewer future duplicate check */ });
+    if (categoryBreakdown.length > 0) {
+      rows.push([]);
+      rows.push(['TAX BY CATEGORY', '', '', '', '', '', '']);
+      rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '']);
+      categoryBreakdown.forEach(([cat, sums]) => {
+        rows.push([cat, String(sums.amount), String(sums.tax), '', '', '', '']);
       });
     }
+
+    const NL = String.fromCharCode(10);
+    const csvContent = rows.map(r => r.map(c => JSON.stringify(c)).join(',')).join(NL);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'finsnap-report.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const handleConfirmDelete = () => {
-    if (editTransaction && onDelete) {
-      onDelete(editTransaction.id);
+  const handleDownloadPDF = async () => {
+    setPdfLoading(true);
+    try {
+      // Load html2pdf.js via script tag so it never enters the webpack bundle
+      if (!(window as any).html2pdf) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Failed to load html2pdf.js'));
+          document.head.appendChild(script);
+        });
+      }
+      const html2pdfFn = (window as any).html2pdf;
+      const element = document.getElementById('tax-report-pdf-content');
+      if (!element || !html2pdfFn) return;
+      await html2pdfFn()
+        .set({
+          margin: 8,
+          filename: 'finsnap-tax-report.pdf',
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { format: 'a4', orientation: 'portrait' },
+        })
+        .from(element)
+        .save();
+    } catch {
+      // silently fall back
+    } finally {
+      setPdfLoading(false);
     }
   };
 
-  const modalTitle = isEditMode ? tr.editTransaction : (quickScan ? tr.quickScanTitle : tr.addTransactionTitle);
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'summary', label: tr.tabSummary },
+    { id: 'ledger', label: tr.tabLedger },
+    { id: 'tax', label: tr.tabTax },
+  ];
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl z-50 max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl z-50 max-h-[92vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 rounded-full bg-slate-200" />
         </div>
 
-        <div className="px-5 pb-8 pt-2">
-          <div className="flex items-center justify-between mb-6">
+        <div className="px-5 pb-8 pt-2" id="tax-report-pdf-content">
+          <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
-              {step !== 'type' && !isEditMode && (
-                <button
-                  onClick={() => {
-                    if (step === 'ocr') setStep('receipt');
-                    else if (step === 'manual') setStep('receipt');
-                    else setStep('type');
-                  }}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5 text-slate-500" />
-                </button>
-              )}
-              <h2 className="text-lg font-bold text-slate-900">{modalTitle}</h2>
+              <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center">
+                <FileSpreadsheet className="w-4 h-4 text-teal-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">{tr.taxReportTitle}</h2>
+                <p className="text-xs text-slate-500">{tr.taxReportSub}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              {isEditMode && onDelete && (
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors"
-                >
-                  <Trash2 className="w-4 h-4 text-rose-400" />
-                </button>
-              )}
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
           </div>
 
-          {/* Delete confirmation */}
-          {showDeleteConfirm && (
-            <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-4 space-y-3">
-              <p className="text-sm font-semibold text-rose-800">{tr.confirmDelete}</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleConfirmDelete}
-                  className="flex-1 py-2 bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.98]"
-                >
-                  {tr.yes}
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition-all hover:bg-slate-50 active:scale-[0.98]"
-                >
-                  {tr.no}
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Workbook Tab Bar */}
+          <div className="flex items-center gap-1 mb-5 bg-slate-100 p-1 rounded-xl" dir="ltr">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-1 py-2 px-3 text-xs font-semibold rounded-lg transition-all duration-150 ${activeTab === tab.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-          {/* Step: type */}
-          {step === 'type' && (
+          {activeTab === 'summary' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-500 mb-4">Select the transaction type:</p>
-              <button
-                onClick={() => handleTypeSelect('income')}
-                className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-emerald-400 rounded-2xl text-left transition-all duration-150 hover:bg-emerald-50 active:scale-[0.98] group"
-              >
-                <div className="text-3xl">💰</div>
-                <div>
-                  <div className="font-bold text-slate-900">{tr.incomeLabel}</div>
-                  <div className="text-sm text-slate-500">Money coming in</div>
+              <div className="bg-slate-50 rounded-2xl p-4">
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {currentYear}</div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">{tr.totalIncome}</span>
+                    <span className="text-sm font-bold text-emerald-600" dir="ltr">{formatCurrency(totalIncome, lang, 2)}</span>
+                  </div>
+                  <div className="h-px bg-slate-200" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-slate-600">{tr.totalExpenses}</span>
+                    <span className="text-sm font-bold text-rose-500" dir="ltr">{formatCurrency(totalExpenses, lang, 2)}</span>
+                  </div>
+                  <div className="h-px bg-slate-200" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-800">{tr.netProfit}</span>
+                    <span className={`text-base font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} dir="ltr">{formatCurrency(netProfit, lang, 2)}</span>
+                  </div>
                 </div>
-                <div className="ml-auto w-8 h-8 rounded-full bg-slate-50 group-hover:bg-emerald-500 flex items-center justify-center transition-all">
-                  <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-4">
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Transaction Count</div>
+                <div className="flex gap-3">
+                  <div className="flex-1 bg-emerald-50 rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-emerald-600">{transactions.filter(t => t.type === 'income').length}</div>
+                    <div className="text-xs text-emerald-600">{tr.income}</div>
+                  </div>
+                  <div className="flex-1 bg-rose-50 rounded-xl p-3 text-center">
+                    <div className="text-lg font-bold text-rose-500">{transactions.filter(t => t.type === 'expense').length}</div>
+                    <div className="text-xs text-rose-500">{tr.expense}</div>
+                  </div>
                 </div>
-              </button>
-              <button
-                onClick={() => handleTypeSelect('expense')}
-                className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-rose-400 rounded-2xl text-left transition-all duration-150 hover:bg-rose-50 active:scale-[0.98] group"
-              >
-                <div className="text-3xl">💸</div>
-                <div>
-                  <div className="font-bold text-slate-900">{tr.expenseLabel}</div>
-                  <div className="text-sm text-slate-500">Money going out</div>
-                </div>
-                <div className="ml-auto w-8 h-8 rounded-full bg-slate-50 group-hover:bg-rose-500 flex items-center justify-center transition-all">
-                  <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                </div>
-              </button>
+              </div>
             </div>
           )}
 
-          {/* Step: receipt */}
-          {step === 'receipt' && (
+          {activeTab === 'ledger' && (
+            <div className="space-y-2">
+              {transactions.length === 0 ? (
+                <div className="text-center py-8 text-sm text-slate-400">No transactions yet.</div>
+              ) : (
+                transactions.slice().reverse().map(tx => (
+                  <div key={tx.id} className="bg-slate-50 rounded-xl p-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${tx.type === 'income' ? 'bg-emerald-500' : 'bg-rose-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-800 truncate">{tx.description}</div>
+                        <div className="text-xs text-slate-500">{tx.date} · {tx.category}</div>
+                      </div>
+                      <div className={`text-sm font-bold shrink-0 ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`} dir="ltr">
+                        {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, lang, 2)}
+                      </div>
+                    </div>
+                    {tx.items && tx.items.length > 0 && (
+                      <div className="mt-2 ml-5 space-y-0.5 border-t border-slate-200 pt-2">
+                        {tx.items.map((item, i) => (
+                          <div key={i} className="flex justify-between text-xs text-slate-500">
+                            <span>{item.name}</span>
+                            <span dir="ltr">{formatCurrency(item.price, lang, 2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {tx.hasReceipt && (
+                      <div className="shrink-0">
+                        {tx.receiptHash ? (
+                          <button
+                            onClick={() => handleViewReceipt(tx)}
+                            disabled={loadingReceiptId === tx.id}
+                            className="flex items-center gap-1 text-xs text-teal-600 bg-teal-50 hover:bg-teal-100 px-1.5 py-0.5 rounded-md font-medium transition-colors"
+                          >
+                            <Eye className="w-3 h-3" />
+                            {loadingReceiptId === tx.id ? '…' : tr.receiptScanned}
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md font-medium">📎 {tr.receiptScanned}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'tax' && (
             <div className="space-y-3">
-              <div className="mb-4">
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${txType === 'income' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                  {txType === 'income' ? '💰' : '💸'} {txType === 'income' ? tr.income : tr.expense}
-                </span>
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600">{tr.totalTaxPaid}</span>
+                  <span className="text-sm font-bold text-slate-800" dir="ltr">{formatCurrency(totalTax, lang, 2)}</span>
+                </div>
+                <div className="h-px bg-slate-200" />
+                <p className="text-xs text-slate-400 leading-relaxed">{tr.taxLineExplainer}</p>
               </div>
-              <p className="text-base font-semibold text-slate-800">{tr.receiptQuestion}</p>
 
-              {/* Scan/OCR: exclusively for active paid plans — never shown as a
-                  usable option for free users or daily-code users, per the
-                  rule that OCR must stay exclusive to purchased plans. */}
-              {hasScanAccess ? (
-                <button
-                  onClick={handleReceiptYes}
-                  className={`w-full flex items-center gap-4 p-5 border-2 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] group ${scanExhausted ? 'border-slate-200 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-teal-400 hover:bg-teal-50'}`}
-                >
-                  <div className="text-3xl">📸</div>
-                  <div>
-                    <div className="font-bold text-slate-900">{tr.yesUpload}</div>
-                    <div className="text-xs text-slate-500 mt-0.5" dir="ltr">
-                      {scansLeft > 0 ? `${scansLeft} scan${scansLeft !== 1 ? 's' : ''} left this month` : tr.scanLimitReached}
+              {categoryBreakdown.length > 0 && (
+                <div className="bg-slate-50 rounded-2xl p-4">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.taxByCategory}</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wide px-0.5">
+                      <span>{tr.categoryColumn}</span>
+                      <span dir="ltr">{tr.totalExpenses} · {tr.totalTaxPaid}</span>
                     </div>
-                  </div>
-                  <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
-                    <ScanLine className="w-3.5 h-3.5" />
-                    OCR
-                  </div>
-                </button>
-              ) : (
-                <button
-                  onClick={onOpenUpgrade}
-                  className="w-full flex items-center gap-4 p-5 border-2 border-dashed border-slate-200 rounded-2xl text-left transition-all duration-150 hover:border-teal-300 hover:bg-teal-50 active:scale-[0.98]"
-                >
-                  <div className="text-3xl opacity-50">📸</div>
-                  <div>
-                    <div className="font-bold text-slate-500">{tr.yesUpload}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{tr.scanRequiresPlan}</div>
-                  </div>
-                  <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">
-                    <Lock className="w-3.5 h-3.5" />
-                  </div>
-                </button>
-              )}
-
-              {/* Manual entry: available to plan holders AND today's daily-code
-                  redeemers — but not to a fully free/locked user. */}
-              {hasManualAccess ? (
-                <button
-                  onClick={() => setStep('manual')}
-                  className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-slate-400 rounded-2xl text-left transition-all duration-150 hover:bg-slate-50 active:scale-[0.98]"
-                >
-                  <div className="text-3xl">✍️</div>
-                  <div>
-                    <div className="font-bold text-slate-900">{tr.noManual}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{tr.enterDetailsYourself}</div>
-                  </div>
-                </button>
-              ) : (
-                <div className="w-full flex items-center gap-4 p-5 border-2 border-dashed border-slate-200 rounded-2xl opacity-70">
-                  <div className="text-3xl opacity-50">✍️</div>
-                  <div>
-                    <div className="font-bold text-slate-500">{tr.noManual}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{tr.manualRequiresCodeOrPlan}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step: OCR scanner */}
-          {step === 'ocr' && (
-            <div className="space-y-4">
-              <div className={`relative border-2 border-dashed rounded-2xl transition-all duration-200 ${dragging ? 'border-teal-400 bg-teal-50' : 'border-slate-300 hover:border-teal-300 hover:bg-slate-50'}`}
-                onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="absolute inset-0 opacity-0 cursor-pointer z-10 w-full h-full"
-                  onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
-                />
-                <div className="flex flex-col items-center justify-center py-10 px-4 text-center pointer-events-none">
-                  {ocrStatus === 'idle' && (
-                    <>
-                      <div className="w-14 h-14 rounded-2xl bg-teal-100 flex items-center justify-center mb-4">
-                        <Upload className="w-7 h-7 text-teal-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-slate-700 mb-1">{tr.uploadReceipt}</p>
-                      <p className="text-xs text-slate-400">{tr.ocrHint}</p>
-                    </>
-                  )}
-                  {ocrStatus === 'scanning' && (
-                    <>
-                      <div className="w-14 h-14 rounded-2xl bg-teal-100 flex items-center justify-center mb-4">
-                        <ScanLine className="w-7 h-7 text-teal-600 animate-pulse" />
-                      </div>
-                      <p className="text-sm font-semibold text-slate-700 mb-3">{tr.ocrScanning}</p>
-                      <div className="w-full max-w-[200px] h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-teal-500 rounded-full transition-all duration-300"
-                          style={{ width: `${ocrProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-slate-400 mt-2" dir="ltr">{ocrProgress}%</p>
-                    </>
-                  )}
-                  {(ocrStatus === 'done' || ocrStatus === 'error') && (
-                    <>
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${ocrStatus === 'done' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                        {ocrStatus === 'done'
-                          ? <CheckCircle className="w-7 h-7 text-emerald-600" />
-                          : <AlertCircle className="w-7 h-7 text-rose-500" />
-                        }
-                      </div>
-                      <p className={`text-sm font-semibold ${ocrStatus === 'done' ? 'text-emerald-700' : 'text-rose-600'}`}>{ocrBanner}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {ocrStatus === 'idle' && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-teal-200 hover:shadow-teal-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <ScanLine className="w-4 h-4" />
-                  {tr.scanReceipt}
-                </button>
-              )}
-
-              <button
-                onClick={() => setStep('manual')}
-                className="w-full py-2.5 text-slate-500 hover:text-slate-700 text-sm font-medium transition-colors"
-              >
-                {tr.noManual}
-              </button>
-            </div>
-          )}
-
-          {/* Step: manual entry */}
-          {step === 'manual' && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.settingsAccountType}</label>
-                <div className="flex gap-2">
-                  {(['personal', 'business'] as const).map(opt => (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        setTxAccountType(opt);
-                        // Keep the category sane if it doesn't exist in the new bucket's list.
-                        if (txType === 'expense') {
-                          const nextCats = opt === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
-                          if (!nextCats.includes(category) && !customExpenseCatKeys.includes(category)) {
-                            setCategory(opt === 'business' ? 'catBusinessMaterials' : 'catGroceries');
-                          }
-                        }
-                      }}
-                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                        txAccountType === opt ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                    >
-                      {opt === 'business' ? `💼 ${tr.business}` : `🏠 ${tr.personal}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {ocrBanner && (
-                <div className={`flex items-center gap-2 text-xs font-medium rounded-xl px-3 py-2 ${ocrStatus === 'done' ? 'bg-emerald-50 text-emerald-700' : ocrStatus === 'error' ? 'bg-rose-50 text-rose-600' : ''}`}>
-                  {ocrStatus === 'done' && <CheckCircle className="w-3.5 h-3.5 shrink-0" />}
-                  {ocrBanner}
-                </div>
-              )}
-
-              {duplicateWarning && (
-                <div className="flex items-start gap-2.5 text-xs font-medium rounded-xl px-3 py-2.5 bg-amber-50 text-amber-800 border border-amber-200">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <div className="font-semibold mb-0.5">{tr.duplicateReceiptTitle}</div>
-                    <div className="text-amber-700 font-normal">
-                      {tr.duplicateReceiptDesc
-                        .replace('{merchant}', duplicateWarning.matchedMerchant || '')
-                        .replace('{date}', duplicateWarning.matchedDate || '')}
-                    </div>
-                  </div>
-                  <button onClick={() => setDuplicateWarning(null)} className="shrink-0">
-                    <X className="w-3.5 h-3.5 text-amber-500" />
-                  </button>
-                </div>
-              )}
-
-              {isEditMode && (
-                <div className="flex gap-2 mb-2">
-                  {(['income', 'expense'] as TransactionType[]).map(t => (
-                    <button
-                      key={t}
-                      onClick={() => {
-                        setTxType(t);
-                        const defaultCat = t === 'income' ? 'catSalary' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
-                        if (!cats.includes(category)) setCategory(defaultCat);
-                      }}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${txType === t ? (t === 'income' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                    >
-                      {t === 'income' ? `💰 ${tr.income}` : `💸 ${tr.expense}`}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-
-              {receiptItems.length > 0 && (
-                <div className="bg-slate-50 rounded-xl p-3">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                    {'Receipt Items / آیتم‌های رسید'}
-                  </div>
-                  <div className="space-y-1">
-                    {receiptItems.map((item, i) => (
-                      <div key={i} className="flex justify-between items-center text-xs text-slate-700">
-                        <span>{item.name}</span>
-                        <span className="font-semibold" dir="ltr">{item.price.toLocaleString()}</span>
+                    {categoryBreakdown.map(([cat, sums]) => (
+                      <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-3 py-2">
+                        <span className="text-xs font-medium text-slate-700">{(tr as any)[cat] || cat}</span>
+                        <span className="text-xs font-semibold text-slate-600" dir="ltr">
+                          {formatCurrency(sums.amount, lang, 2)} · {formatCurrency(sums.tax, lang, 2)}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.amount}</label>
-                <div className="relative" dir="ltr">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full pl-7 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                  />
-                </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                <Lock className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-amber-700 leading-relaxed">{tr.taxDisclaimer}</p>
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.description}</label>
-                <input
-                  type="text"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder={txType === 'income' ? 'e.g. Client invoice #12' : 'e.g. Office supplies'}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                  dir="auto"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.category}</label>
-                <select
-                  value={category}
-                  onChange={e => {
-                    if (e.target.value === '__add_new__') {
-                      setShowNewCatInput(true);
-                      setCategory('');
-                    } else {
-                      setCategory(e.target.value);
-                    }
-                  }}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all appearance-none"
-                >
-                  {cats.map(c => (
-                    <option key={c} value={c}>{(tr as any)[c] ?? customCategories[c] ?? c}</option>
-                  ))}
-                  {txType === 'expense' && (
-                    <option value="__add_new__">{tr.addNewCategory}</option>
-                  )}
-                </select>
-
-                {showNewCatInput && (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={newCatLabel}
-                      onChange={e => setNewCatLabel(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleConfirmNewCategory(); } if (e.key === 'Escape') { setShowNewCatInput(false); setNewCatLabel(''); } }}
-                      placeholder={tr.newCategoryLabel}
-                      className="flex-1 px-3 py-2 bg-teal-50 border border-teal-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-transparent transition-all"
-                      dir="auto"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleConfirmNewCategory}
-                      disabled={!newCatLabel.trim()}
-                      className="px-3 py-2 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-xl text-xs transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      OK
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setShowNewCatInput(false); setNewCatLabel(''); }}
-                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition-all"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.date}</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                  dir="ltr"
-                />
-              </div>
-
-              <button
-                onClick={handleSave}
-                disabled={!amount || !description}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl text-sm shadow-lg shadow-emerald-200 hover:shadow-emerald-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isEditMode ? tr.updateTransaction : tr.save}
-              </button>
             </div>
           )}
+
+          <div className="mt-6 space-y-3">
+            {/* PDF — available to everyone */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={pdfLoading}
+              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
+            >
+              {pdfLoading ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              ) : <FileDown className="w-4 h-4" />}
+              {tr.downloadPDF}
+            </button>
+
+            {tier === 'premium' ? (
+              <button onClick={handleDownloadExcel} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 flex items-center justify-center gap-2">
+                <Download className="w-4 h-4" />
+                {tr.downloadExcel}
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                  <Lock className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-700">{tr.downloadBlocked}</p>
+                </div>
+                <button
+                  onClick={() => { onClose(); onOpenUpgrade(); }}
+                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-amber-200 flex items-center justify-center gap-2"
+                >
+                  <Lock className="w-4 h-4" />
+                  {tr.upgradeToPremium}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
