@@ -50,6 +50,7 @@ export interface AppState {
   totalExpenses: number;
   budgets: Record<string, number>;
   customCategories: Record<string, string>;
+  customIncomeCategories: Record<string, string>; // اضافه شده برای دسته‌بندی‌های سفارشی درآمد
   // Calendar due date + recurrence per budget item (category key). `date`
   // is the anchor due date (YYYY-MM-DD); recurrence determines how the
   // *next* occurrence is computed from that anchor.
@@ -80,6 +81,7 @@ export const INITIAL_STATE: AppState = {
   totalExpenses: 0,
   budgets: {},
   customCategories: {},
+  customIncomeCategories: {}, // مقدار اولیه خالی برای دسته‌بندی‌های درآمد
   budgetDueDates: {},
   budgetReminders: {},
 };
