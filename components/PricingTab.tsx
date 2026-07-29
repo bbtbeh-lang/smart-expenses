@@ -408,7 +408,22 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         lastTemplateSnapshot !== null && JSON.stringify(prev) === lastTemplateSnapshot;
 
       const base = untouchedSinceLastTemplate ? [] : prev;
-      const kept = base.filter(c => c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0);
+      const kept = base.filter(c => {
+        const hasContent = c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0;
+        if (!hasContent) return false;
+        // Recipe-group categories (`group` set) came from a *previous*
+        // template's per-batch breakdown. Many templates reuse the exact
+        // same label for a given slot (e.g. every template's hidden-cost
+        // category is named "Hidden Costs (often forgotten)"), so if we
+        // kept these around, the name-based dedup below would treat the
+        // NEW template's category as a duplicate and silently drop it —
+        // leaving the OLD template's numbers sitting under a heading that
+        // now belongs to a different business type. Recipe categories
+        // always get replaced wholesale by the newly applied template;
+        // only the person's own free-form categories are preserved.
+        if (template.recipeCategories && c.group) return false;
+        return true;
+      });
       const existingNames = new Set(kept.map(c => c.name.trim().toLowerCase()));
       const additions: CostCategory[] = [];
 
