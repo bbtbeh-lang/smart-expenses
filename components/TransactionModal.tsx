@@ -148,9 +148,22 @@ export default function TransactionModal({
         img.src = url;
       });
       setOcrProgress(60);
-      setReceiptImageBase64(base64);
+
+      // ذخیره تصویر در state مناسب بسته به نوع تراکنش
+      const isIncome = txType === 'income';
+      if (isIncome) {
+        setInvoiceImageBase64(base64);
+      } else {
+        setReceiptImageBase64(base64);
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch('/api/ocr', {
+
+      // مسیر API بر اساس نوع تراکنش انتخاب می‌شه:
+      // درآمد → /api/ocr/income  |  هزینه → /api/ocr
+      const ocrEndpoint = isIncome ? '/api/ocr/income' : '/api/ocr';
+
+      const response = await fetch(ocrEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,19 +190,37 @@ export default function TransactionModal({
       if (parsed.description) setDescription(parsed.description);
       if (parsed.date) setDate(parsed.date);
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
-      if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
-      if (parsed.category && expenseCats.includes(parsed.category)) {
-        setCategory(parsed.category);
-      }
       if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
-      if (parsed.duplicate?.isDuplicate) {
-        setDuplicateWarning({
-          matchedMerchant: parsed.duplicate.matchedMerchant,
-          matchedDate: parsed.duplicate.matchedDate,
-        });
+
+      if (isIncome) {
+        // پر کردن invoiceHash و پردازش داده‌های فاکتور درآمد
+        if (parsed.invoiceHash) setInvoiceHash(parsed.invoiceHash);
+        if (parsed.category && INCOME_OCR_CATEGORIES.includes(parsed.category)) {
+          setCategory(parsed.category);
+        }
+        if (parsed.duplicate?.isDuplicate) {
+          setDuplicateWarning({
+            matchedMerchant: parsed.duplicate.matchedClient ?? null,
+            matchedDate: parsed.duplicate.matchedDate ?? null,
+          });
+        } else {
+          setDuplicateWarning(null);
+        }
       } else {
-        setDuplicateWarning(null);
+        // پر کردن receiptHash و پردازش داده‌های رسید هزینه
+        if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
+        if (parsed.category && expenseCats.includes(parsed.category)) {
+          setCategory(parsed.category);
+        }
+        if (parsed.duplicate?.isDuplicate) {
+          setDuplicateWarning({
+            matchedMerchant: parsed.duplicate.matchedMerchant ?? null,
+            matchedDate: parsed.duplicate.matchedDate ?? null,
+          });
+        } else {
+          setDuplicateWarning(null);
+        }
       }
 
       setOcrStatus('done');
@@ -201,7 +232,7 @@ export default function TransactionModal({
       setOcrBanner('OCR failed — please enter details manually.');
       setTimeout(() => setStep('manual'), 1200);
     }
-  }, [tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
+  }, [txType, tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
@@ -235,20 +266,42 @@ export default function TransactionModal({
     } else {
       onSaveManual(tx);
     }
-    if (receiptHash) {
+    // ثبت اسکن در دیتابیس — endpoint بسته به نوع تراکنش انتخاب می‌شه
+    // تا از ثبت تکراری جلوگیری بشه
+    const isIncome = tx.type === 'income';
+    const hashToRecord = isIncome ? invoiceHash : receiptHash;
+
+    if (hashToRecord) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session?.access_token) return;
-        fetch('/api/receipts/record-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({
-            receiptHash,
-            merchant: description,
-            amount: parseFloat(amount),
-            date,
-            image: receiptImageBase64,
-          }),
-        }).catch(() => {});
+
+        if (isIncome) {
+          // فاکتور درآمدی → record-income-scan با invoiceHash و invoiceImageBase64
+          fetch('/api/receipts/record-income-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+              invoiceHash,
+              clientName: description,
+              amount: parseFloat(amount),
+              date,
+              image: invoiceImageBase64,
+            }),
+          }).catch(() => {});
+        } else {
+          // رسید هزینه → record-scan با receiptHash و receiptImageBase64
+          fetch('/api/receipts/record-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+              receiptHash,
+              merchant: description,
+              amount: parseFloat(amount),
+              date,
+              image: receiptImageBase64,
+            }),
+          }).catch(() => {});
+        }
       });
     }
   };
