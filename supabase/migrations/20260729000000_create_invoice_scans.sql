@@ -22,6 +22,7 @@ create index if not exists invoice_scans_user_created_idx on invoice_scans(user_
 alter table invoice_scans enable row level security;
 
 -- Users can read only their own scan history.
+drop policy if exists "read_own_invoice_scans" on invoice_scans;
 create policy "read_own_invoice_scans" on invoice_scans
   for select to authenticated
   using (auth.uid() = user_id);
@@ -36,14 +37,17 @@ on conflict (id) do nothing;
 
 -- Files are stored under a path like "{user_id}/{hash}.jpg" — these
 -- policies let a user read/write only inside their own folder.
+drop policy if exists "read_own_invoice_files" on storage.objects;
 create policy "read_own_invoice_files" on storage.objects
   for select to authenticated
   using (bucket_id = 'invoices' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "insert_own_invoice_files" on storage.objects;
 create policy "insert_own_invoice_files" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'invoices' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "delete_own_invoice_files" on storage.objects;
 create policy "delete_own_invoice_files" on storage.objects
   for delete to authenticated
   using (bucket_id = 'invoices' and (storage.foldername(name))[1] = auth.uid()::text);
