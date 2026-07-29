@@ -21,6 +21,11 @@ const VALID_INCOME_CATEGORIES = new Set([
 
 const DUPLICATE_LOOKBACK_DAYS = 180;
 
+// Frontend already downsizes to max 1200px + jpeg 0.85 before upload, so a
+// well-formed image should land well under this — this just guards against
+// abuse/bad clients before we spend a scan credit or a model call on it.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
+
 export async function POST(req: Request) {
   let userId: string | null = null;
   let scanConsumed = false;
@@ -35,6 +40,28 @@ export async function POST(req: Request) {
     if (authError || !userData?.user) return Response.json({ error: 'not_authenticated' }, { status: 401 });
     userId = userData.user.id;
 
+    // Validate the payload BEFORE consuming a scan credit — a malformed
+    // request shouldn't cost the user one of their daily scans.
+    const body = await req.json().catch(() => null);
+    const image: string | undefined = body?.image;
+    const mimeType: string | undefined = body?.mimeType;
+    if (!image || typeof image !== 'string') {
+      return Response.json({ error: 'missing_image' }, { status: 400 });
+    }
+
+    let imageBuffer: Buffer;
+    try {
+      imageBuffer = Buffer.from(image, 'base64');
+    } catch {
+      return Response.json({ error: 'invalid_image' }, { status: 400 });
+    }
+    if (imageBuffer.length === 0) {
+      return Response.json({ error: 'invalid_image' }, { status: 400 });
+    }
+    if (imageBuffer.length > MAX_IMAGE_BYTES) {
+      return Response.json({ error: 'image_too_large' }, { status: 413 });
+    }
+
     const consumeResult = await consumeScan(userId);
     if (!consumeResult.allowed) {
       return Response.json(
@@ -45,9 +72,7 @@ export async function POST(req: Request) {
     scanConsumed = true;
     scanResult = consumeResult;
 
-    const { image, mimeType } = await req.json();
-    const safeMimeType = getSupportedMimeType(mimeType);
-    const imageBuffer = Buffer.from(image, 'base64');
+    const safeMimeType = getSupportedMimeType(mimeType || '');
 
     const duplicateCheckPromise = (async () => {
       try {
