@@ -18,10 +18,18 @@ interface TaxReportModalProps {
 
 type Tab = 'summary' | 'ledger' | 'tax';
 
-export default function TaxReportModal({ tr, tier, lang, transactions, onClose, onOpenUpgrade }: TaxReportModalProps) {
+export default function TaxReportModal({ tr, tier, lang, transactions: allTransactions, onClose, onOpenUpgrade }: TaxReportModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
+
+  const currentYear = new Date().getFullYear();
+  // Transactions store dates as plain 'YYYY-MM-DD' strings (see
+  // todayLocalDate in lib/utils.ts) specifically to avoid the
+  // new Date("2026-07-27") UTC-midnight parsing bug — so we compare
+  // the year as a string slice here too, instead of re-parsing with
+  // `new Date(t.date)`, to stay consistent with that fix.
+  const transactions = allTransactions.filter(t => t.date.slice(0, 4) === String(currentYear));
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -192,7 +200,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
           {activeTab === 'summary' && (
             <div className="space-y-3">
               <div className="bg-slate-50 rounded-2xl p-4">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {new Date().getFullYear()}</div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {currentYear}</div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-600">{tr.totalIncome}</span>
