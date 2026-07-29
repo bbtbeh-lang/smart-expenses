@@ -125,6 +125,26 @@ export default function AdminPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Monthly-equivalent revenue per active paid subscriber — yearly plans
+  // are annualized (yearlyPriceCAD / 12), matching the fix already applied
+  // to the upgrade/downgrade comparison in /api/stripe/change-plan.
+  // NOTE: this must stay above the early `return`s below — hooks can never
+  // run conditionally, or React throws a client-side exception once the
+  // number of hooks called differs between renders.
+  const { mrr, activeSubscribers } = useMemo(() => {
+    if (!customers) return { mrr: 0, activeSubscribers: 0 };
+    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free');
+    const total = paying.reduce((sum, c) => {
+      const plan = PLANS[c.plan as PlanId];
+      if (!plan) return sum;
+      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : plan.monthlyPriceCAD);
+    }, 0);
+    return { mrr: total, activeSubscribers: paying.length };
+  }, [customers]);
+
+  const formatCAD = (n: number) =>
+    n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 });
+
   if (!authChecked) {
     return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Loading…</div>;
   }
@@ -144,23 +164,6 @@ export default function AdminPage() {
   }
 
   const usagePercent = status?.maxUses ? Math.min(100, (status.uses / status.maxUses) * 100) : 0;
-
-  // Monthly-equivalent revenue per active paid subscriber — yearly plans
-  // are annualized (yearlyPriceCAD / 12), matching the fix already applied
-  // to the upgrade/downgrade comparison in /api/stripe/change-plan.
-  const { mrr, activeSubscribers } = useMemo(() => {
-    if (!customers) return { mrr: 0, activeSubscribers: 0 };
-    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free');
-    const total = paying.reduce((sum, c) => {
-      const plan = PLANS[c.plan as PlanId];
-      if (!plan) return sum;
-      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : plan.monthlyPriceCAD);
-    }, 0);
-    return { mrr: total, activeSubscribers: paying.length };
-  }, [customers]);
-
-  const formatCAD = (n: number) =>
-    n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 });
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10">
