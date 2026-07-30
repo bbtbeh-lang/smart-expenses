@@ -107,6 +107,8 @@ const LABELS = {
     modeItems: 'Item by item',
     itemName: 'Item name',
     itemPrice: 'Price',
+    selectItem: 'Select an item...',
+    otherItem: 'Other (type your own)',
     addItem: 'Add item',
     subtotal: 'Subtotal',
     noItemsYet: 'No items added yet.',
@@ -126,7 +128,7 @@ const LABELS = {
     hoursLabel: 'Hours worked (this job/period)',
     areaLabel: 'Total area (sq ft or m²)',
     projectNote: 'Total cost = the full project price. Quantity is fixed at 1.',
-    groupDirect: 'Direct Consumables',
+    groupDirect: 'Direct Variable Costs',
     groupSupplies: 'Supplies & Equipment',
     groupHidden: 'Hidden & Overhead Costs',
     personalGuardTitle: 'A tool for businesses & freelancers',
@@ -167,6 +169,8 @@ const LABELS = {
     modeItems: 'مورد به مورد',
     itemName: 'نام مورد',
     itemPrice: 'قیمت',
+    selectItem: 'یک مورد را انتخاب کنید...',
+    otherItem: 'سایر (وارد کردن دستی)',
     addItem: '+ افزودن مورد',
     subtotal: 'جمع جزء',
     noItemsYet: 'هنوز موردی اضافه نشده.',
@@ -186,7 +190,7 @@ const LABELS = {
     hoursLabel: 'ساعت کار (این پروژه/دوره)',
     areaLabel: 'مساحت کل (متر مربع یا فوت مربع)',
     projectNote: 'مجموع هزینه = کل قیمت پروژه. تعداد روی ۱ ثابته.',
-    groupDirect: 'مواد مصرفی مستقیم',
+    groupDirect: 'هزینه‌های متغیر مستقیم',
     groupSupplies: 'ملزومات و تجهیزات',
     groupHidden: 'هزینه‌های پنهان و سربار',
     personalGuardTitle: 'ابزاری برای بیزینس‌ها و فریلنسرها',
@@ -264,6 +268,30 @@ function recipeGroupForIndex(index: number, total: number): RecipeGroup {
   return 'supplies';
 }
 
+// Master dropdown options for "Direct Variable Costs" items — the union of
+// every template's own direct-cost ingredient/material names (index 0 of
+// each template's recipeCategories), deduped and localized. Used so the
+// item-name field can be a select instead of free text, regardless of
+// which template (if any) was applied.
+const DIRECT_ITEM_OPTIONS: Record<'EN' | 'FA', string[]> = (() => {
+  const byLang: Record<'EN' | 'FA', Set<string>> = { EN: new Set(), FA: new Set() };
+  for (const t of BUSINESS_TEMPLATES) {
+    const directCat = t.recipeCategories?.[0];
+    if (!directCat) continue;
+    for (const item of directCat.items) {
+      byLang.EN.add(item.name.EN);
+      byLang.FA.add(item.name.FA || item.name.EN);
+    }
+  }
+  return {
+    EN: Array.from(byLang.EN).sort((a, b) => a.localeCompare(b)),
+    FA: Array.from(byLang.FA).sort((a, b) => a.localeCompare(b, 'fa')),
+  };
+})();
+
+// Sentinel value for the dropdown's "Other" option — never a real item name.
+const NAME_OTHER = '__other__';
+
 function categoryTotal(c: CostCategory) {
   if (c.mode === 'single') return num(c.single);
   return c.items.reduce((s, it) => s + num(it.price), 0);
@@ -318,9 +346,17 @@ function CostCategoryEditor({
 }) {
   const inputClass = 'w-full py-2.5 px-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400';
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+  const isDirectGroup = category.group === 'direct';
+  const directOptions = DIRECT_ITEM_OPTIONS[isRtl ? 'FA' : 'EN'];
+  // An item is in "custom name" mode if it already holds a name that isn't
+  // one of the preset options (typed before this feature existed, or after
+  // explicitly choosing "Other"), or if the person just clicked "Other" on
+  // a still-blank item — tracked here since a blank custom item and a
+  // blank not-yet-chosen item both have name === ''.
+  const [forcedCustomIds, setForcedCustomIds] = useState<Set<string>>(new Set());
 
   const addItem = () => {
-    onChange({ ...category, items: [...category.items, newItem()] });
+    onChange({ ...category, items: [...category.items, { ...newItem(), price: isDirectGroup ? '0' : '' }] });
   };
   const updateItem = (id: string, patch: Partial<CostItem>) => {
     onChange({ ...category, items: category.items.map(it => (it.id === id ? { ...it, ...patch } : it)) });
@@ -387,35 +423,67 @@ function CostCategoryEditor({
       ) : (
         <div className="space-y-2" onClick={e => e.stopPropagation()}>
           {category.items.length === 0 && <p className="text-[11px] text-slate-400">{labels.noItemsYet}</p>}
-          {category.items.map(it => (
-            <div key={it.id} className="border border-slate-100 rounded-lg p-2">
-              <input
-                value={it.name}
-                onChange={e => updateItem(it.id, { name: e.target.value })}
-                placeholder={labels.itemName}
-                className={`${inputClass} mb-2`}
-              />
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={it.price}
-                  onChange={e => updateItem(it.id, { price: e.target.value })}
-                  placeholder={labels.itemPrice}
-                  className={`${inputClass} flex-1`}
-                  dir="ltr"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeItem(it.id)}
-                  className="text-slate-300 hover:text-rose-500 transition-colors p-1 shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+          {category.items.map(it => {
+            // For "Direct Variable Costs" items, the name is picked from a
+            // dropdown of known ingredients/materials (built from every
+            // template) instead of typed freely. A name that isn't in the
+            // preset list — a custom item, or one already typed before this
+            // feature existed — falls back to the "Other" text input so
+            // nothing already saved gets clobbered.
+            const isCustomName = it.name !== '' && !directOptions.includes(it.name);
+            const showAsDropdown = isDirectGroup && !isCustomName && !forcedCustomIds.has(it.id);
+            return (
+              <div key={it.id} className="border border-slate-100 rounded-lg p-2">
+                {showAsDropdown ? (
+                  <select
+                    value={it.name}
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (val === NAME_OTHER) {
+                        setForcedCustomIds(prev => new Set(prev).add(it.id));
+                        updateItem(it.id, { name: '' });
+                      } else {
+                        updateItem(it.id, { name: val });
+                      }
+                    }}
+                    className={`${inputClass} mb-2`}
+                  >
+                    <option value="" disabled={it.name !== ''}>{labels.selectItem}</option>
+                    {directOptions.map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                    <option value={NAME_OTHER}>{labels.otherItem}</option>
+                  </select>
+                ) : (
+                  <input
+                    value={it.name}
+                    onChange={e => updateItem(it.id, { name: e.target.value })}
+                    placeholder={labels.itemName}
+                    className={`${inputClass} mb-2`}
+                  />
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={it.price}
+                    onChange={e => updateItem(it.id, { price: e.target.value })}
+                    placeholder={labels.itemPrice}
+                    className={`${inputClass} flex-1`}
+                    dir="ltr"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(it.id)}
+                    className="text-slate-300 hover:text-rose-500 transition-colors p-1 shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <button
             type="button"
             onClick={addItem}
@@ -558,12 +626,20 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           const label = cat.name[lang] || cat.name.EN;
           if (existingNames.has(label.trim().toLowerCase())) return;
           existingNames.add(label.trim().toLowerCase());
+          const group = recipeGroupForIndex(idx, totalRecipeCats);
           additions.push({
             ...newCategory(),
             name: label,
             mode: 'items',
-            items: cat.items.map(it => ({ id: generateId(), name: it.name[lang] || it.name.EN, price: String(it.price) })),
-            group: recipeGroupForIndex(idx, totalRecipeCats),
+            // Direct Variable Costs items are picked from a dropdown, and
+            // the person enters their own amount — the template only
+            // suggests WHICH ingredients/materials matter, not a price.
+            items: cat.items.map(it => ({
+              id: generateId(),
+              name: it.name[lang] || it.name.EN,
+              price: group === 'direct' ? '0' : String(it.price),
+            })),
+            group,
           });
         });
       } else {
