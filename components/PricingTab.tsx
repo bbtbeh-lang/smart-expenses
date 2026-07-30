@@ -63,6 +63,11 @@ interface SavedProduct {
   marginPct: string;
   createdAt: number;
   updatedAt?: number;
+  // Which business template (if any) this product was priced under —
+  // shown as a badge in the saved-items list so several products under
+  // the same business type are easy to tell apart from products under a
+  // different one. Undefined for products built without a template.
+  templateName?: string;
 }
 
 // Bumped from v2 → v3: the saved-record shape changed (full categories +
@@ -101,6 +106,8 @@ const LABELS = {
     saved: 'Saved Items',
     noSaved: 'Nothing saved yet. Fill in the numbers above and save your first one.',
     delete: 'Delete',
+    edit: 'Edit',
+    addAnotherProduct: '+ Add another product (same template)',
     tapToEdit: 'Tap an item to load it for editing',
     perUnit: 'per unit',
     modeSingle: 'One total',
@@ -163,6 +170,8 @@ const LABELS = {
     saved: 'موارد ذخیره‌شده',
     noSaved: 'هنوز چیزی ذخیره نشده. اعداد بالا را وارد کن و اولین مورد را ذخیره کن.',
     delete: 'حذف',
+    edit: 'ویرایش',
+    addAnotherProduct: '+ افزودن محصول دیگر (همین قالب)',
     tapToEdit: 'برای ویرایش روی هر مورد بزن',
     perUnit: 'به ازای هر واحد',
     modeSingle: 'یک عدد کلی',
@@ -534,6 +543,11 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // person has touched anything (including the name) since. `null` once
   // they edit something (or before any template has ever been applied).
   const [lastTemplateSnapshot, setLastTemplateSnapshot] = useState<string | null>(null);
+  // Display name of the business template currently backing the form (if
+  // any) — persists across "Add another product" so several products can
+  // be saved under the same template, and is stored on each saved record
+  // so the saved-items list can show which business type it belongs to.
+  const [appliedTemplateName, setAppliedTemplateName] = useState<string | null>(null);
 
   useEffect(() => {
     setSaved(loadSaved());
@@ -666,6 +680,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       setLastTemplateSnapshot(JSON.stringify({ name: nextName, categories: next }));
       return next;
     });
+    setAppliedTemplateName(templateName);
     if (template.defaultPricingBasis) setPricingBasis(template.defaultPricingBasis);
     setShowTemplates(false);
   };
@@ -713,6 +728,33 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setMarginPct('30');
     setEditingId(null);
     setLastTemplateSnapshot(null);
+    setAppliedTemplateName(null);
+  };
+
+  // Lets the person price several different products under the SAME
+  // business template — e.g. a bakery pricing three different cakes —
+  // without redoing template selection each time. Keeps the template's
+  // category/item structure (so the Direct Variable Costs dropdown still
+  // has the right ingredient options) but clears every product-specific
+  // number, since a new product naturally has its own quantities and
+  // costs, not the previous product's.
+  const startNewProduct = () => {
+    setName('');
+    setCategories(prev =>
+      prev.map(c => ({
+        ...c,
+        single: '',
+        items: c.items.map(it => ({ ...it, price: c.group === 'direct' ? '0' : '' })),
+      }))
+    );
+    setQuantity('');
+    setBatchWeight('');
+    setUnitWeight('');
+    setHoursOrArea('');
+    setEditingId(null);
+    setLastTemplateSnapshot(null);
+    // pricingBasis, marginPct, and appliedTemplateName intentionally carry
+    // over — they're business-level choices, not per-product ones.
   };
 
   const handleSave = () => {
@@ -731,6 +773,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                 unitWeight,
                 hoursOrArea,
                 marginPct,
+                templateName: appliedTemplateName ?? p.templateName,
                 updatedAt: now,
               }
             : p
@@ -752,6 +795,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       hoursOrArea,
       marginPct,
       createdAt: now,
+      templateName: appliedTemplateName ?? undefined,
     };
     setSaved(prev => {
       const next = [entry, ...prev];
@@ -774,6 +818,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setMarginPct(p.marginPct);
     setEditingId(p.id);
     setLastTemplateSnapshot(null);
+    setAppliedTemplateName(p.templateName ?? null);
   };
 
   const handleDelete = (id: string) => {
@@ -835,11 +880,6 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         </h3>
 
         <div className="space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
-          </div>
-
           <div className="flex flex-col gap-2">
             <button
               type="button"
@@ -888,6 +928,14 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               <Sparkles className="w-3.5 h-3.5" />
               {L.suggestHidden}
             </button>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
+            {appliedTemplateName && (
+              <p className="text-[11px] text-emerald-600 font-medium mt-1">{appliedTemplateName}</p>
+            )}
           </div>
 
           <Accordion
@@ -1098,6 +1146,17 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             </button>
           )}
         </div>
+
+        {!editingId && appliedTemplateName && (
+          <button
+            type="button"
+            onClick={startNewProduct}
+            className="w-full flex items-center justify-center gap-1.5 mt-2 py-2 border border-dashed border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700 text-xs font-semibold rounded-xl transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {L.addAnotherProduct}
+          </button>
+        )}
       </div>
 
       {/* Saved items */}
@@ -1127,31 +1186,45 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               const profit = price - costPerUnit;
               const isEditing = p.id === editingId;
               return (
-                <button
+                <div
                   key={p.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelectSaved(p)}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors ${isEditing ? 'bg-amber-50' : ''}`}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleSelectSaved(p); }}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors cursor-pointer ${isEditing ? 'bg-amber-50' : ''}`}
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-slate-800 flex items-center gap-1.5 truncate">
                       {p.name}
                       {isEditing && <PenSquare className="w-3 h-3 text-amber-600 shrink-0" />}
                     </p>
+                    {p.templateName && (
+                      <p className="text-[10px] text-emerald-600 font-medium truncate">{p.templateName}</p>
+                    )}
                     <p className="text-[10px] text-slate-400" dir="ltr">
                       {L.costPerUnit}: {fmt(costPerUnit)} · {L.suggestedPrice.split('(')[0].trim()}: {fmt(price)} · {L.netProfit.split('(')[0].trim()}: {fmt(profit)}
                     </p>
                   </div>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={e => { e.stopPropagation(); handleDelete(p.id); }}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleDelete(p.id); } }}
-                    className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </span>
-                </button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    <button
+                      type="button"
+                      title={L.edit}
+                      onClick={e => { e.stopPropagation(); handleSelectSaved(p); }}
+                      className="text-slate-300 hover:text-emerald-600 transition-colors p-1.5"
+                    >
+                      <PenSquare className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title={L.delete}
+                      onClick={e => { e.stopPropagation(); handleDelete(p.id); }}
+                      className="text-slate-300 hover:text-rose-500 transition-colors p-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
