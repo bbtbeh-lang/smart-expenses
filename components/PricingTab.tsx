@@ -660,9 +660,16 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       const additions: CostCategory[] = [];
 
       if (template.recipeCategories) {
-        // Per-batch ingredient/cost breakdown (item-by-item mode) — the
-        // right shape for costing a single product, unlike `items` below
-        // which is a monthly overhead figure.
+        // Per-batch cost breakdown — only the CATEGORY SHELLS (direct /
+        // supplies / hidden) are created here, each starting with an
+        // empty item list. The template supplies context (which buckets
+        // exist, and — via activeTemplateId — which ingredient/material
+        // names populate each bucket's dropdown), not pre-filled cost
+        // rows. The person adds their own items one at a time from that
+        // dropdown (or "Other") using the "+ Add item" button, so the
+        // costs section stays quiet immediately after picking a
+        // template instead of being flooded with a template's full
+        // ingredient list.
         const totalRecipeCats = template.recipeCategories.length;
         template.recipeCategories.forEach((cat, idx) => {
           const label = cat.name[lang] || cat.name.EN;
@@ -673,30 +680,27 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             ...newCategory(),
             name: label,
             mode: 'items',
-            // Direct Variable Costs items are picked from a dropdown, and
-            // the person enters their own amount — the template only
-            // suggests WHICH ingredients/materials matter, not a price.
-            items: cat.items.map(it => ({
-              id: generateId(),
-              name: it.name[lang] || it.name.EN,
-              price: group === 'direct' ? '0' : String(it.price),
-            })),
+            items: [],
             group,
           });
         });
       } else {
+        // Same principle for non-recipe (single-value) templates: create
+        // the suggested category names, but leave each amount blank
+        // instead of pre-filling the template's typical figure — the
+        // person types their own number.
         template.items.forEach(item => {
           const label = item.label[lang] || item.label.EN;
           if (existingNames.has(label.trim().toLowerCase())) return;
           existingNames.add(label.trim().toLowerCase());
-          additions.push({ ...newCategory(), name: label, single: String(item.amount) });
+          additions.push({ ...newCategory(), name: label, single: '' });
         });
         // This template has no per-batch recipe breakdown, so it also
-        // never ships its own hidden-costs bucket. Suggest the generic
-        // one automatically so hidden/overhead costs don't get missed —
-        // still fully editable/removable afterward.
+        // never ships its own hidden-costs bucket. Add an empty shell
+        // for it so hidden/overhead costs aren't forgotten — still no
+        // items pre-filled, and still fully editable/removable.
         if (!existingNames.has(L.groupHidden.trim().toLowerCase())) {
-          additions.push(hiddenCostsCategory(lang));
+          additions.push({ ...newCategory(), name: L.groupHidden, mode: 'items', items: [], group: 'hidden' });
         }
       }
 
