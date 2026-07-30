@@ -1,9 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash, LayoutGrid, ChevronDown } from 'lucide-react';
+import {
+  Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash,
+  LayoutGrid, ChevronDown, PenSquare, RotateCcw, ShieldAlert, Info,
+} from 'lucide-react';
 import { Lang, AccountType } from '@/lib/types';
 import { BUSINESS_TEMPLATES, BusinessTemplate } from '@/lib/businessTemplates';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 interface PricingTabProps {
   lang: Lang;
@@ -11,6 +15,7 @@ interface PricingTabProps {
 }
 
 type CostMode = 'single' | 'items';
+type PricingBasis = 'quantity' | 'weight' | 'hour' | 'project' | 'area';
 
 interface CostItem {
   id: string;
@@ -24,12 +29,13 @@ interface CostItem {
 // trade): the person names it, so it works for a candle maker, a plumber,
 // a designer, or anything else without us guessing their industry.
 // Fixed grouping used ONLY for categories that came from a business
-// template's `recipeCategories` (see businessTemplates.ts): every
-// template's per-batch breakdown follows the same 3-part shape —
-// direct consumables, then supplies/equipment, then hidden/overhead
-// costs — so we can label each one automatically without the person
-// typing anything. Categories the person adds themselves have no
-// group and render exactly as before (free-form, no header).
+// template's `recipeCategories` (see businessTemplates.ts), or from the
+// "Suggest hidden costs" shortcut: every template's per-batch breakdown
+// follows the same 3-part shape — direct consumables, then supplies/
+// equipment, then hidden/overhead costs — so we can label each one
+// automatically without the person typing anything. Categories the
+// person adds themselves have no group and render exactly as before
+// (free-form, no header).
 type RecipeGroup = 'direct' | 'supplies' | 'hidden';
 
 interface CostCategory {
@@ -41,21 +47,29 @@ interface CostCategory {
   group?: RecipeGroup;
 }
 
-interface SavedCategorySnapshot {
-  name: string;
-  total: number;
-}
-
+// A full saved record. Unlike the old schema (which only kept a
+// name+total snapshot per category), this stores everything needed to
+// load the record straight back into the form for editing — the exact
+// categories/items, the pricing basis, and every input that feeds it.
 interface SavedProduct {
   id: string;
   name: string;
-  categories: SavedCategorySnapshot[];
-  quantity: number;
-  marginPct: number;
+  categories: CostCategory[];
+  pricingBasis: PricingBasis;
+  quantity: string;
+  batchWeight: string;
+  unitWeight: string;
+  hoursOrArea: string;
+  marginPct: string;
   createdAt: number;
+  updatedAt?: number;
 }
 
-const STORAGE_KEY = 'finsnap_pricing_v2';
+// Bumped from v2 → v3: the saved-record shape changed (full categories +
+// pricing basis instead of a flattened name/total snapshot) so that saved
+// items can be reloaded for editing. Older v2 records use an incompatible
+// shape and are intentionally not migrated.
+const STORAGE_KEY = 'finsnap_pricing_v3';
 
 const LABELS = {
   EN: {
@@ -66,6 +80,7 @@ const LABELS = {
     productNamePlaceholder: 'e.g. Handmade candle, Logo design, Sink repair...',
     categoryNamePlaceholder: 'e.g. Materials, Labor, Packaging, Travel...',
     addCategory: '+ Add Cost Category',
+    suggestHidden: '+ Suggest hidden costs',
     removeCategory: 'Remove category',
     quantity: 'Quantity (units, clients, or jobs)',
     totalCost: 'Total Cost',
@@ -80,9 +95,13 @@ const LABELS = {
     totalRevenue: 'Total Revenue',
     totalProfit: 'Total Profit',
     save: 'Save This',
+    update: 'Update This',
+    newEntry: 'New',
+    editingBadge: 'Editing a saved item',
     saved: 'Saved Items',
     noSaved: 'Nothing saved yet. Fill in the numbers above and save your first one.',
     delete: 'Delete',
+    tapToEdit: 'Tap an item to load it for editing',
     perUnit: 'per unit',
     modeSingle: 'One total',
     modeItems: 'Item by item',
@@ -110,6 +129,8 @@ const LABELS = {
     groupDirect: 'Direct Consumables',
     groupSupplies: 'Supplies & Equipment',
     groupHidden: 'Hidden & Overhead Costs',
+    personalGuardTitle: 'A tool for businesses & freelancers',
+    personalGuardBody: 'The Pricing & Profit Estimator helps you cost and price a product or service you sell, so it only applies to business and freelance accounts. Switch to a business account to use it.',
   },
   FA: {
     title: '💰 محاسبه‌گر قیمت‌گذاری و سود',
@@ -119,6 +140,7 @@ const LABELS = {
     productNamePlaceholder: 'مثلاً شمع دست‌ساز، طراحی لوگو، تعمیر سینک...',
     categoryNamePlaceholder: 'مثلاً مواد اولیه، دستمزد، بسته‌بندی، رفت‌وآمد...',
     addCategory: '+ افزودن دسته‌ی هزینه',
+    suggestHidden: '+ پیشنهاد هزینه‌های پنهان',
     removeCategory: 'حذف دسته',
     quantity: 'تعداد (واحد، مشتری، یا سرویس)',
     totalCost: 'مجموع هزینه',
@@ -133,9 +155,13 @@ const LABELS = {
     totalRevenue: 'مجموع درآمد',
     totalProfit: 'مجموع سود',
     save: 'ذخیره',
+    update: 'به‌روزرسانی',
+    newEntry: 'مورد جدید',
+    editingBadge: 'در حال ویرایش یک مورد ذخیره‌شده',
     saved: 'موارد ذخیره‌شده',
     noSaved: 'هنوز چیزی ذخیره نشده. اعداد بالا را وارد کن و اولین مورد را ذخیره کن.',
     delete: 'حذف',
+    tapToEdit: 'برای ویرایش روی هر مورد بزن',
     perUnit: 'به ازای هر واحد',
     modeSingle: 'یک عدد کلی',
     modeItems: 'مورد به مورد',
@@ -163,8 +189,22 @@ const LABELS = {
     groupDirect: 'مواد مصرفی مستقیم',
     groupSupplies: 'ملزومات و تجهیزات',
     groupHidden: 'هزینه‌های پنهان و سربار',
+    personalGuardTitle: 'ابزاری برای بیزینس‌ها و فریلنسرها',
+    personalGuardBody: 'محاسبه‌گر قیمت‌گذاری و سود کمکت می‌کنه هزینه و قیمت یک محصول یا خدمتی که می‌فروشی رو حساب کنی، پس فقط برای حساب‌های بیزینسی و فریلنسری کاربرد داره. برای استفاده از این ابزار، حسابت رو به نوع بیزینسی سوییچ کن.',
   },
 };
+
+// Generic hidden/overhead costs that apply to almost any small business or
+// freelance setup, regardless of job type — used both by the manual
+// "Suggest hidden costs" button and as an automatic top-up for templates
+// that don't already ship their own hidden-cost breakdown.
+const HIDDEN_COST_ITEMS: { EN: string; FA: string }[] = [
+  { EN: 'Equipment Depreciation', FA: 'استهلاک تجهیزات' },
+  { EN: 'Energy / Utilities Share', FA: 'سهم انرژی (برق/گاز)' },
+  { EN: 'Internet & Phone', FA: 'اینترنت و تلفن' },
+  { EN: 'Insurance', FA: 'بیمه' },
+  { EN: 'Software & Subscriptions', FA: 'نرم‌افزار و اشتراک‌ها' },
+];
 
 function loadSaved(): SavedProduct[] {
   try {
@@ -189,8 +229,27 @@ function num(s: string) {
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
+// Empty starting values on purpose: price/qty fields should read as
+// placeholders, not pre-filled zeros, until the person actually types
+// something.
 function newCategory(): CostCategory {
   return { id: generateId(), name: '', mode: 'single', single: '', items: [] };
+}
+
+function newItem(): CostItem {
+  return { id: generateId(), name: '', price: '' };
+}
+
+function hiddenCostsCategory(lang: Lang): CostCategory {
+  const isRtl = lang === 'FA';
+  return {
+    id: generateId(),
+    name: isRtl ? LABELS.FA.groupHidden : LABELS.EN.groupHidden,
+    mode: 'items',
+    single: '',
+    items: HIDDEN_COST_ITEMS.map(name => ({ id: generateId(), name: isRtl ? name.FA : name.EN, price: '' })),
+    group: 'hidden',
+  };
 }
 
 // Maps a recipeCategories position to its fixed group. Templates
@@ -208,6 +267,35 @@ function recipeGroupForIndex(index: number, total: number): RecipeGroup {
 function categoryTotal(c: CostCategory) {
   if (c.mode === 'single') return num(c.single);
   return c.items.reduce((s, it) => s + num(it.price), 0);
+}
+
+// The single source of truth for "how many sellable units" a batch/
+// project/job amounts to, given the chosen pricing basis. Shared by the
+// live calculator and by the saved-items list (so a reloaded/saved
+// record shows numbers computed the exact same way).
+function computeEffectiveQty(
+  basis: PricingBasis,
+  quantity: string,
+  batchWeight: string,
+  unitWeight: string,
+  hoursOrArea: string
+) {
+  switch (basis) {
+    case 'weight': {
+      const batch = num(batchWeight);
+      const unit = num(unitWeight);
+      if (batch <= 0 || unit <= 0) return 0;
+      return batch / unit;
+    }
+    case 'hour':
+    case 'area':
+      return Math.max(0, num(hoursOrArea));
+    case 'project':
+      return 1;
+    case 'quantity':
+    default:
+      return Math.max(1, Math.round(num(quantity)) || 1);
+  }
 }
 
 // One free-form cost bucket: an editable name (so it can be "Materials",
@@ -232,7 +320,7 @@ function CostCategoryEditor({
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
 
   const addItem = () => {
-    onChange({ ...category, items: [...category.items, { id: generateId(), name: '', price: '' }] });
+    onChange({ ...category, items: [...category.items, newItem()] });
   };
   const updateItem = (id: string, patch: Partial<CostItem>) => {
     onChange({ ...category, items: category.items.map(it => (it.id === id ? { ...it, ...patch } : it)) });
@@ -242,18 +330,19 @@ function CostCategoryEditor({
   };
 
   return (
-    <div className="border border-slate-100 rounded-xl p-3">
+    <div className="p-3">
       <div className="flex items-center gap-2 mb-2">
         <input
           value={category.name}
           onChange={e => onChange({ ...category, name: e.target.value })}
           placeholder={labels.categoryNamePlaceholder}
+          onClick={e => e.stopPropagation()}
           className={`${inputClass} flex-1 font-semibold`}
         />
         {canRemove && (
           <button
             type="button"
-            onClick={onRemove}
+            onClick={e => { e.stopPropagation(); onRemove(); }}
             title={labels.removeCategory}
             className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
           >
@@ -263,7 +352,7 @@ function CostCategoryEditor({
       </div>
 
       <div className="flex justify-end mb-2">
-        <div className="flex bg-slate-100 rounded-lg p-0.5">
+        <div className="flex bg-slate-100 rounded-lg p-0.5" onClick={e => e.stopPropagation()}>
           <button
             type="button"
             onClick={() => onChange({ ...category, mode: 'single' })}
@@ -274,7 +363,7 @@ function CostCategoryEditor({
           </button>
           <button
             type="button"
-            onClick={() => onChange({ ...category, mode: 'items', items: category.items.length ? category.items : [{ id: generateId(), name: '', price: '' }] })}
+            onClick={() => onChange({ ...category, mode: 'items', items: category.items.length ? category.items : [newItem()] })}
             className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${category.mode === 'items' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
           >
             <ListPlus className="w-3 h-3" />
@@ -290,12 +379,13 @@ function CostCategoryEditor({
           step="0.01"
           value={category.single}
           onChange={e => onChange({ ...category, single: e.target.value })}
+          onClick={e => e.stopPropagation()}
           placeholder="0.00"
           className={inputClass}
           dir="ltr"
         />
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" onClick={e => e.stopPropagation()}>
           {category.items.length === 0 && <p className="text-[11px] text-slate-400">{labels.noItemsYet}</p>}
           {category.items.map(it => (
             <div key={it.id} className="border border-slate-100 rounded-lg p-2">
@@ -350,8 +440,12 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
 
   const [name, setName] = useState('');
   const [categories, setCategories] = useState<CostCategory[]>(() => [newCategory(), newCategory()]);
-  const [quantity, setQuantity] = useState('1');
-  type PricingBasis = 'quantity' | 'weight' | 'hour' | 'project' | 'area';
+  // Which category accordions are expanded. Starts as "all open" once the
+  // initial categories exist (see effect below) so the first render
+  // matches the old always-expanded look; collapses are then up to the
+  // person.
+  const [openCategoryIds, setOpenCategoryIds] = useState<string[]>([]);
+  const [quantity, setQuantity] = useState('');
   const [pricingBasis, setPricingBasis] = useState<PricingBasis>('quantity');
   // Weight mode needs two numbers (how much the whole batch makes vs. how
   // big one sellable unit is) to derive an effective quantity; hour/area
@@ -363,65 +457,93 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   const [marginPct, setMarginPct] = useState('30');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
-  // Snapshot of `categories` exactly as it looked right after the most
-  // recently applied template — used to detect whether the person has
-  // touched anything since. `null` once they edit something (or before
-  // any template has ever been applied).
+  // Which saved record (if any) the form currently mirrors. Non-null
+  // means "Save This" becomes "Update This" and saving overwrites that
+  // record instead of creating a new one.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // Snapshot of `{ name, categories }` exactly as it looked right after
+  // the most recently applied template — used to detect whether the
+  // person has touched anything (including the name) since. `null` once
+  // they edit something (or before any template has ever been applied).
   const [lastTemplateSnapshot, setLastTemplateSnapshot] = useState<string | null>(null);
 
   useEffect(() => {
     setSaved(loadSaved());
+    // Keep the accordion open by default for whatever categories exist
+    // right after mount (covers the two starter categories created above).
+    setOpenCategoryIds(prev => (prev.length === 0 ? categories.map(c => c.id) : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+
+  const expandCategory = (id: string) => {
+    setOpenCategoryIds(prev => (prev.includes(id) ? prev : [...prev, id]));
+  };
 
   const updateCategory = (id: string, next: CostCategory) => {
     setCategories(prev => prev.map(c => (c.id === id ? next : c)));
     setLastTemplateSnapshot(null);
   };
   const addCategory = () => {
-    setCategories(prev => [...prev, newCategory()]);
+    const cat = newCategory();
+    setCategories(prev => [...prev, cat]);
+    expandCategory(cat.id);
     setLastTemplateSnapshot(null);
   };
   const removeCategory = (id: string) => {
     setCategories(prev => prev.filter(c => c.id !== id));
+    setOpenCategoryIds(prev => prev.filter(x => x !== id));
+    setLastTemplateSnapshot(null);
+  };
+
+  // Manual shortcut: add a generic hidden/overhead-costs category
+  // (depreciation, energy, internet...) regardless of whether a template
+  // was used. Skips adding a duplicate if a hidden-cost category is
+  // already present.
+  const addHiddenCostsSuggestion = () => {
+    if (categories.some(c => c.group === 'hidden')) return;
+    const cat = hiddenCostsCategory(lang);
+    setCategories(prev => [...prev, cat]);
+    expandCategory(cat.id);
     setLastTemplateSnapshot(null);
   };
 
   // Applying a template prefills typical monthly cost categories for the
   // chosen business type.
   //
-  // If nothing has been edited since the last template was applied (i.e.
-  // `categories` still matches `lastTemplateSnapshot` exactly), picking a
-  // different template REPLACES the previous one wholesale — otherwise,
-  // switching templates while just browsing would silently leave the old
-  // template's categories sitting there untouched.
-  //
-  // Once the person has actually changed something (edited an amount,
-  // renamed a category, added/removed one), `lastTemplateSnapshot` is
-  // null and we fall back to merging: keep everything they've filled in,
-  // and only add the new template's items that don't already match an
-  // existing category name.
+  // Bug fix: name, categories, AND their sub-items must sync together as
+  // ONE unit. Previously the "still on the last applied template" check
+  // only covered `categories`, so picking a second template while nothing
+  // had been touched would correctly refresh the categories but leave the
+  // old template's name behind (since name was only ever filled when
+  // blank). The snapshot now covers `{ name, categories }` together, so
+  // switching templates replaces name + categories + items consistently,
+  // while still respecting anything the person has actually edited.
   const handleApplyTemplate = (template: BusinessTemplate) => {
+    const templateName = template.name[lang] || template.name.EN;
+
     setCategories(prev => {
+      const currentSnapshot = JSON.stringify({ name, categories: prev });
       const untouchedSinceLastTemplate =
-        lastTemplateSnapshot !== null && JSON.stringify(prev) === lastTemplateSnapshot;
+        lastTemplateSnapshot !== null && currentSnapshot === lastTemplateSnapshot;
 
       const base = untouchedSinceLastTemplate ? [] : prev;
       const kept = base.filter(c => {
         const hasContent = c.name.trim() !== '' || c.single.trim() !== '' || c.items.length > 0;
         if (!hasContent) return false;
         // Recipe-group categories (`group` set) came from a *previous*
-        // template's per-batch breakdown. Many templates reuse the exact
-        // same label for a given slot (e.g. every template's hidden-cost
-        // category is named "Hidden Costs (often forgotten)"), so if we
-        // kept these around, the name-based dedup below would treat the
-        // NEW template's category as a duplicate and silently drop it —
-        // leaving the OLD template's numbers sitting under a heading that
-        // now belongs to a different business type. Recipe categories
-        // always get replaced wholesale by the newly applied template;
-        // only the person's own free-form categories are preserved.
-        if (template.recipeCategories && c.group) return false;
+        // template's per-batch breakdown (or from the hidden-cost
+        // shortcut). Many templates reuse the exact same label for a
+        // given slot (e.g. every template's hidden-cost category is
+        // named "Hidden Costs (often forgotten)"), so if we kept these
+        // around, the name-based dedup below would treat the NEW
+        // template's category as a duplicate and silently drop it —
+        // leaving the OLD template's numbers sitting under a heading
+        // that now belongs to a different business type. Recipe/group
+        // categories always get replaced wholesale by the newly applied
+        // template; only the person's own free-form categories survive.
+        if (c.group) return false;
         return true;
       });
       const existingNames = new Set(kept.map(c => c.name.trim().toLowerCase()));
@@ -451,39 +573,31 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           existingNames.add(label.trim().toLowerCase());
           additions.push({ ...newCategory(), name: label, single: String(item.amount) });
         });
+        // This template has no per-batch recipe breakdown, so it also
+        // never ships its own hidden-costs bucket. Suggest the generic
+        // one automatically so hidden/overhead costs don't get missed —
+        // still fully editable/removable afterward.
+        if (!existingNames.has(L.groupHidden.trim().toLowerCase())) {
+          additions.push(hiddenCostsCategory(lang));
+        }
       }
 
       const next = [...kept, ...additions];
-      setLastTemplateSnapshot(JSON.stringify(next));
+      const nextName = untouchedSinceLastTemplate || !name.trim() ? templateName : name;
+
+      setName(nextName);
+      setOpenCategoryIds(next.map(c => c.id));
+      setLastTemplateSnapshot(JSON.stringify({ name: nextName, categories: next }));
       return next;
     });
-    if (!name.trim()) setName(template.name[lang] || template.name.EN);
     if (template.defaultPricingBasis) setPricingBasis(template.defaultPricingBasis);
     setShowTemplates(false);
   };
 
-  // How many "sellable units" the batch/project/job amounts to, depending
-  // on the chosen pricing basis. This is the ONLY thing that changes per
-  // basis — once we have this number, the cost/margin math below is
-  // identical for all five modes.
-  const effectiveQty = useMemo(() => {
-    switch (pricingBasis) {
-      case 'weight': {
-        const batch = num(batchWeight);
-        const unit = num(unitWeight);
-        if (batch <= 0 || unit <= 0) return 0;
-        return batch / unit;
-      }
-      case 'hour':
-      case 'area':
-        return Math.max(0, num(hoursOrArea));
-      case 'project':
-        return 1;
-      case 'quantity':
-      default:
-        return Math.max(1, Math.round(num(quantity)) || 1);
-    }
-  }, [pricingBasis, quantity, batchWeight, unitWeight, hoursOrArea]);
+  const effectiveQty = useMemo(
+    () => computeEffectiveQty(pricingBasis, quantity, batchWeight, unitWeight, hoursOrArea),
+    [pricingBasis, quantity, batchWeight, unitWeight, hoursOrArea]
+  );
 
   const calc = useMemo(() => {
     const qty = effectiveQty > 0 ? effectiveQty : 1;
@@ -512,34 +626,130 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     };
   }, [categories, effectiveQty, marginPct]);
 
+  const resetForm = () => {
+    setName('');
+    setCategories([newCategory(), newCategory()]);
+    setQuantity('');
+    setPricingBasis('quantity');
+    setBatchWeight('');
+    setUnitWeight('');
+    setHoursOrArea('');
+    setMarginPct('30');
+    setEditingId(null);
+    setLastTemplateSnapshot(null);
+  };
+
   const handleSave = () => {
+    const now = Date.now();
+    if (editingId) {
+      setSaved(prev => {
+        const next = prev.map(p =>
+          p.id === editingId
+            ? {
+                ...p,
+                name: name.trim() || (isRtl ? 'مورد بدون نام' : 'Untitled item'),
+                categories,
+                pricingBasis,
+                quantity,
+                batchWeight,
+                unitWeight,
+                hoursOrArea,
+                marginPct,
+                updatedAt: now,
+              }
+            : p
+        );
+        persistSaved(next);
+        return next;
+      });
+      return;
+    }
+
     const entry: SavedProduct = {
       id: generateId(),
       name: name.trim() || (isRtl ? 'مورد بدون نام' : 'Untitled item'),
-      categories: categories
-        .filter(c => categoryTotal(c) > 0 || c.name.trim())
-        .map(c => ({ name: c.name.trim() || (isRtl ? 'بدون‌نام' : 'Unnamed'), total: categoryTotal(c) })),
-      quantity: calc.qty,
-      marginPct: num(marginPct),
-      createdAt: Date.now(),
+      categories,
+      pricingBasis,
+      quantity,
+      batchWeight,
+      unitWeight,
+      hoursOrArea,
+      marginPct,
+      createdAt: now,
     };
-    const next = [entry, ...saved];
-    setSaved(next);
-    persistSaved(next);
+    setSaved(prev => {
+      const next = [entry, ...prev];
+      persistSaved(next);
+      return next;
+    });
+  };
+
+  // Loads a saved record back into the form so it can be edited, instead
+  // of only ever being deletable.
+  const handleSelectSaved = (p: SavedProduct) => {
+    setName(p.name);
+    setCategories(p.categories);
+    setOpenCategoryIds(p.categories.map(c => c.id));
+    setPricingBasis(p.pricingBasis);
+    setQuantity(p.quantity);
+    setBatchWeight(p.batchWeight);
+    setUnitWeight(p.unitWeight);
+    setHoursOrArea(p.hoursOrArea);
+    setMarginPct(p.marginPct);
+    setEditingId(p.id);
+    setLastTemplateSnapshot(null);
   };
 
   const handleDelete = (id: string) => {
-    const next = saved.filter(p => p.id !== id);
-    setSaved(next);
-    persistSaved(next);
+    setSaved(prev => {
+      const next = prev.filter(p => p.id !== id);
+      persistSaved(next);
+      return next;
+    });
+    if (editingId === id) resetForm();
   };
 
   const inputClass = 'w-full py-2.5 px-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400';
+
+  // The Pricing & Profit Estimator only makes sense for someone pricing a
+  // product or service they sell — a personal/home account has no such
+  // thing to price, so show guidance instead of the calculator.
+  if (accountType === 'personal') {
+    return (
+      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+        <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 mt-4 shadow-sm text-center">
+          <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-3">
+            <ShieldAlert className="w-6 h-6 text-amber-500" />
+          </div>
+          <h3 className="text-sm font-bold text-slate-800 mb-1.5">{L.personalGuardTitle}</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">{L.personalGuardBody}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
+
+      {editingId && (
+        <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-4">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+            <PenSquare className="w-3.5 h-3.5" />
+            {L.editingBadge}
+          </span>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-900"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            {L.newEntry}
+          </button>
+        </div>
+      )}
 
       {/* Step 1: Cost breakdown */}
       <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-4 shadow-sm">
@@ -554,79 +764,104 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
           </div>
 
-          {accountType === 'business' && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowTemplates(s => !s)}
-                className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-all"
-              >
-                <span className="flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4" />
-                  {L.templatesButton}
-                </span>
-                <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
-              </button>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setShowTemplates(s => !s)}
+              className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-all"
+            >
+              <span className="flex items-center gap-2">
+                <LayoutGrid className="w-4 h-4" />
+                {L.templatesButton}
+              </span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+            </button>
 
-              {showTemplates && (
-                <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-                  <p className="text-xs text-slate-400 mb-3">{L.templatesHint}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {BUSINESS_TEMPLATES.map(template => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => handleApplyTemplate(template)}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
-                      >
-                        <span className="text-lg shrink-0">{template.icon}</span>
-                        <span className="text-xs font-medium text-slate-700 leading-tight">{template.name[lang] || template.name.EN}</span>
-                      </button>
-                    ))}
+            {showTemplates && (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                <p className="text-xs text-slate-400 mb-3">{L.templatesHint}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {BUSINESS_TEMPLATES.map(template => (
                     <button
+                      key={template.id}
                       type="button"
-                      onClick={() => setShowTemplates(false)}
-                      className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                      onClick={() => handleApplyTemplate(template)}
+                      className="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
                     >
-                      <span className="text-lg shrink-0">✏️</span>
-                      <span className="text-xs font-medium text-slate-700 leading-tight">{L.templateOther}</span>
+                      <span className="text-lg shrink-0">{template.icon}</span>
+                      <span className="text-xs font-medium text-slate-700 leading-tight">{template.name[lang] || template.name.EN}</span>
                     </button>
-                  </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplates(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
+                  >
+                    <span className="text-lg shrink-0">✏️</span>
+                    <span className="text-xs font-medium text-slate-700 leading-tight">{L.templateOther}</span>
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
-
-          {categories.map((c, idx) => {
-            const groupLabels: Record<RecipeGroup, string> = {
-              direct: L.groupDirect,
-              supplies: L.groupSupplies,
-              hidden: L.groupHidden,
-            };
-            // Show the fixed header only once per group, right above the
-            // first category that belongs to it — so a template's 3-part
-            // breakdown reads as 3 clearly-labeled sections instead of
-            // repeating the same header on every card.
-            const showGroupHeader = !!c.group && categories[idx - 1]?.group !== c.group;
-
-            return (
-              <div key={c.id}>
-                {showGroupHeader && (
-                  <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide mb-1.5 mt-3 first:mt-0">
-                    {groupLabels[c.group as RecipeGroup]}
-                  </div>
-                )}
-                <CostCategoryEditor
-                  labels={L}
-                  isRtl={isRtl}
-                  category={c}
-                  onChange={next => updateCategory(c.id, next)}
-                  onRemove={() => removeCategory(c.id)}
-                  canRemove={categories.length > 1}
-                />
               </div>
-            );
-          })}
+            )}
+
+            <button
+              type="button"
+              onClick={addHiddenCostsSuggestion}
+              className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-amber-300 text-amber-700 hover:bg-amber-50 text-xs font-semibold rounded-xl transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {L.suggestHidden}
+            </button>
+          </div>
+
+          <Accordion
+            type="multiple"
+            value={openCategoryIds}
+            onValueChange={setOpenCategoryIds}
+            className="space-y-2"
+          >
+            {categories.map((c, idx) => {
+              const groupLabels: Record<RecipeGroup, string> = {
+                direct: L.groupDirect,
+                supplies: L.groupSupplies,
+                hidden: L.groupHidden,
+              };
+              // Show the fixed header only once per group, right above the
+              // first category that belongs to it — so a template's 3-part
+              // breakdown reads as 3 clearly-labeled sections instead of
+              // repeating the same header on every card.
+              const showGroupHeader = !!c.group && categories[idx - 1]?.group !== c.group;
+              const displayName = c.name.trim() || L.categoryNamePlaceholder;
+
+              return (
+                <div key={c.id}>
+                  {showGroupHeader && (
+                    <div className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide mb-1.5 mt-3 first:mt-0">
+                      {groupLabels[c.group as RecipeGroup]}
+                    </div>
+                  )}
+                  <AccordionItem value={c.id} className="border border-slate-100 rounded-xl overflow-hidden">
+                    <AccordionTrigger className="px-3 py-2.5 hover:no-underline">
+                      <span className="flex items-center justify-between w-full gap-2 pr-2">
+                        <span className="text-xs font-semibold text-slate-700 truncate">{displayName}</span>
+                        <span className="text-[11px] font-bold text-slate-400 shrink-0" dir="ltr">{fmt(categoryTotal(c))}</span>
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-0 pb-0 px-0">
+                      <CostCategoryEditor
+                        labels={L}
+                        isRtl={isRtl}
+                        category={c}
+                        onChange={next => updateCategory(c.id, next)}
+                        onRemove={() => removeCategory(c.id)}
+                        canRemove={categories.length > 1}
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </div>
+              );
+            })}
+          </Accordion>
 
           <button
             type="button"
@@ -768,13 +1003,25 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           </div>
         )}
 
-        <button
-          onClick={handleSave}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-xl transition-all active:scale-95"
-        >
-          <Save className="w-4 h-4" />
-          {L.save}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold rounded-xl transition-all active:scale-95"
+          >
+            <Save className="w-4 h-4" />
+            {editingId ? L.update : L.save}
+          </button>
+          {editingId && (
+            <button
+              onClick={resetForm}
+              type="button"
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-semibold rounded-xl transition-all active:scale-95"
+            >
+              <RotateCcw className="w-4 h-4" />
+              {L.newEntry}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Saved items */}
@@ -784,29 +1031,51 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <Package className="w-4 h-4 text-emerald-600" />
             {L.saved} {saved.length > 0 && `(${saved.length})`}
           </h3>
+          {saved.length > 0 && (
+            <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+              <Info className="w-3 h-3" />
+              {L.tapToEdit}
+            </p>
+          )}
         </div>
         {saved.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">{L.noSaved}</div>
         ) : (
           <div className="divide-y divide-slate-50">
             {saved.map(p => {
-              const totalCost = p.categories.reduce((s, c) => s + c.total, 0);
-              const costPerUnit = totalCost / p.quantity;
-              const margin = Math.min(95, Math.max(0, p.marginPct));
+              const qty = computeEffectiveQty(p.pricingBasis, p.quantity, p.batchWeight, p.unitWeight, p.hoursOrArea) || 1;
+              const totalCost = p.categories.reduce((s, c) => s + categoryTotal(c), 0);
+              const costPerUnit = totalCost / qty;
+              const margin = Math.min(95, Math.max(0, num(p.marginPct)));
               const price = margin >= 95 ? costPerUnit : costPerUnit / (1 - margin / 100);
               const profit = price - costPerUnit;
+              const isEditing = p.id === editingId;
               return (
-                <div key={p.id} className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-800">{p.name}</p>
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleSelectSaved(p)}
+                  className={`w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-50 transition-colors ${isEditing ? 'bg-amber-50' : ''}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 flex items-center gap-1.5 truncate">
+                      {p.name}
+                      {isEditing && <PenSquare className="w-3 h-3 text-amber-600 shrink-0" />}
+                    </p>
                     <p className="text-[10px] text-slate-400" dir="ltr">
                       {L.costPerUnit}: {fmt(costPerUnit)} · {L.suggestedPrice.split('(')[0].trim()}: {fmt(price)} · {L.netProfit.split('(')[0].trim()}: {fmt(profit)}
                     </p>
                   </div>
-                  <button onClick={() => handleDelete(p.id)} className="text-slate-300 hover:text-rose-500 transition-colors p-1.5">
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={e => { e.stopPropagation(); handleDelete(p.id); }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleDelete(p.id); } }}
+                    className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
+                  >
                     <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                  </span>
+                </button>
               );
             })}
           </div>
