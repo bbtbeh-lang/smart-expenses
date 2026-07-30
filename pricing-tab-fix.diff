@@ -1,0 +1,162 @@
+diff --git a/components/PricingTab.tsx b/components/PricingTab.tsx
+index e96d591..311f4c7 100644
+--- a/components/PricingTab.tsx
++++ b/components/PricingTab.tsx
+@@ -68,6 +68,13 @@ interface SavedProduct {
+   // the same business type are easy to tell apart from products under a
+   // different one. Undefined for products built without a template.
+   templateName?: string;
++  // Stable id of that same template (e.g. "restaurant"), used to look up
++  // its own Direct Variable Costs item list when the record is reopened
++  // for editing — templateName alone isn't a safe lookup key since it's
++  // a localized display string. Undefined for older saved records
++  // created before this field existed, or for products built without a
++  // template.
++  templateId?: string;
+ }
+ 
+ // Bumped from v2 → v3: the saved-record shape changed (full categories +
+@@ -277,25 +284,33 @@ function recipeGroupForIndex(index: number, total: number): RecipeGroup {
+   return 'supplies';
+ }
+ 
+-// Master dropdown options for "Direct Variable Costs" items — the union of
+-// every template's own direct-cost ingredient/material names (index 0 of
+-// each template's recipeCategories), deduped and localized. Used so the
+-// item-name field can be a select instead of free text, regardless of
+-// which template (if any) was applied.
+-const DIRECT_ITEM_OPTIONS: Record<'EN' | 'FA', string[]> = (() => {
+-  const byLang: Record<'EN' | 'FA', Set<string>> = { EN: new Set(), FA: new Set() };
++// Dropdown options for "Direct Variable Costs" items, kept PER BUSINESS
++// TEMPLATE (keyed by template id) instead of merged across all of them —
++// so once the person has picked a business template, the item-name
++// dropdown only offers that template's own ingredients/materials (e.g. a
++// bakery sees flour/butter/sugar, not a barbershop's scissors/gloves).
++// Built from each template's own direct-cost category (index 0 of
++// `recipeCategories`), deduped and localized. Templates with no
++// recipeCategories (service/time-based businesses) simply have no entry
++// here — their Direct Variable Costs items, if any are added, fall back
++// to a free-text field since there's nothing template-specific to offer.
++const DIRECT_ITEM_OPTIONS_BY_TEMPLATE: Record<string, Record<'EN' | 'FA', string[]>> = (() => {
++  const byTemplate: Record<string, Record<'EN' | 'FA', string[]>> = {};
+   for (const t of BUSINESS_TEMPLATES) {
+     const directCat = t.recipeCategories?.[0];
+     if (!directCat) continue;
++    const en = new Set<string>();
++    const fa = new Set<string>();
+     for (const item of directCat.items) {
+-      byLang.EN.add(item.name.EN);
+-      byLang.FA.add(item.name.FA || item.name.EN);
++      en.add(item.name.EN);
++      fa.add(item.name.FA || item.name.EN);
+     }
++    byTemplate[t.id] = {
++      EN: Array.from(en).sort((a, b) => a.localeCompare(b)),
++      FA: Array.from(fa).sort((a, b) => a.localeCompare(b, 'fa')),
++    };
+   }
+-  return {
+-    EN: Array.from(byLang.EN).sort((a, b) => a.localeCompare(b)),
+-    FA: Array.from(byLang.FA).sort((a, b) => a.localeCompare(b, 'fa')),
+-  };
++  return byTemplate;
+ })();
+ 
+ // Sentinel value for the dropdown's "Other" option — never a real item name.
+@@ -345,6 +360,7 @@ function CostCategoryEditor({
+   onChange,
+   onRemove,
+   canRemove,
++  activeTemplateId,
+ }: {
+   labels: typeof LABELS.EN;
+   isRtl: boolean;
+@@ -352,11 +368,18 @@ function CostCategoryEditor({
+   onChange: (next: CostCategory) => void;
+   onRemove: () => void;
+   canRemove: boolean;
++  // Id of the business template currently backing the form (if any).
++  // Direct Variable Costs items are only offered as a dropdown when a
++  // template is selected AND that template has its own item list — the
++  // dropdown always reflects that ONE template, never a mix of every
++  // template's ingredients/materials.
++  activeTemplateId: string | null;
+ }) {
+   const inputClass = 'w-full py-2.5 px-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400';
+   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+   const isDirectGroup = category.group === 'direct';
+-  const directOptions = DIRECT_ITEM_OPTIONS[isRtl ? 'FA' : 'EN'];
++  const directOptions =
++    (activeTemplateId && DIRECT_ITEM_OPTIONS_BY_TEMPLATE[activeTemplateId]?.[isRtl ? 'FA' : 'EN']) || [];
+   // An item is in "custom name" mode if it already holds a name that isn't
+   // one of the preset options (typed before this feature existed, or after
+   // explicitly choosing "Other"), or if the person just clicked "Other" on
+@@ -440,7 +463,8 @@ function CostCategoryEditor({
+             // feature existed — falls back to the "Other" text input so
+             // nothing already saved gets clobbered.
+             const isCustomName = it.name !== '' && !directOptions.includes(it.name);
+-            const showAsDropdown = isDirectGroup && !isCustomName && !forcedCustomIds.has(it.id);
++            const showAsDropdown =
++              isDirectGroup && directOptions.length > 0 && !isCustomName && !forcedCustomIds.has(it.id);
+             return (
+               <div key={it.id} className="border border-slate-100 rounded-lg p-2">
+                 {showAsDropdown ? (
+@@ -548,6 +572,10 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+   // be saved under the same template, and is stored on each saved record
+   // so the saved-items list can show which business type it belongs to.
+   const [appliedTemplateName, setAppliedTemplateName] = useState<string | null>(null);
++  // Id of that same template (e.g. "restaurant") — the actual lookup key
++  // for the Direct Variable Costs dropdown's item list, since the display
++  // name is localized and not a safe key across languages/edits.
++  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
+ 
+   useEffect(() => {
+     setSaved(loadSaved());
+@@ -681,6 +709,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+       return next;
+     });
+     setAppliedTemplateName(templateName);
++    setAppliedTemplateId(template.id);
+     if (template.defaultPricingBasis) setPricingBasis(template.defaultPricingBasis);
+     setShowTemplates(false);
+   };
+@@ -729,6 +758,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+     setEditingId(null);
+     setLastTemplateSnapshot(null);
+     setAppliedTemplateName(null);
++    setAppliedTemplateId(null);
+   };
+ 
+   // Lets the person price several different products under the SAME
+@@ -774,6 +804,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+                 hoursOrArea,
+                 marginPct,
+                 templateName: appliedTemplateName ?? p.templateName,
++                templateId: appliedTemplateId ?? p.templateId,
+                 updatedAt: now,
+               }
+             : p
+@@ -796,6 +827,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+       marginPct,
+       createdAt: now,
+       templateName: appliedTemplateName ?? undefined,
++      templateId: appliedTemplateId ?? undefined,
+     };
+     setSaved(prev => {
+       const next = [entry, ...prev];
+@@ -819,6 +851,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+     setEditingId(p.id);
+     setLastTemplateSnapshot(null);
+     setAppliedTemplateName(p.templateName ?? null);
++    setAppliedTemplateId(p.templateId ?? null);
+   };
+ 
+   const handleDelete = (id: string) => {
+@@ -979,6 +1012,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
+                         onChange={next => updateCategory(c.id, next)}
+                         onRemove={() => removeCategory(c.id)}
+                         canRemove={categories.length > 1}
++                        activeTemplateId={appliedTemplateId}
+                       />
+                     </AccordionContent>
+                   </AccordionItem>
