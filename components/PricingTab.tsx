@@ -98,6 +98,10 @@ interface DraftSnapshot {
   editingId: string | null;
   openCategoryIds: string[];
   lastTemplateSnapshot: string | null;
+  // True once the person explicitly picks "My business isn't listed" for
+  // THIS product — the other way (besides applying a template) to satisfy
+  // the required first step and unlock the name field + cost categories.
+  skippedTemplate: boolean;
 }
 
 // Bumped from v2 → v3: the saved-record shape changed (full categories +
@@ -156,6 +160,7 @@ const LABELS = {
     templatesButton: 'Start from a business template',
     templatesHint: 'Pick your type of business to prefill typical monthly cost categories — edit any amount after.',
     templateOther: "My business isn't listed",
+    startingPointRequired: 'Pick a business template above, or "My business isn\u2019t listed", to start pricing a product.',
     pricingBasisLabel: 'How do you price this?',
     basisQuantity: 'Per unit',
     basisWeight: 'Per weight',
@@ -224,6 +229,7 @@ const LABELS = {
     templatesButton: 'شروع از یک قالب کسب‌وکار',
     templatesHint: 'نوع کسب‌وکارت رو انتخاب کن تا دسته‌های هزینه‌ی معمول ماهانه از قبل پر بشن — بعداً هر مبلغی رو می‌تونی ویرایش کنی.',
     templateOther: 'کسب‌وکار من توی لیست نیست',
+    startingPointRequired: 'اول از بین قالب‌های بالا یکی رو انتخاب کن، یا بزن «کسب‌وکار من توی لیست نیست» — بعد می‌تونی قیمت‌گذاری محصول رو شروع کنی.',
     pricingBasisLabel: 'قیمت‌گذاری بر چه اساسیه؟',
     basisQuantity: 'بر اساس تعداد',
     basisWeight: 'بر اساس وزن',
@@ -607,6 +613,14 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // for the Direct Variable Costs dropdown's item list, since the display
   // name is localized and not a safe key across languages/edits.
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
+  // See DraftSnapshot.skippedTemplate — true once the person explicitly
+  // chooses "My business isn't listed" for the CURRENT product.
+  const [skippedTemplate, setSkippedTemplate] = useState(false);
+  // The required first step: either a template is applied, or the person
+  // explicitly said their business isn't listed. Until one of those is
+  // true, the product name field and cost categories stay hidden — there's
+  // nothing sensible to name or cost yet.
+  const hasChosenStartingPoint = appliedTemplateId !== null || skippedTemplate;
 
   // ---- Manage Products: multi-product draft state ----
   // Every field above (name, categories, pricingBasis, ...) is the ACTIVE
@@ -637,12 +651,13 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     editingId: null,
     openCategoryIds: [],
     lastTemplateSnapshot: null,
+    skippedTemplate: false,
   });
 
   const captureCurrentSnapshot = (): DraftSnapshot => ({
     name, categories, pricingBasis, quantity, batchWeight, unitWeight,
     hoursOrArea, marginPct, appliedTemplateName, appliedTemplateId,
-    editingId, openCategoryIds, lastTemplateSnapshot,
+    editingId, openCategoryIds, lastTemplateSnapshot, skippedTemplate,
   });
 
   const applyDraftSnapshot = (s: DraftSnapshot) => {
@@ -659,6 +674,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setEditingId(s.editingId);
     setOpenCategoryIds(s.openCategoryIds.length ? s.openCategoryIds : s.categories.map(c => c.id));
     setLastTemplateSnapshot(s.lastTemplateSnapshot);
+    setSkippedTemplate(s.skippedTemplate);
   };
 
   // Saves the outgoing product's current fields into its own slot, then
@@ -679,6 +695,10 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // themselves. Renaming a category label on this new product afterward
   // never affects the product it was copied from, or any other product —
   // each draft's `categories` is its own independent copy from this point on.
+  // If the outgoing product instead skipped templates entirely, the new
+  // one also starts unlocked (no need to re-answer "my business isn't
+  // listed" for every single product in the same session) but with fresh
+  // blank categories.
   const addDraft = () => {
     draftSnapshotsRef.current[activeDraftId] = captureCurrentSnapshot();
     const id = generateId();
@@ -693,7 +713,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             id: generateId(), name: c.name, mode: c.mode, single: '', items: [], group: c.group,
           })),
         }
-      : blankDraftSnapshot();
+      : skippedTemplate
+        ? { ...blankDraftSnapshot(), skippedTemplate: true }
+        : blankDraftSnapshot();
     draftSnapshotsRef.current[id] = snapshot;
     setDraftIds(prev => [...prev, id]);
     applyDraftSnapshot(snapshot);
@@ -902,6 +924,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setLastTemplateSnapshot(null);
     setAppliedTemplateName(null);
     setAppliedTemplateId(null);
+    setSkippedTemplate(false);
   };
 
   const handleSave = () => {
@@ -969,6 +992,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setLastTemplateSnapshot(null);
     setAppliedTemplateName(p.templateName ?? null);
     setAppliedTemplateId(p.templateId ?? null);
+    setSkippedTemplate(!p.templateId);
   };
 
   const handleDelete = (id: string) => {
@@ -1086,10 +1110,12 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                 <LayoutGrid className="w-4 h-4" />
                 {L.templatesButton}
               </span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+              {hasChosenStartingPoint && (
+                <ChevronDown className={`w-4 h-4 transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
+              )}
             </button>
 
-            {showTemplates && (
+            {(showTemplates || !hasChosenStartingPoint) && (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
                 <p className="text-xs text-slate-400 mb-3">{L.templatesHint}</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -1106,7 +1132,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                   ))}
                   <button
                     type="button"
-                    onClick={() => setShowTemplates(false)}
+                    onClick={() => { setSkippedTemplate(true); setShowTemplates(false); }}
                     className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
                   >
                     <span className="text-lg shrink-0">✏️</span>
@@ -1115,7 +1141,13 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                 </div>
               </div>
             )}
+          </div>
 
+          {!hasChosenStartingPoint && (
+            <p className="text-xs text-slate-400 text-center py-2">{L.startingPointRequired}</p>
+          )}
+
+          {hasChosenStartingPoint && (
             <button
               type="button"
               onClick={addHiddenCostsSuggestion}
@@ -1124,8 +1156,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               <Sparkles className="w-3.5 h-3.5" />
               {L.suggestHidden}
             </button>
-          </div>
+          )}
 
+          {hasChosenStartingPoint && (
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">{L.productName}</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder={L.productNamePlaceholder} className={inputClass} />
@@ -1133,7 +1166,10 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               <p className="text-[11px] text-emerald-600 font-medium mt-1">{appliedTemplateName}</p>
             )}
           </div>
+          )}
 
+          {hasChosenStartingPoint && (
+          <>
           <Accordion
             type="multiple"
             value={openCategoryIds}
@@ -1251,8 +1287,11 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               <p className="text-[11px] text-slate-400 italic">{L.projectNote}</p>
             )}
           </div>
+          </>
+          )}
         </div>
 
+        {hasChosenStartingPoint && (
         <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
           <div className="bg-slate-50 rounded-xl p-3">
             <p className="text-[10px] font-semibold text-slate-500 uppercase mb-0.5">{L.totalCost}</p>
@@ -1263,6 +1302,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <p className="text-sm font-bold text-slate-800" dir="ltr">{fmt(calc.costPerUnit)}</p>
           </div>
         </div>
+        )}
       </div>
 
       {/* Step 2: Smart price recommender */}
