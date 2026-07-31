@@ -866,11 +866,12 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       }
 
       const next = [...kept, ...additions];
-      const nextName = untouchedSinceLastTemplate || !name.trim() ? templateName : name;
-
-      setName(nextName);
+      // Applying a template never touches the product name — it's meant
+      // to hold the SPECIFIC product/service (e.g. "Chocolate cake 2kg"),
+      // not the business type. The business type is shown separately as a
+      // badge below the field (see appliedTemplateName).
       setOpenCategoryIds(next.map(c => c.id));
-      setLastTemplateSnapshot(JSON.stringify({ name: nextName, categories: next }));
+      setLastTemplateSnapshot(JSON.stringify({ name, categories: next }));
       return next;
     });
     setAppliedTemplateName(templateName);
