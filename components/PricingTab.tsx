@@ -254,13 +254,16 @@ const LABELS = {
 // Generic hidden/overhead costs that apply to almost any small business or
 // freelance setup, regardless of job type — used both by the manual
 // "Suggest hidden costs" button and as an automatic top-up for templates
-// that don't already ship their own hidden-cost breakdown.
-const HIDDEN_COST_ITEMS: { EN: string; FA: string }[] = [
-  { EN: 'Equipment Depreciation', FA: 'استهلاک تجهیزات' },
-  { EN: 'Energy / Utilities Share', FA: 'سهم انرژی (برق/گاز)' },
-  { EN: 'Internet & Phone', FA: 'اینترنت و تلفن' },
-  { EN: 'Insurance', FA: 'بیمه' },
-  { EN: 'Software & Subscriptions', FA: 'نرم‌افزار و اشتراک‌ها' },
+// that don't already ship their own hidden-cost breakdown. Each carries a
+// modest ballpark per-unit default (CAD) — a reasonable starting point the
+// person can accept as-is or overwrite, not a claim of accuracy for their
+// specific business.
+const HIDDEN_COST_ITEMS: { EN: string; FA: string; price: number }[] = [
+  { EN: 'Equipment Depreciation', FA: 'استهلاک تجهیزات', price: 0.4 },
+  { EN: 'Energy / Utilities Share', FA: 'سهم انرژی (برق/گاز)', price: 0.3 },
+  { EN: 'Internet & Phone', FA: 'اینترنت و تلفن', price: 0.2 },
+  { EN: 'Insurance', FA: 'بیمه', price: 0.3 },
+  { EN: 'Software & Subscriptions', FA: 'نرم‌افزار و اشتراک‌ها', price: 0.2 },
 ];
 
 function loadSaved(): SavedProduct[] {
@@ -304,7 +307,7 @@ function hiddenCostsCategory(lang: Lang): CostCategory {
     name: isRtl ? LABELS.FA.groupHidden : LABELS.EN.groupHidden,
     mode: 'items',
     single: '',
-    items: HIDDEN_COST_ITEMS.map(name => ({ id: generateId(), name: isRtl ? name.FA : name.EN, price: '' })),
+    items: HIDDEN_COST_ITEMS.map(item => ({ id: generateId(), name: isRtl ? item.FA : item.EN, price: String(item.price) })),
     group: 'hidden',
   };
 }
@@ -821,16 +824,22 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       const additions: CostCategory[] = [];
 
       if (template.recipeCategories) {
-        // Per-batch cost breakdown — only the CATEGORY SHELLS (direct /
-        // supplies / hidden) are created here, each starting with an
-        // empty item list. The template supplies context (which buckets
-        // exist, and — via activeTemplateId — which ingredient/material
-        // names populate each bucket's dropdown), not pre-filled cost
-        // rows. The person adds their own items one at a time from that
-        // dropdown (or "Other") using the "+ Add item" button, so the
-        // costs section stays quiet immediately after picking a
-        // template instead of being flooded with a template's full
-        // ingredient list.
+        // Per-batch cost breakdown — the CATEGORY SHELLS (direct /
+        // supplies / hidden) are created here. Direct and supplies start
+        // with an empty item list on purpose: the template supplies
+        // context (which buckets exist, and — via activeTemplateId —
+        // which ingredient/material names populate each bucket's
+        // dropdown), not pre-filled cost rows, so the person adds their
+        // own items one at a time and the costs section stays quiet
+        // immediately after picking a template instead of being flooded
+        // with a template's full ingredient list.
+        //
+        // The Hidden & Overhead group is the one exception: it's
+        // consistently the thing people forget to price in at all, so it
+        // ships pre-filled with the template's own per-business-type
+        // default line items and figures (already curated per template in
+        // businessTemplates.ts) — no extra copy, just numbers already
+        // sitting in the field, ready to accept or overwrite.
         const totalRecipeCats = template.recipeCategories.length;
         template.recipeCategories.forEach((cat, idx) => {
           const label = cat.name[lang] || cat.name.EN;
@@ -841,7 +850,13 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             ...newCategory(),
             name: label,
             mode: 'items',
-            items: [],
+            items: group === 'hidden'
+              ? cat.items.map(it => ({
+                  id: generateId(),
+                  name: it.name[lang] || it.name.EN,
+                  price: String(it.price),
+                }))
+              : [],
             group,
           });
         });
@@ -857,11 +872,23 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           additions.push({ ...newCategory(), name: label, single: '' });
         });
         // This template has no per-batch recipe breakdown, so it also
-        // never ships its own hidden-costs bucket. Add an empty shell
-        // for it so hidden/overhead costs aren't forgotten — still no
-        // items pre-filled, and still fully editable/removable.
+        // never ships its own hidden-costs bucket. Add one pre-filled
+        // with the generic hidden-cost defaults (same figures as the
+        // manual "Suggest hidden costs" shortcut) so overhead isn't
+        // forgotten — still fully editable/removable.
         if (!existingNames.has(L.groupHidden.trim().toLowerCase())) {
-          additions.push({ ...newCategory(), name: L.groupHidden, mode: 'items', items: [], group: 'hidden' });
+          const isRtl = lang === 'FA';
+          additions.push({
+            ...newCategory(),
+            name: L.groupHidden,
+            mode: 'items',
+            items: HIDDEN_COST_ITEMS.map(it => ({
+              id: generateId(),
+              name: isRtl ? it.FA : it.EN,
+              price: String(it.price),
+            })),
+            group: 'hidden',
+          });
         }
       }
 
