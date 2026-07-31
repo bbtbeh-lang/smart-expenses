@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash,
   LayoutGrid, ChevronDown, PenSquare, RotateCcw, ShieldAlert, Info,
@@ -77,6 +77,29 @@ interface SavedProduct {
   templateId?: string;
 }
 
+// One in-memory "product tab": a full snapshot of every field the pricing
+// form is built on. This is what lets someone flip between several
+// products (e.g. "Cream Pastry" vs "Halva") under the same business
+// template, in memory, without losing whatever they've customized on
+// each one — category names included, since each snapshot carries its
+// own `categories` array (and therefore its own renamed labels)
+// completely independently of every other product's snapshot.
+interface DraftSnapshot {
+  name: string;
+  categories: CostCategory[];
+  pricingBasis: PricingBasis;
+  quantity: string;
+  batchWeight: string;
+  unitWeight: string;
+  hoursOrArea: string;
+  marginPct: string;
+  appliedTemplateName: string | null;
+  appliedTemplateId: string | null;
+  editingId: string | null;
+  openCategoryIds: string[];
+  lastTemplateSnapshot: string | null;
+}
+
 // Bumped from v2 → v3: the saved-record shape changed (full categories +
 // pricing basis instead of a flattened name/total snapshot) so that saved
 // items can be reloaded for editing. Older v2 records use an incompatible
@@ -114,8 +137,12 @@ const LABELS = {
     noSaved: 'Nothing saved yet. Fill in the numbers above and save your first one.',
     delete: 'Delete',
     edit: 'Edit',
-    addAnotherProduct: '+ Add another product (same template)',
     tapToEdit: 'Tap an item to load it for editing',
+    manageProducts: 'Manage Products',
+    manageProductsHint: 'Pick which product you\u2019re pricing before filling in details below — each one keeps its own costs and labels.',
+    newProduct: '+ New product',
+    unnamedProduct: 'Untitled product',
+    removeProductTab: 'Close this product',
     perUnit: 'per unit',
     modeSingle: 'One total',
     modeItems: 'Item by item',
@@ -178,8 +205,12 @@ const LABELS = {
     noSaved: 'هنوز چیزی ذخیره نشده. اعداد بالا را وارد کن و اولین مورد را ذخیره کن.',
     delete: 'حذف',
     edit: 'ویرایش',
-    addAnotherProduct: '+ افزودن محصول دیگر (همین قالب)',
     tapToEdit: 'برای ویرایش روی هر مورد بزن',
+    manageProducts: 'مدیریت محصولات',
+    manageProductsHint: 'قبل از پر کردن جزئیات، مشخص کن در حال قیمت‌گذاری کدوم محصولی — هرکدوم هزینه‌ها و برچسب‌های خودشون رو جدا نگه می‌دارن.',
+    newProduct: '+ محصول جدید',
+    unnamedProduct: 'محصول بدون‌نام',
+    removeProductTab: 'بستن این محصول',
     perUnit: 'به ازای هر واحد',
     modeSingle: 'یک عدد کلی',
     modeItems: 'مورد به مورد',
@@ -577,6 +608,114 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // name is localized and not a safe key across languages/edits.
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
 
+  // ---- Manage Products: multi-product draft state ----
+  // Every field above (name, categories, pricingBasis, ...) is the ACTIVE
+  // draft's live state — every existing handler in this file (updateCategory,
+  // handleApplyTemplate, handleSave, ...) keeps reading/writing "the
+  // current fields" completely unchanged. Switching drafts just snapshots
+  // those fields out to draftSnapshotsRef under the outgoing draft's id,
+  // then restores the incoming draft's own snapshot (or blank defaults for
+  // a brand-new one) back into the same live state hooks. This gives each
+  // product its own independent, in-memory copy of every field — including
+  // custom category names — without a person needing to hit "Save" first.
+  const [initialDraftId] = useState(() => generateId());
+  const [draftIds, setDraftIds] = useState<string[]>(() => [initialDraftId]);
+  const [activeDraftId, setActiveDraftId] = useState<string>(initialDraftId);
+  const draftSnapshotsRef = useRef<Record<string, DraftSnapshot>>({});
+
+  const blankDraftSnapshot = (): DraftSnapshot => ({
+    name: '',
+    categories: [newCategory(), newCategory()],
+    pricingBasis: 'quantity',
+    quantity: '',
+    batchWeight: '',
+    unitWeight: '',
+    hoursOrArea: '',
+    marginPct: '30',
+    appliedTemplateName: null,
+    appliedTemplateId: null,
+    editingId: null,
+    openCategoryIds: [],
+    lastTemplateSnapshot: null,
+  });
+
+  const captureCurrentSnapshot = (): DraftSnapshot => ({
+    name, categories, pricingBasis, quantity, batchWeight, unitWeight,
+    hoursOrArea, marginPct, appliedTemplateName, appliedTemplateId,
+    editingId, openCategoryIds, lastTemplateSnapshot,
+  });
+
+  const applyDraftSnapshot = (s: DraftSnapshot) => {
+    setName(s.name);
+    setCategories(s.categories);
+    setPricingBasis(s.pricingBasis);
+    setQuantity(s.quantity);
+    setBatchWeight(s.batchWeight);
+    setUnitWeight(s.unitWeight);
+    setHoursOrArea(s.hoursOrArea);
+    setMarginPct(s.marginPct);
+    setAppliedTemplateName(s.appliedTemplateName);
+    setAppliedTemplateId(s.appliedTemplateId);
+    setEditingId(s.editingId);
+    setOpenCategoryIds(s.openCategoryIds.length ? s.openCategoryIds : s.categories.map(c => c.id));
+    setLastTemplateSnapshot(s.lastTemplateSnapshot);
+  };
+
+  // Saves the outgoing product's current fields into its own slot, then
+  // loads the target product's fields into the form.
+  const switchDraft = (id: string) => {
+    if (id === activeDraftId) return;
+    draftSnapshotsRef.current[activeDraftId] = captureCurrentSnapshot();
+    applyDraftSnapshot(draftSnapshotsRef.current[id] ?? blankDraftSnapshot());
+    setActiveDraftId(id);
+  };
+
+  // "+ New product" — opens a fresh tab for pricing a different product.
+  // If the current product came from a business template, the new one
+  // starts from the SAME category shells (names + groups, e.g. "Direct
+  // Variable Costs") so its dropdown is already scoped to that template —
+  // but with every amount and item list empty, matching the empty-state
+  // rule: no costs are ever pre-filled, the person adds each one
+  // themselves. Renaming a category label on this new product afterward
+  // never affects the product it was copied from, or any other product —
+  // each draft's `categories` is its own independent copy from this point on.
+  const addDraft = () => {
+    draftSnapshotsRef.current[activeDraftId] = captureCurrentSnapshot();
+    const id = generateId();
+    const snapshot: DraftSnapshot = appliedTemplateId
+      ? {
+          ...blankDraftSnapshot(),
+          pricingBasis,
+          marginPct,
+          appliedTemplateName,
+          appliedTemplateId,
+          categories: categories.map(c => ({
+            id: generateId(), name: c.name, mode: c.mode, single: '', items: [], group: c.group,
+          })),
+        }
+      : blankDraftSnapshot();
+    draftSnapshotsRef.current[id] = snapshot;
+    setDraftIds(prev => [...prev, id]);
+    applyDraftSnapshot(snapshot);
+    setActiveDraftId(id);
+  };
+
+  // Closes a product tab (only when more than one exists, so the form
+  // always has an active product to show).
+  const removeDraft = (id: string) => {
+    setDraftIds(prev => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter(x => x !== id);
+      delete draftSnapshotsRef.current[id];
+      if (id === activeDraftId) {
+        const fallbackId = next[next.length - 1];
+        applyDraftSnapshot(draftSnapshotsRef.current[fallbackId] ?? blankDraftSnapshot());
+        setActiveDraftId(fallbackId);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
     setSaved(loadSaved());
     // Keep the accordion open by default for whatever categories exist
@@ -765,32 +904,6 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setAppliedTemplateId(null);
   };
 
-  // Lets the person price several different products under the SAME
-  // business template — e.g. a bakery pricing three different cakes —
-  // without redoing template selection each time. Keeps the template's
-  // category/item structure (so the Direct Variable Costs dropdown still
-  // has the right ingredient options) but clears every product-specific
-  // number, since a new product naturally has its own quantities and
-  // costs, not the previous product's.
-  const startNewProduct = () => {
-    setName('');
-    setCategories(prev =>
-      prev.map(c => ({
-        ...c,
-        single: '',
-        items: c.items.map(it => ({ ...it, price: c.group === 'direct' ? '0' : '' })),
-      }))
-    );
-    setQuantity('');
-    setBatchWeight('');
-    setUnitWeight('');
-    setHoursOrArea('');
-    setEditingId(null);
-    setLastTemplateSnapshot(null);
-    // pricingBasis, marginPct, and appliedTemplateName intentionally carry
-    // over — they're business-level choices, not per-product ones.
-  };
-
   const handleSave = () => {
     const now = Date.now();
     if (editingId) {
@@ -891,6 +1004,52 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
+
+      {/* Manage Products — choose which product you're pricing before
+          touching any details below; each tab keeps its own costs and
+          category labels independently, in memory. */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-3 mb-4 shadow-sm">
+        <h3 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
+          <LayoutGrid className="w-3.5 h-3.5 text-emerald-600" />
+          {L.manageProducts}
+        </h3>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          {draftIds.map(id => {
+            const isActive = id === activeDraftId;
+            const draftName = isActive ? name : (draftSnapshotsRef.current[id]?.name || '');
+            return (
+              <div key={id} className="relative shrink-0 group">
+                <button
+                  type="button"
+                  onClick={() => switchDraft(id)}
+                  className={`flex items-center gap-1 pl-3 pr-2 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${isActive ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  {draftName.trim() || L.unnamedProduct}
+                </button>
+                {draftIds.length > 1 && (
+                  <button
+                    type="button"
+                    title={L.removeProductTab}
+                    onClick={e => { e.stopPropagation(); removeDraft(id); }}
+                    className={`absolute -top-1.5 ${isRtl ? '-left-1.5' : '-right-1.5'} w-4 h-4 rounded-full flex items-center justify-center text-[10px] leading-none ${isActive ? 'bg-emerald-800' : 'bg-slate-300'} text-white opacity-0 group-hover:opacity-100 transition-opacity`}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={addDraft}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-emerald-300 text-emerald-600 hover:bg-emerald-50 text-xs font-semibold whitespace-nowrap shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {L.newProduct}
+          </button>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-1.5">{L.manageProductsHint}</p>
+      </div>
 
       {editingId && (
         <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-4">
@@ -1185,16 +1344,6 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           )}
         </div>
 
-        {!editingId && appliedTemplateName && (
-          <button
-            type="button"
-            onClick={startNewProduct}
-            className="w-full flex items-center justify-center gap-1.5 mt-2 py-2 border border-dashed border-slate-300 text-slate-500 hover:bg-slate-50 hover:text-slate-700 text-xs font-semibold rounded-xl transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {L.addAnotherProduct}
-          </button>
-        )}
       </div>
 
       {/* Saved items */}
