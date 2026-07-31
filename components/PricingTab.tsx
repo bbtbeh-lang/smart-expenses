@@ -1029,9 +1029,13 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
 
-      {/* Manage Products — choose which product you're pricing before
-          touching any details below; each tab keeps its own costs and
-          category labels independently, in memory. */}
+      {/* Manage Products — only relevant once there's an actual product to
+          manage: appears after the required first step (template chosen,
+          or explicitly skipped) for the current product, or once a second
+          product tab already exists. Showing it above/before that step
+          would suggest managing products is possible before picking what
+          they even are. */}
+      {(hasChosenStartingPoint || draftIds.length > 1) && (
       <div className="bg-white rounded-2xl border border-slate-100 p-3 mb-4 shadow-sm">
         <h3 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
           <LayoutGrid className="w-3.5 h-3.5 text-emerald-600" />
@@ -1074,6 +1078,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         </div>
         <p className="text-[10px] text-slate-400 mt-1.5">{L.manageProductsHint}</p>
       </div>
+      )}
 
       {editingId && (
         <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-4">
