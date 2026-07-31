@@ -875,6 +875,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     });
     setAppliedTemplateName(templateName);
     setAppliedTemplateId(template.id);
+    setSkippedTemplate(false);
     if (template.defaultPricingBasis) setPricingBasis(template.defaultPricingBasis);
     setShowTemplates(false);
   };
@@ -943,8 +944,14 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                 unitWeight,
                 hoursOrArea,
                 marginPct,
-                templateName: appliedTemplateName ?? p.templateName,
-                templateId: appliedTemplateId ?? p.templateId,
+                // The live appliedTemplateName/appliedTemplateId already
+                // reflect this record's template correctly (handleSelectSaved
+                // set them from it), or null if the person explicitly
+                // detached it via "My business isn't listed" since loading
+                // it for edit. Falling back to the OLD record's value here
+                // would silently undo that explicit detachment on Update.
+                templateName: appliedTemplateName ?? undefined,
+                templateId: appliedTemplateId ?? undefined,
                 updatedAt: now,
               }
             : p
@@ -1137,7 +1144,20 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                   ))}
                   <button
                     type="button"
-                    onClick={() => { setSkippedTemplate(true); setShowTemplates(false); }}
+                    onClick={() => {
+                      // Detach any previously-applied template — this is a
+                      // real switch to "no template", not just a first
+                      // choice. Existing category names/items/amounts are
+                      // left exactly as they are (nothing destructive);
+                      // only the template LINK is cleared, so the Direct
+                      // Variable Costs dropdown correctly stops offering
+                      // that template's ingredient list going forward.
+                      setSkippedTemplate(true);
+                      setAppliedTemplateId(null);
+                      setAppliedTemplateName(null);
+                      setLastTemplateSnapshot(null);
+                      setShowTemplates(false);
+                    }}
                     className="flex items-center gap-2 px-3 py-2.5 bg-white border border-dashed border-slate-300 rounded-xl text-left hover:border-emerald-300 hover:bg-emerald-50 transition-all"
                   >
                     <span className="text-lg shrink-0">✏️</span>
