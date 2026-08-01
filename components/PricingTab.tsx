@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash,
-  LayoutGrid, ChevronDown, PenSquare, RotateCcw, ShieldAlert, Info,
+  LayoutGrid, ChevronDown, PenSquare, RotateCcw, ShieldAlert, Info, Layers, Target,
 } from 'lucide-react';
 import { Lang, AccountType } from '@/lib/types';
 import { BUSINESS_TEMPLATES, BusinessTemplate } from '@/lib/businessTemplates';
@@ -187,6 +187,14 @@ const LABELS = {
     projectNote: 'Total cost = the full project price. Quantity is fixed at 1.',
     pendingQtyInput: 'Fill in the fields above to calculate this',
     marginTooHighWithFees: "Your percent-based fees plus this profit margin add up to too much of the price to solve — lower the margin slider or reduce the percent fees.",
+    breakEvenPrice: 'Break-even price (0% profit)',
+    marketCheckTitle: 'Market check (optional)',
+    marketCheckHint: "What do competitors charge for something similar? See how your price compares.",
+    marketRefPricePlaceholder: 'e.g. what competitors charge',
+    marketBelowBreakEvenWarning: "That market price is below your break-even point — you'd lose money on every sale at that price.",
+    marginAtMarketPriceLabel: 'Your margin at that price',
+    aboveSuggested: 'above your suggested price',
+    belowSuggested: 'below your suggested price',
     groupDirect: 'Direct Variable Costs',
     groupSupplies: 'Supplies & Equipment',
     groupHidden: 'Hidden & Overhead Costs',
@@ -261,6 +269,14 @@ const LABELS = {
     projectNote: 'مجموع هزینه = کل قیمت پروژه. تعداد روی ۱ ثابته.',
     pendingQtyInput: 'برای محاسبه‌ی این بخش، اول فیلدهای بالا را کامل کن',
     marginTooHighWithFees: 'مجموع کارمزدهای درصدی و حاشیه سودی که انتخاب کردی خیلی زیاده و قابل محاسبه نیست — لغزنده‌ی حاشیه سود رو کمتر کن یا درصد کارمزدها رو کاهش بده.',
+    breakEvenPrice: 'نقطه‌ی سربه‌سر (سود صفر)',
+    marketCheckTitle: 'مقایسه با بازار (اختیاری)',
+    marketCheckHint: 'رقبا برای یه چیز مشابه چقدر می‌گیرن؟ قیمتت رو باهاش مقایسه کن.',
+    marketRefPricePlaceholder: 'مثلاً قیمت رقبا',
+    marketBelowBreakEvenWarning: 'این قیمت بازار از نقطه‌ی سربه‌سرت پایین‌تره — با این قیمت توی هر فروش ضرر می‌کنی.',
+    marginAtMarketPriceLabel: 'حاشیه سودت با این قیمت',
+    aboveSuggested: 'بالاتر از قیمت پیشنهادیت',
+    belowSuggested: 'پایین‌تر از قیمت پیشنهادیت',
     groupDirect: 'هزینه‌های متغیر مستقیم',
     groupSupplies: 'ملزومات و تجهیزات',
     groupHidden: 'هزینه‌های پنهان و سربار',
@@ -652,6 +668,12 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   const [unitWeight, setUnitWeight] = useState('');
   const [hoursOrArea, setHoursOrArea] = useState('');
   const [marginPct, setMarginPct] = useState('30');
+  // Optional, not saved with the product — a quick "how does my calculated
+  // price compare to what the market/competitors charge" check, the kind
+  // of sanity check a pricing manager runs before finalizing a cost-plus
+  // number. Kept ephemeral/local since it's advisory, not a fact about
+  // the product itself.
+  const [marketRefPrice, setMarketRefPrice] = useState('');
   const [saved, setSaved] = useState<SavedProduct[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   // Which saved record (if any) the form currently mirrors. Non-null
@@ -1019,6 +1041,25 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     const actualMarginPct = !pricingInfeasible && suggestedPrice > 0 ? (netProfitPerUnit / suggestedPrice) * 100 : 0;
     const markupPct = !pricingInfeasible && costPerUnit > 0 ? (netProfitPerUnit / costPerUnit) * 100 : 0;
 
+    // Break-even price: the same formula at 0% margin — the absolute
+    // floor below which every sale loses money, regardless of what
+    // margin the person eventually chooses. A pricing/financial
+    // consultant checks this first, independent of the margin slider.
+    const breakEvenDenom = 1 - percentFraction;
+    const breakEvenInfeasible = breakEvenDenom <= 0.05;
+    const breakEvenPrice = breakEvenInfeasible ? 0 : flatCostPerUnit / breakEvenDenom;
+
+    // Optional market/competitor reference price check: back-solve what
+    // margin the person would actually get if they charged the market
+    // price instead of the cost-plus suggestion, and flag it if that
+    // price doesn't even clear break-even.
+    const marketPrice = num(marketRefPrice);
+    const hasMarketPrice = marketPrice > 0;
+    const marketCostAtPrice = flatCostPerUnit + percentFraction * marketPrice;
+    const marginAtMarketPrice = hasMarketPrice ? ((marketPrice - marketCostAtPrice) / marketPrice) * 100 : 0;
+    const marketBelowBreakEven = hasMarketPrice && !breakEvenInfeasible && marketPrice < breakEvenPrice;
+    const marketVsSuggestedPct = hasMarketPrice && suggestedPrice > 0 ? ((marketPrice - suggestedPrice) / suggestedPrice) * 100 : 0;
+
     return {
       totalCost,
       costPerUnit,
@@ -1030,10 +1071,17 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       netProfitPerUnit,
       actualMarginPct,
       markupPct,
+      breakEvenPrice,
+      breakEvenInfeasible,
+      hasMarketPrice,
+      marketPrice,
+      marginAtMarketPrice,
+      marketBelowBreakEven,
+      marketVsSuggestedPct,
       totalRevenue: suggestedPrice * qty,
       totalProfit: netProfitPerUnit * qty,
     };
-  }, [categories, effectiveQty, marginPct]);
+  }, [categories, effectiveQty, marginPct, marketRefPrice]);
 
   const resetForm = () => {
     setName('');
@@ -1168,7 +1216,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       {(hasChosenStartingPoint || draftIds.length > 1) && (
       <div className="bg-white rounded-2xl border border-slate-100 p-3 mb-4 shadow-sm">
         <h3 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-          <LayoutGrid className="w-3.5 h-3.5 text-emerald-600" />
+          <Layers className="w-3.5 h-3.5 text-emerald-600" />
           {L.manageProducts}
         </h3>
         <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
@@ -1496,6 +1544,11 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 mb-3 text-white">
           <p className="text-[10px] font-semibold uppercase opacity-80 mb-0.5">{L.suggestedPrice}</p>
           <p className="text-2xl font-bold" dir="ltr">{fmt(calc.suggestedPrice)}</p>
+          {!calc.breakEvenInfeasible && (
+            <p className="text-[10px] opacity-80 mt-1" dir="ltr">
+              {L.breakEvenPrice}: {fmt(calc.breakEvenPrice)}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1511,6 +1564,45 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <p className="text-[10px] font-semibold text-slate-500 uppercase mb-0.5">{L.markup}</p>
             <p className="text-sm font-bold text-slate-800" dir="ltr">{calc.markupPct.toFixed(1)}%</p>
           </div>
+        </div>
+
+        {/* Market check — the piece a Pricing Manager / Market Research
+            Analyst adds on top of pure cost-plus math: how does the
+            cost-plus number sit against what the market actually pays?
+            Optional and not saved with the product; purely a live sanity
+            check while deciding on a final price. */}
+        <div className="border-t border-slate-100 pt-3 mb-3">
+          <p className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5 text-slate-500" />
+            {L.marketCheckTitle}
+          </p>
+          <p className="text-[10px] text-slate-400 mb-2">{L.marketCheckHint}</p>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={marketRefPrice}
+            onChange={e => setMarketRefPrice(e.target.value)}
+            placeholder={L.marketRefPricePlaceholder}
+            className={`${inputClass} mb-2`}
+            dir="ltr"
+          />
+          {calc.hasMarketPrice && (
+            calc.marketBelowBreakEven ? (
+              <div className="rounded-xl bg-rose-50 p-3 flex items-start gap-2">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-rose-700">{L.marketBelowBreakEvenWarning}</p>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600 flex flex-wrap gap-x-3 gap-y-1">
+                <span>{L.marginAtMarketPriceLabel}: <span className="font-bold text-slate-800" dir="ltr">{calc.marginAtMarketPrice.toFixed(1)}%</span></span>
+                <span>
+                  {calc.marketVsSuggestedPct >= 0 ? L.aboveSuggested : L.belowSuggested}:{' '}
+                  <span className="font-bold text-slate-800" dir="ltr">{Math.abs(calc.marketVsSuggestedPct).toFixed(1)}%</span>
+                </span>
+              </div>
+            )
+          )}
         </div>
         </>
         )}
