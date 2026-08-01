@@ -23,6 +23,13 @@ export interface BusinessTemplateItem {
 export interface RecipeCostItem {
   name: { EN: string; FR: string; FA: string };
   price: number; // CAD, for one batch/unit
+  // For costs that are genuinely a percentage of the selling price
+  // (card-processing fees, self-employment contributions like CPP) rather
+  // than a flat per-unit dollar amount. When set, PricingTab resolves the
+  // fee against the calculated selling price instead of baking in a
+  // dollar figure guessed from an assumed price point. `price` above is
+  // then unused for this item (kept only so the interface stays uniform).
+  pctOfPrice?: number; // percentage points, e.g. 2.5 means 2.5%
 }
 export interface RecipeCategory {
   name: { EN: string; FR: string; FA: string };
@@ -84,7 +91,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
         items: [
           { name: { EN: 'Kitchen Utilities (gas/electric share)', FR: "Services publics de cuisine (part)", FA: 'سهم گاز و برق آشپزخانه' }, price: 0.8 },
-          { name: { EN: 'Card Processing Fee (~2.5%)', FR: 'Frais de traitement carte (~2,5 %)', FA: 'کارمزد کارت اعتباری (حدود ۲.۵٪)' }, price: 0.5 },
+          { name: { EN: 'Card Processing Fee (% of price)', FR: 'Frais de traitement carte (% du prix)', FA: 'کارمزد کارت اعتباری (٪ از قیمت فروش)' }, price: 0.5, pctOfPrice: 2.5 },
           { name: { EN: 'Food Waste / Spoilage Allowance', FR: 'Provision pour perte alimentaire', FA: 'ضایعات و دورریز غذا' }, price: 0.6 },
         ],
       },
@@ -164,7 +171,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
         items: [
           { name: { EN: 'Unbillable Admin Time (emails, invoicing)', FR: 'Temps administratif non facturable', FA: 'زمان اداری غیرقابل‌فاکتور (ایمیل، فاکتور)' }, price: 3.0 },
-          { name: { EN: 'CPP Self-Employed Contribution (~11.9%)', FR: 'Cotisation RPC travailleur autonome (~11,9 %)', FA: 'حق بیمه CPP شغل آزاد (حدود ۱۱.۹٪)' }, price: 6.0 },
+          { name: { EN: 'CPP Self-Employed Contribution (% of price)', FR: 'Cotisation RPC travailleur autonome (% du prix)', FA: 'حق بیمه CPP شغل آزاد (٪ از قیمت فروش)' }, price: 6.0, pctOfPrice: 11.9 },
         ],
       },
     ],
@@ -239,7 +246,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
         items: [
-          { name: { EN: 'CPP Self-Employed Contribution (~11.9%)', FR: 'Cotisation RPC travailleur autonome (~11,9 %)', FA: 'حق بیمه CPP شغل آزاد (حدود ۱۱.۹٪)' }, price: 2.5 },
+          { name: { EN: 'CPP Self-Employed Contribution (% of price)', FR: 'Cotisation RPC travailleur autonome (% du prix)', FA: 'حق بیمه CPP شغل آزاد (٪ از قیمت فروش)' }, price: 2.5, pctOfPrice: 11.9 },
           { name: { EN: 'Idle Time Between Rides (unpaid)', FR: 'Temps mort entre les courses (non payé)', FA: 'زمان بیکاری بین سفرها (بدون درآمد)' }, price: 3.0 },
         ],
       },
@@ -458,7 +465,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
         items: [
-          { name: { EN: 'Card Processing Fee (~2.5%)', FR: 'Frais de traitement carte (~2,5 %)', FA: 'کارمزد کارت اعتباری (حدود ۲.۵٪)' }, price: 0.1 },
+          { name: { EN: 'Card Processing Fee (% of price)', FR: 'Frais de traitement carte (% du prix)', FA: 'کارمزد کارت اعتباری (٪ از قیمت فروش)' }, price: 0.1, pctOfPrice: 2.5 },
           { name: { EN: 'Shrinkage / Theft Allowance', FR: 'Provision pour freinte / vol', FA: 'ضایعات و کسری انبار' }, price: 0.15 },
         ],
       },

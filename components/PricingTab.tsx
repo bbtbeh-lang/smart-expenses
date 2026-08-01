@@ -21,6 +21,14 @@ interface CostItem {
   id: string;
   name: string;
   price: string;
+  // 'flat' (default, omitted for backward compat with saved data): price
+  // is a fixed dollar amount per unit. 'percent': price is a percentage
+  // of the final selling price (e.g. "2.5" = 2.5%) — used for costs that
+  // are genuinely proportional to what's charged, like card-processing
+  // fees or self-employment contributions, instead of guessing a dollar
+  // figure off an assumed price point. Resolved in the price formula
+  // below rather than summed as a flat dollar amount.
+  kind?: 'flat' | 'percent';
 }
 
 // A single cost bucket the person defines themselves — e.g. "Materials",
@@ -152,6 +160,9 @@ const LABELS = {
     modeItems: 'Item by item',
     itemName: 'Item name',
     itemPrice: 'Price',
+    itemPricePercent: 'Percent (e.g. 2.5)',
+    kindFlat: 'Flat dollar amount',
+    kindPercent: 'Percent of selling price',
     selectItem: 'Select an item...',
     otherItem: 'Other (type your own)',
     addItem: 'Add item',
@@ -174,6 +185,8 @@ const LABELS = {
     hoursLabel: 'Hours worked (this job/period)',
     areaLabel: 'Total area (sq ft or m²)',
     projectNote: 'Total cost = the full project price. Quantity is fixed at 1.',
+    pendingQtyInput: 'Fill in the fields above to calculate this',
+    marginTooHighWithFees: "Your percent-based fees plus this profit margin add up to too much of the price to solve — lower the margin slider or reduce the percent fees.",
     groupDirect: 'Direct Variable Costs',
     groupSupplies: 'Supplies & Equipment',
     groupHidden: 'Hidden & Overhead Costs',
@@ -221,6 +234,9 @@ const LABELS = {
     modeItems: 'مورد به مورد',
     itemName: 'نام مورد',
     itemPrice: 'قیمت',
+    itemPricePercent: 'درصد (مثلاً ۲.۵)',
+    kindFlat: 'مبلغ ثابت',
+    kindPercent: 'درصدی از قیمت فروش',
     selectItem: 'یک مورد را انتخاب کنید...',
     otherItem: 'سایر (وارد کردن دستی)',
     addItem: '+ افزودن مورد',
@@ -243,6 +259,8 @@ const LABELS = {
     hoursLabel: 'ساعت کار (این پروژه/دوره)',
     areaLabel: 'مساحت کل (متر مربع یا فوت مربع)',
     projectNote: 'مجموع هزینه = کل قیمت پروژه. تعداد روی ۱ ثابته.',
+    pendingQtyInput: 'برای محاسبه‌ی این بخش، اول فیلدهای بالا را کامل کن',
+    marginTooHighWithFees: 'مجموع کارمزدهای درصدی و حاشیه سودی که انتخاب کردی خیلی زیاده و قابل محاسبه نیست — لغزنده‌ی حاشیه سود رو کمتر کن یا درصد کارمزدها رو کاهش بده.',
     groupDirect: 'هزینه‌های متغیر مستقیم',
     groupSupplies: 'ملزومات و تجهیزات',
     groupHidden: 'هزینه‌های پنهان و سربار',
@@ -356,9 +374,20 @@ const DIRECT_ITEM_OPTIONS_BY_TEMPLATE: Record<string, Record<'EN' | 'FA', string
 // Sentinel value for the dropdown's "Other" option — never a real item name.
 const NAME_OTHER = '__other__';
 
-function categoryTotal(c: CostCategory) {
+// Flat-dollar portion of a category's total (single mode is always flat;
+// item mode sums every item EXCEPT percent-of-price ones, since those
+// can't be added as dollars without knowing the final selling price).
+function categoryFlatTotal(c: CostCategory) {
   if (c.mode === 'single') return num(c.single);
-  return c.items.reduce((s, it) => s + num(it.price), 0);
+  return c.items.reduce((s, it) => s + (it.kind === 'percent' ? 0 : num(it.price)), 0);
+}
+
+// Sum of percent-of-price rates in a category, as percentage points
+// (e.g. 2.5 means 2.5%). Always 0 for single mode, since percent items
+// only exist in item-by-item mode.
+function categoryPercentTotal(c: CostCategory) {
+  if (c.mode === 'single') return 0;
+  return c.items.reduce((s, it) => s + (it.kind === 'percent' ? num(it.price) : 0), 0);
 }
 
 // The single source of truth for "how many sellable units" a batch/
@@ -401,6 +430,7 @@ function CostCategoryEditor({
   onRemove,
   canRemove,
   activeTemplateId,
+  namePlaceholder,
 }: {
   labels: typeof LABELS.EN;
   isRtl: boolean;
@@ -414,6 +444,11 @@ function CostCategoryEditor({
   // dropdown always reflects that ONE template, never a mix of every
   // template's ingredients/materials.
   activeTemplateId: string | null;
+  // Placeholder for the name field. Defaults to the generic free-form
+  // hint, but a template-sourced group category (e.g. Hidden & Overhead)
+  // passes its own group label instead, since the generic "e.g.
+  // Materials, Labor..." hint doesn't fit a hidden-cost bucket.
+  namePlaceholder?: string;
 }) {
   const inputClass = 'w-full py-2.5 px-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400';
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
@@ -443,7 +478,7 @@ function CostCategoryEditor({
         <input
           value={category.name}
           onChange={e => onChange({ ...category, name: e.target.value })}
-          placeholder={labels.categoryNamePlaceholder}
+          placeholder={namePlaceholder || labels.categoryNamePlaceholder}
           onClick={e => e.stopPropagation()}
           className={`${inputClass} flex-1 font-semibold`}
         />
@@ -536,13 +571,31 @@ function CostCategoryEditor({
                   />
                 )}
                 <div className="flex items-center gap-2">
+                  <div className="flex bg-slate-100 rounded-lg p-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      title={labels.kindFlat}
+                      onClick={() => updateItem(it.id, { kind: 'flat' })}
+                      className={`w-6 py-1.5 rounded-md text-[11px] font-bold transition-all ${(it.kind ?? 'flat') === 'flat' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      $
+                    </button>
+                    <button
+                      type="button"
+                      title={labels.kindPercent}
+                      onClick={() => updateItem(it.id, { kind: 'percent' })}
+                      className={`w-6 py-1.5 rounded-md text-[11px] font-bold transition-all ${it.kind === 'percent' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      %
+                    </button>
+                  </div>
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step={it.kind === 'percent' ? '0.1' : '0.01'}
                     value={it.price}
                     onChange={e => updateItem(it.id, { price: e.target.value })}
-                    placeholder={labels.itemPrice}
+                    placeholder={it.kind === 'percent' ? labels.itemPricePercent : labels.itemPrice}
                     className={`${inputClass} flex-1`}
                     dir="ltr"
                   />
@@ -567,7 +620,10 @@ function CostCategoryEditor({
           </button>
           <div className="flex justify-between text-xs pt-1 border-t border-slate-100">
             <span className="text-slate-500">{labels.subtotal}</span>
-            <span className="font-bold text-slate-800" dir="ltr">{fmt(categoryTotal(category))}</span>
+            <span className="font-bold text-slate-800" dir="ltr">
+              {fmt(categoryFlatTotal(category))}
+              {categoryPercentTotal(category) > 0 && ` + ${categoryPercentTotal(category)}%`}
+            </span>
           </div>
         </div>
       )}
@@ -848,13 +904,22 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           const group = recipeGroupForIndex(idx, totalRecipeCats);
           additions.push({
             ...newCategory(),
-            name: label,
+            // Direct/Supplies keep the template's own descriptive name
+            // (e.g. "Ingredients", "Packaging") since it's distinct from
+            // the fixed group header above it. The Hidden group's own
+            // template name is near-identical to the fixed "Hidden &
+            // Overhead Costs" header already shown right above it, so
+            // showing it again in the editable name field would just be
+            // the same phrase twice — left blank instead, still fully
+            // renameable if the person wants a label of their own.
+            name: group === 'hidden' ? '' : label,
             mode: 'items',
             items: group === 'hidden'
               ? cat.items.map(it => ({
                   id: generateId(),
                   name: it.name[lang] || it.name.EN,
-                  price: String(it.price),
+                  price: it.pctOfPrice != null ? String(it.pctOfPrice) : String(it.price),
+                  kind: it.pctOfPrice != null ? 'percent' as const : 'flat' as const,
                 }))
               : [],
             group,
@@ -875,12 +940,14 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         // never ships its own hidden-costs bucket. Add one pre-filled
         // with the generic hidden-cost defaults (same figures as the
         // manual "Suggest hidden costs" shortcut) so overhead isn't
-        // forgotten — still fully editable/removable.
+        // forgotten — still fully editable/removable. Name left blank
+        // for the same reason as above: it would otherwise repeat the
+        // fixed "Hidden & Overhead Costs" header verbatim.
         if (!existingNames.has(L.groupHidden.trim().toLowerCase())) {
           const isRtl = lang === 'FA';
           additions.push({
             ...newCategory(),
-            name: L.groupHidden,
+            name: '',
             mode: 'items',
             items: HIDDEN_COST_ITEMS.map(it => ({
               id: generateId(),
@@ -914,23 +981,51 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   );
 
   const calc = useMemo(() => {
-    const qty = effectiveQty > 0 ? effectiveQty : 1;
+    // effectiveQty is 0 only when the pricing basis needs an input that
+    // isn't filled in yet (batch/unit weight for 'weight', hours for
+    // 'hour', area for 'area'). Silently treating that as "1 unit" would
+    // show a confidently wrong cost-per-unit and selling price (e.g. the
+    // whole batch's ingredient cost presented as if it were one dessert's
+    // cost). 'quantity' and 'project' always resolve to >=1 on their own,
+    // so they're never in this state.
+    const qtyResolved = effectiveQty > 0;
+    const qty = qtyResolved ? effectiveQty : 1;
     const margin = Math.min(95, Math.max(0, num(marginPct)));
+    const marginFraction = margin / 100;
 
-    const totalCost = categories.reduce((s, c) => s + categoryTotal(c), 0);
-    const costPerUnit = totalCost / qty;
+    const flatTotal = categories.reduce((s, c) => s + categoryFlatTotal(c), 0);
+    const flatCostPerUnit = flatTotal / qty;
+    // Percent-of-price items (card processing fees, CPP, etc.) are rates
+    // that apply to the FINAL selling price, not the batch — they're not
+    // divided by qty.
+    const percentPts = categories.reduce((s, c) => s + categoryPercentTotal(c), 0);
+    const percentFraction = percentPts / 100;
 
-    // Margin here is defined as % of the SELLING PRICE (standard "profit margin"),
-    // not % of cost — that's why price = cost / (1 - margin), not cost * (1 + margin).
-    const suggestedPrice = margin >= 95 ? costPerUnit : costPerUnit / (1 - margin / 100);
-    const netProfitPerUnit = suggestedPrice - costPerUnit;
-    const actualMarginPct = suggestedPrice > 0 ? (netProfitPerUnit / suggestedPrice) * 100 : 0;
-    const markupPct = costPerUnit > 0 ? (netProfitPerUnit / costPerUnit) * 100 : 0;
+    // Solve algebraically instead of assuming price = cost * (1 + markup):
+    // price = flatCost + percentFraction*price + marginFraction*price
+    //      => price * (1 - percentFraction - marginFraction) = flatCost
+    //      => price = flatCost / (1 - percentFraction - marginFraction)
+    // If the percent fees plus the desired margin leave less than 5% of
+    // the price to cover flat costs, the combination is mathematically
+    // infeasible (or absurdly leveraged) — flag it instead of showing a
+    // wildly inflated or negative number.
+    const denom = 1 - percentFraction - marginFraction;
+    const pricingInfeasible = denom <= 0.05;
+
+    const suggestedPrice = pricingInfeasible ? 0 : flatCostPerUnit / denom;
+    const costPerUnit = pricingInfeasible ? flatCostPerUnit : flatCostPerUnit + percentFraction * suggestedPrice;
+    const totalCost = costPerUnit * qty;
+    const netProfitPerUnit = pricingInfeasible ? 0 : suggestedPrice - costPerUnit;
+    const actualMarginPct = !pricingInfeasible && suggestedPrice > 0 ? (netProfitPerUnit / suggestedPrice) * 100 : 0;
+    const markupPct = !pricingInfeasible && costPerUnit > 0 ? (netProfitPerUnit / costPerUnit) * 100 : 0;
 
     return {
       totalCost,
       costPerUnit,
       qty,
+      qtyResolved,
+      percentPts,
+      pricingInfeasible,
       suggestedPrice,
       netProfitPerUnit,
       actualMarginPct,
@@ -1240,7 +1335,8 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               // breakdown reads as 3 clearly-labeled sections instead of
               // repeating the same header on every card.
               const showGroupHeader = !!c.group && categories[idx - 1]?.group !== c.group;
-              const displayName = c.name.trim() || L.categoryNamePlaceholder;
+              const groupPlaceholder = c.group ? groupLabels[c.group as RecipeGroup] : L.categoryNamePlaceholder;
+              const displayName = c.name.trim() || groupPlaceholder;
 
               return (
                 <div key={c.id}>
@@ -1253,7 +1349,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                     <AccordionTrigger className="px-3 py-2.5 hover:no-underline">
                       <span className="flex items-center justify-between w-full gap-2 pr-2">
                         <span className="text-xs font-semibold text-slate-700 truncate">{displayName}</span>
-                        <span className="text-[11px] font-bold text-slate-400 shrink-0" dir="ltr">{fmt(categoryTotal(c))}</span>
+                        <span className="text-[11px] font-bold text-slate-400 shrink-0" dir="ltr">
+                          {fmt(categoryFlatTotal(c))}{categoryPercentTotal(c) > 0 && ` +${categoryPercentTotal(c)}%`}
+                        </span>
                       </span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-0 pb-0 px-0">
@@ -1265,6 +1363,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                         onRemove={() => removeCategory(c.id)}
                         canRemove={categories.length > 1}
                         activeTemplateId={appliedTemplateId}
+                        namePlaceholder={groupPlaceholder}
                       />
                     </AccordionContent>
                   </AccordionItem>
@@ -1352,7 +1451,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           </div>
           <div className="bg-slate-50 rounded-xl p-3">
             <p className="text-[10px] font-semibold text-slate-500 uppercase mb-0.5">{L.costPerUnit}</p>
-            <p className="text-sm font-bold text-slate-800" dir="ltr">{fmt(calc.costPerUnit)}</p>
+            <p className="text-sm font-bold text-slate-800" dir="ltr">
+              {calc.qtyResolved ? fmt(calc.costPerUnit) : '—'}
+            </p>
           </div>
         </div>
         )}
@@ -1381,6 +1482,17 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           />
         </div>
 
+        {!calc.qtyResolved && hasChosenStartingPoint ? (
+          <div className="rounded-2xl bg-slate-50 border border-dashed border-slate-200 p-4 mb-3 text-center">
+            <p className="text-xs font-medium text-slate-500">{L.pendingQtyInput}</p>
+          </div>
+        ) : calc.pricingInfeasible ? (
+          <div className="rounded-2xl bg-amber-50 border border-dashed border-amber-200 p-4 mb-3 text-center flex items-start gap-2 text-start">
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs font-medium text-amber-700">{L.marginTooHighWithFees}</p>
+          </div>
+        ) : (
+        <>
         <div className="rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 p-4 mb-3 text-white">
           <p className="text-[10px] font-semibold uppercase opacity-80 mb-0.5">{L.suggestedPrice}</p>
           <p className="text-2xl font-bold" dir="ltr">{fmt(calc.suggestedPrice)}</p>
@@ -1400,6 +1512,8 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <p className="text-sm font-bold text-slate-800" dir="ltr">{calc.markupPct.toFixed(1)}%</p>
           </div>
         </div>
+        </>
+        )}
 
         {calc.qty > 1 && (
           <div className="border-t border-slate-100 pt-3 mb-3">
@@ -1458,12 +1572,20 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         ) : (
           <div className="divide-y divide-slate-50">
             {saved.map(p => {
-              const qty = computeEffectiveQty(p.pricingBasis, p.quantity, p.batchWeight, p.unitWeight, p.hoursOrArea) || 1;
-              const totalCost = p.categories.reduce((s, c) => s + categoryTotal(c), 0);
-              const costPerUnit = totalCost / qty;
+              const rawQty = computeEffectiveQty(p.pricingBasis, p.quantity, p.batchWeight, p.unitWeight, p.hoursOrArea);
+              const qtyResolved = rawQty > 0;
+              const qty = qtyResolved ? rawQty : 1;
+              const flatTotal = p.categories.reduce((s, c) => s + categoryFlatTotal(c), 0);
+              const flatCostPerUnit = flatTotal / qty;
+              const percentPts = p.categories.reduce((s, c) => s + categoryPercentTotal(c), 0);
+              const percentFraction = percentPts / 100;
               const margin = Math.min(95, Math.max(0, num(p.marginPct)));
-              const price = margin >= 95 ? costPerUnit : costPerUnit / (1 - margin / 100);
-              const profit = price - costPerUnit;
+              const denom = 1 - percentFraction - margin / 100;
+              const pricingInfeasible = denom <= 0.05;
+              const price = pricingInfeasible ? 0 : flatCostPerUnit / denom;
+              const costPerUnit = pricingInfeasible ? flatCostPerUnit : flatCostPerUnit + percentFraction * price;
+              const totalCost = costPerUnit * qty;
+              const profit = pricingInfeasible ? 0 : price - costPerUnit;
               const isEditing = p.id === editingId;
               return (
                 <div
@@ -1483,7 +1605,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                       <p className="text-[10px] text-emerald-600 font-medium truncate">{p.templateName}</p>
                     )}
                     <p className="text-[10px] text-slate-400" dir="ltr">
-                      {L.costPerUnit}: {fmt(costPerUnit)} · {L.suggestedPrice.split('(')[0].trim()}: {fmt(price)} · {L.netProfit.split('(')[0].trim()}: {fmt(profit)}
+                      {qtyResolved && !pricingInfeasible
+                        ? <>{L.costPerUnit}: {fmt(costPerUnit)} · {L.suggestedPrice.split('(')[0].trim()}: {fmt(price)} · {L.netProfit.split('(')[0].trim()}: {fmt(profit)}</>
+                        : <>{L.costPerUnit}: — · {L.totalCost}: {fmt(totalCost)}</>}
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0">
