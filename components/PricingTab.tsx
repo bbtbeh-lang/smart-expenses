@@ -53,6 +53,13 @@ interface CostCategory {
   single: string;
   items: CostItem[];
   group?: RecipeGroup;
+  // Only meaningful for the 'hidden' group category: overhead (electricity
+  // share, equipment depreciation, unbillable time, rent share, etc.) as
+  // a percentage of direct costs, instead of asking the person to guess a
+  // dollar figure for each one individually. Standard small-business
+  // practice — nobody actually meters "how much electricity did this one
+  // dish use". Resolved against direct+supplies flat totals in `calc`.
+  overheadPct?: string;
 }
 
 // A full saved record. Unlike the old schema (which only kept a
@@ -153,6 +160,7 @@ const LABELS = {
     manageProducts: 'Manage Products',
     manageProductsHint: 'Pick which product you\u2019re pricing before filling in details below — each one keeps its own costs and labels.',
     newProduct: '+ New product',
+    addAnotherProduct: 'Price another product',
     unnamedProduct: 'Untitled product',
     removeProductTab: 'Close this product',
     perUnit: 'per unit',
@@ -196,8 +204,10 @@ const LABELS = {
     aboveSuggested: 'above your suggested price',
     belowSuggested: 'below your suggested price',
     groupDirect: 'Direct Variable Costs',
-    groupSupplies: 'Supplies & Equipment',
+    groupSupplies: 'Packaging & Direct Consumables',
     groupHidden: 'Hidden & Overhead Costs',
+    overheadPctLabel: 'Overhead (% of direct costs)',
+    overheadPctHint: 'Covers electricity, equipment wear, unbillable time, rent share, etc. — calculated automatically so you don\'t have to guess a dollar amount for each one.',
     personalGuardTitle: 'A tool for businesses & freelancers',
     personalGuardBody: 'The Pricing & Profit Estimator helps you cost and price a product or service you sell, so it only applies to business and freelance accounts. Switch to a business account to use it.',
   },
@@ -235,6 +245,7 @@ const LABELS = {
     manageProducts: 'مدیریت محصولات',
     manageProductsHint: 'قبل از پر کردن جزئیات، مشخص کن در حال قیمت‌گذاری کدوم محصولی — هرکدوم هزینه‌ها و برچسب‌های خودشون رو جدا نگه می‌دارن.',
     newProduct: '+ محصول جدید',
+    addAnotherProduct: 'قیمت‌گذاری یه محصول دیگه',
     unnamedProduct: 'محصول بدون‌نام',
     removeProductTab: 'بستن این محصول',
     perUnit: 'به ازای هر واحد',
@@ -278,27 +289,14 @@ const LABELS = {
     aboveSuggested: 'بالاتر از قیمت پیشنهادیت',
     belowSuggested: 'پایین‌تر از قیمت پیشنهادیت',
     groupDirect: 'هزینه‌های متغیر مستقیم',
-    groupSupplies: 'ملزومات و تجهیزات',
+    groupSupplies: 'بسته‌بندی و ملزومات مصرفی مستقیم',
     groupHidden: 'هزینه‌های پنهان و سربار',
+    overheadPctLabel: 'سربار (٪ از هزینه‌های مستقیم)',
+    overheadPctHint: 'شامل برق، استهلاک تجهیزات، زمان بدون‌فاکتور، سهم اجاره و مواردی مثل این می‌شه — خودکار حساب می‌شه، لازم نیست برای هرکدوم عدد حدس بزنی.',
     personalGuardTitle: 'ابزاری برای بیزینس‌ها و فریلنسرها',
     personalGuardBody: 'محاسبه‌گر قیمت‌گذاری و سود کمکت می‌کنه هزینه و قیمت یک محصول یا خدمتی که می‌فروشی رو حساب کنی، پس فقط برای حساب‌های بیزینسی و فریلنسری کاربرد داره. برای استفاده از این ابزار، حسابت رو به نوع بیزینسی سوییچ کن.',
   },
 };
-
-// Generic hidden/overhead costs that apply to almost any small business or
-// freelance setup, regardless of job type — used both by the manual
-// "Suggest hidden costs" button and as an automatic top-up for templates
-// that don't already ship their own hidden-cost breakdown. Each carries a
-// modest ballpark per-unit default (CAD) — a reasonable starting point the
-// person can accept as-is or overwrite, not a claim of accuracy for their
-// specific business.
-const HIDDEN_COST_ITEMS: { EN: string; FA: string; price: number }[] = [
-  { EN: 'Equipment Depreciation', FA: 'استهلاک تجهیزات', price: 0.4 },
-  { EN: 'Energy / Utilities Share', FA: 'سهم انرژی (برق/گاز)', price: 0.3 },
-  { EN: 'Internet & Phone', FA: 'اینترنت و تلفن', price: 0.2 },
-  { EN: 'Insurance', FA: 'بیمه', price: 0.3 },
-  { EN: 'Software & Subscriptions', FA: 'نرم‌افزار و اشتراک‌ها', price: 0.2 },
-];
 
 function loadSaved(): SavedProduct[] {
   try {
@@ -318,8 +316,8 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-function num(s: string) {
-  const v = parseFloat(s);
+function num(s: string | undefined) {
+  const v = parseFloat(s ?? '');
   return isNaN(v) || v < 0 ? 0 : v;
 }
 
@@ -334,14 +332,19 @@ function newItem(): CostItem {
   return { id: generateId(), name: '', price: '' };
 }
 
-function hiddenCostsCategory(lang: Lang): CostCategory {
-  const isRtl = lang === 'FA';
+// Category created by the manual "+ Suggest hidden costs" button, for
+// when the person is pricing without a business template (or the
+// template didn't add one). Uses the same overhead-as-%-of-direct-cost
+// approach as template-applied categories, with a generic default rate
+// since there's no business-type-specific figure to draw on here.
+function hiddenCostsCategory(): CostCategory {
   return {
     id: generateId(),
-    name: isRtl ? LABELS.FA.groupHidden : LABELS.EN.groupHidden,
+    name: '',
     mode: 'items',
     single: '',
-    items: HIDDEN_COST_ITEMS.map(item => ({ id: generateId(), name: isRtl ? item.FA : item.EN, price: String(item.price) })),
+    items: [],
+    overheadPct: '15',
     group: 'hidden',
   };
 }
@@ -490,6 +493,42 @@ function CostCategoryEditor({
 
   return (
     <div className="p-3">
+      {category.group === 'hidden' ? (
+        <>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-semibold text-slate-800">{namePlaceholder}</span>
+            {canRemove && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onRemove(); }}
+                title={labels.removeCategory}
+                className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-3" onClick={e => e.stopPropagation()}>
+            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between mb-1">
+              <span>{labels.overheadPctLabel}</span>
+              <span className="text-amber-700 font-bold" dir="ltr">{num(category.overheadPct)}%</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={category.overheadPct ?? ''}
+              onChange={e => onChange({ ...category, overheadPct: e.target.value })}
+              placeholder="15"
+              className={inputClass}
+              dir="ltr"
+            />
+            <p className="text-[10px] text-slate-500 mt-1">{labels.overheadPctHint}</p>
+          </div>
+        </>
+      ) : (
+      <>
       <div className="flex items-center gap-2 mb-2">
         <input
           value={category.name}
@@ -642,6 +681,8 @@ function CostCategoryEditor({
             </span>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );
@@ -855,7 +896,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // already present.
   const addHiddenCostsSuggestion = () => {
     if (categories.some(c => c.group === 'hidden')) return;
-    const cat = hiddenCostsCategory(lang);
+    const cat = hiddenCostsCategory();
     setCategories(prev => [...prev, cat]);
     expandCategory(cat.id);
     setLastTemplateSnapshot(null);
@@ -936,14 +977,15 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             // renameable if the person wants a label of their own.
             name: group === 'hidden' ? '' : label,
             mode: 'items',
-            items: group === 'hidden'
-              ? cat.items.map(it => ({
-                  id: generateId(),
-                  name: it.name[lang] || it.name.EN,
-                  price: it.pctOfPrice != null ? String(it.pctOfPrice) : String(it.price),
-                  kind: it.pctOfPrice != null ? 'percent' as const : 'flat' as const,
-                }))
-              : [],
+            // Hidden & Overhead is purely the automatic overhead-%
+            // field now — no itemized entry at all, even for genuinely
+            // percent-of-price fees (card processing, CPP). Those are
+            // folded into each template's overheadPctOfDirectCost
+            // instead, so the person never sees a manual item table
+            // here — same as Direct/Supplies would look before this,
+            // just without any items to add.
+            items: [],
+            overheadPct: group === 'hidden' ? String(template.overheadPctOfDirectCost ?? 15) : undefined,
             group,
           });
         });
@@ -959,23 +1001,19 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
           additions.push({ ...newCategory(), name: label, single: '' });
         });
         // This template has no per-batch recipe breakdown, so it also
-        // never ships its own hidden-costs bucket. Add one pre-filled
-        // with the generic hidden-cost defaults (same figures as the
-        // manual "Suggest hidden costs" shortcut) so overhead isn't
-        // forgotten — still fully editable/removable. Name left blank
-        // for the same reason as above: it would otherwise repeat the
-        // fixed "Hidden & Overhead Costs" header verbatim.
+        // never ships its own hidden-costs bucket. Add one with a generic
+        // overhead % (same default as the manual "Suggest hidden costs"
+        // shortcut) so overhead isn't forgotten — still fully editable.
+        // Name left blank for the same reason as above: it would
+        // otherwise repeat the fixed "Hidden & Overhead Costs" header
+        // verbatim.
         if (!existingNames.has(L.groupHidden.trim().toLowerCase())) {
-          const isRtl = lang === 'FA';
           additions.push({
             ...newCategory(),
             name: '',
             mode: 'items',
-            items: HIDDEN_COST_ITEMS.map(it => ({
-              id: generateId(),
-              name: isRtl ? it.FA : it.EN,
-              price: String(it.price),
-            })),
+            items: [],
+            overheadPct: String(template.overheadPctOfDirectCost ?? 15),
             group: 'hidden',
           });
         }
@@ -1015,7 +1053,24 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     const margin = Math.min(95, Math.max(0, num(marginPct)));
     const marginFraction = margin / 100;
 
-    const flatTotal = categories.reduce((s, c) => s + categoryFlatTotal(c), 0);
+    // Direct + Supplies (and any free-form categories) — everything
+    // EXCEPT the Hidden & Overhead group — form the direct-cost base that
+    // overhead is calculated against.
+    const cogsFlatTotal = categories.reduce((s, c) => s + (c.group === 'hidden' ? 0 : categoryFlatTotal(c)), 0);
+    // Overhead (electricity share, equipment depreciation, unbillable
+    // time, rent share, etc.) as a % of direct costs, instead of asking
+    // the person to itemize and guess a dollar figure for each one —
+    // standard small-business overhead-absorption practice. There's at
+    // most one 'hidden' group category (only ever assigned by template
+    // application / the manual "Suggest hidden costs" shortcut).
+    const hiddenCategory = categories.find(c => c.group === 'hidden');
+    const overheadFraction = hiddenCategory ? Math.max(0, num(hiddenCategory.overheadPct)) / 100 : 0;
+    const overheadCost = overheadFraction * cogsFlatTotal;
+    // The hidden category can still hold manually-added flat items too
+    // (via "+ Add item"), for anyone who wants to itemize on top of the
+    // overhead % instead of relying on it alone.
+    const hiddenExtraFlat = hiddenCategory ? categoryFlatTotal(hiddenCategory) : 0;
+    const flatTotal = cogsFlatTotal + overheadCost + hiddenExtraFlat;
     const flatCostPerUnit = flatTotal / qty;
     // Percent-of-price items (card processing fees, CPP, etc.) are rates
     // that apply to the FINAL selling price, not the batch — they're not
@@ -1207,13 +1262,12 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
 
-      {/* Manage Products — only relevant once there's an actual product to
-          manage: appears after the required first step (template chosen,
-          or explicitly skipped) for the current product, or once a second
-          product tab already exists. Showing it above/before that step
-          would suggest managing products is possible before picking what
-          they even are. */}
-      {(hasChosenStartingPoint || draftIds.length > 1) && (
+      {/* Manage Products — a full tab bar only earns its place once
+          there's actually more than one product to switch between.
+          With just one (still-unnamed) draft, showing a whole card with
+          a single non-functional "current product" pill is just noise —
+          a small link to start a second product is enough. */}
+      {draftIds.length > 1 ? (
       <div className="bg-white rounded-2xl border border-slate-100 p-3 mb-4 shadow-sm">
         <h3 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
           <Layers className="w-3.5 h-3.5 text-emerald-600" />
@@ -1232,16 +1286,14 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                 >
                   {draftName.trim() || L.unnamedProduct}
                 </button>
-                {draftIds.length > 1 && (
-                  <button
-                    type="button"
-                    title={L.removeProductTab}
-                    onClick={e => { e.stopPropagation(); removeDraft(id); }}
-                    className={`absolute -top-1.5 ${isRtl ? '-left-1.5' : '-right-1.5'} w-4 h-4 rounded-full flex items-center justify-center text-[10px] leading-none ${isActive ? 'bg-emerald-800' : 'bg-slate-300'} text-white opacity-0 group-hover:opacity-100 transition-opacity`}
-                  >
-                    ×
-                  </button>
-                )}
+                <button
+                  type="button"
+                  title={L.removeProductTab}
+                  onClick={e => { e.stopPropagation(); removeDraft(id); }}
+                  className={`absolute -top-1.5 ${isRtl ? '-left-1.5' : '-right-1.5'} w-4 h-4 rounded-full flex items-center justify-center text-[10px] leading-none ${isActive ? 'bg-emerald-800' : 'bg-slate-300'} text-white opacity-0 group-hover:opacity-100 transition-opacity`}
+                >
+                  ×
+                </button>
               </div>
             );
           })}
@@ -1256,7 +1308,16 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
         </div>
         <p className="text-[10px] text-slate-400 mt-1.5">{L.manageProductsHint}</p>
       </div>
-      )}
+      ) : hasChosenStartingPoint ? (
+        <button
+          type="button"
+          onClick={addDraft}
+          className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 mb-4"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {L.addAnotherProduct}
+        </button>
+      ) : null}
 
       {editingId && (
         <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-4">
@@ -1398,7 +1459,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                       <span className="flex items-center justify-between w-full gap-2 pr-2">
                         <span className="text-xs font-semibold text-slate-700 truncate">{displayName}</span>
                         <span className="text-[11px] font-bold text-slate-400 shrink-0" dir="ltr">
-                          {fmt(categoryFlatTotal(c))}{categoryPercentTotal(c) > 0 && ` +${categoryPercentTotal(c)}%`}
+                          {c.group === 'hidden'
+                            ? `${num(c.overheadPct)}%${categoryPercentTotal(c) > 0 ? ` +${categoryPercentTotal(c)}%` : ''}${categoryFlatTotal(c) > 0 ? ` +${fmt(categoryFlatTotal(c))}` : ''}`
+                            : `${fmt(categoryFlatTotal(c))}${categoryPercentTotal(c) > 0 ? ` +${categoryPercentTotal(c)}%` : ''}`}
                         </span>
                       </span>
                     </AccordionTrigger>
@@ -1667,7 +1730,11 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
               const rawQty = computeEffectiveQty(p.pricingBasis, p.quantity, p.batchWeight, p.unitWeight, p.hoursOrArea);
               const qtyResolved = rawQty > 0;
               const qty = qtyResolved ? rawQty : 1;
-              const flatTotal = p.categories.reduce((s, c) => s + categoryFlatTotal(c), 0);
+              const cogsFlatTotal = p.categories.reduce((s, c) => s + (c.group === 'hidden' ? 0 : categoryFlatTotal(c)), 0);
+              const savedHiddenCategory = p.categories.find(c => c.group === 'hidden');
+              const overheadFraction = savedHiddenCategory ? Math.max(0, num(savedHiddenCategory.overheadPct)) / 100 : 0;
+              const hiddenExtraFlat = savedHiddenCategory ? categoryFlatTotal(savedHiddenCategory) : 0;
+              const flatTotal = cogsFlatTotal + overheadFraction * cogsFlatTotal + hiddenExtraFlat;
               const flatCostPerUnit = flatTotal / qty;
               const percentPts = p.categories.reduce((s, c) => s + categoryPercentTotal(c), 0);
               const percentFraction = percentPts / 100;
