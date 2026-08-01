@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Calculator, Sparkles, Save, Trash2, Package, Plus, ListPlus, Hash,
-  LayoutGrid, ChevronDown, PenSquare, RotateCcw, ShieldAlert, Info, Layers, Target,
+  LayoutGrid, ChevronDown, PenSquare, RotateCcw, ShieldAlert, Info, Target,
 } from 'lucide-react';
 import { Lang, AccountType } from '@/lib/types';
 import { BUSINESS_TEMPLATES, BusinessTemplate } from '@/lib/businessTemplates';
@@ -92,33 +92,6 @@ interface SavedProduct {
   templateId?: string;
 }
 
-// One in-memory "product tab": a full snapshot of every field the pricing
-// form is built on. This is what lets someone flip between several
-// products (e.g. "Cream Pastry" vs "Halva") under the same business
-// template, in memory, without losing whatever they've customized on
-// each one — category names included, since each snapshot carries its
-// own `categories` array (and therefore its own renamed labels)
-// completely independently of every other product's snapshot.
-interface DraftSnapshot {
-  name: string;
-  categories: CostCategory[];
-  pricingBasis: PricingBasis;
-  quantity: string;
-  batchWeight: string;
-  unitWeight: string;
-  hoursOrArea: string;
-  marginPct: string;
-  appliedTemplateName: string | null;
-  appliedTemplateId: string | null;
-  editingId: string | null;
-  openCategoryIds: string[];
-  lastTemplateSnapshot: string | null;
-  // True once the person explicitly picks "My business isn't listed" for
-  // THIS product — the other way (besides applying a template) to satisfy
-  // the required first step and unlock the name field + cost categories.
-  skippedTemplate: boolean;
-}
-
 // Bumped from v2 → v3: the saved-record shape changed (full categories +
 // pricing basis instead of a flattened name/total snapshot) so that saved
 // items can be reloaded for editing. Older v2 records use an incompatible
@@ -157,12 +130,8 @@ const LABELS = {
     delete: 'Delete',
     edit: 'Edit',
     tapToEdit: 'Tap an item to load it for editing',
-    manageProducts: 'Manage Products',
-    manageProductsHint: 'Pick which product you\u2019re pricing before filling in details below — each one keeps its own costs and labels.',
-    newProduct: '+ New product',
-    addAnotherProduct: 'Price another product',
     unnamedProduct: 'Untitled product',
-    removeProductTab: 'Close this product',
+    addAnotherProduct: 'Price another product',
     perUnit: 'per unit',
     modeSingle: 'One total',
     modeItems: 'Item by item',
@@ -242,12 +211,8 @@ const LABELS = {
     delete: 'حذف',
     edit: 'ویرایش',
     tapToEdit: 'برای ویرایش روی هر مورد بزن',
-    manageProducts: 'مدیریت محصولات',
-    manageProductsHint: 'قبل از پر کردن جزئیات، مشخص کن در حال قیمت‌گذاری کدوم محصولی — هرکدوم هزینه‌ها و برچسب‌های خودشون رو جدا نگه می‌دارن.',
-    newProduct: '+ محصول جدید',
-    addAnotherProduct: 'قیمت‌گذاری یه محصول دیگه',
     unnamedProduct: 'محصول بدون‌نام',
-    removeProductTab: 'بستن این محصول',
+    addAnotherProduct: 'قیمت‌گذاری یه محصول دیگه',
     perUnit: 'به ازای هر واحد',
     modeSingle: 'یک عدد کلی',
     modeItems: 'مورد به مورد',
@@ -749,117 +714,6 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // draft's live state — every existing handler in this file (updateCategory,
   // handleApplyTemplate, handleSave, ...) keeps reading/writing "the
   // current fields" completely unchanged. Switching drafts just snapshots
-  // those fields out to draftSnapshotsRef under the outgoing draft's id,
-  // then restores the incoming draft's own snapshot (or blank defaults for
-  // a brand-new one) back into the same live state hooks. This gives each
-  // product its own independent, in-memory copy of every field — including
-  // custom category names — without a person needing to hit "Save" first.
-  const [initialDraftId] = useState(() => generateId());
-  const [draftIds, setDraftIds] = useState<string[]>(() => [initialDraftId]);
-  const [activeDraftId, setActiveDraftId] = useState<string>(initialDraftId);
-  const draftSnapshotsRef = useRef<Record<string, DraftSnapshot>>({});
-
-  const blankDraftSnapshot = (): DraftSnapshot => ({
-    name: '',
-    categories: [newCategory(), newCategory()],
-    pricingBasis: 'quantity',
-    quantity: '',
-    batchWeight: '',
-    unitWeight: '',
-    hoursOrArea: '',
-    marginPct: '30',
-    appliedTemplateName: null,
-    appliedTemplateId: null,
-    editingId: null,
-    openCategoryIds: [],
-    lastTemplateSnapshot: null,
-    skippedTemplate: false,
-  });
-
-  const captureCurrentSnapshot = (): DraftSnapshot => ({
-    name, categories, pricingBasis, quantity, batchWeight, unitWeight,
-    hoursOrArea, marginPct, appliedTemplateName, appliedTemplateId,
-    editingId, openCategoryIds, lastTemplateSnapshot, skippedTemplate,
-  });
-
-  const applyDraftSnapshot = (s: DraftSnapshot) => {
-    setName(s.name);
-    setCategories(s.categories);
-    setPricingBasis(s.pricingBasis);
-    setQuantity(s.quantity);
-    setBatchWeight(s.batchWeight);
-    setUnitWeight(s.unitWeight);
-    setHoursOrArea(s.hoursOrArea);
-    setMarginPct(s.marginPct);
-    setAppliedTemplateName(s.appliedTemplateName);
-    setAppliedTemplateId(s.appliedTemplateId);
-    setEditingId(s.editingId);
-    setOpenCategoryIds(s.openCategoryIds.length ? s.openCategoryIds : s.categories.map(c => c.id));
-    setLastTemplateSnapshot(s.lastTemplateSnapshot);
-    setSkippedTemplate(s.skippedTemplate);
-  };
-
-  // Saves the outgoing product's current fields into its own slot, then
-  // loads the target product's fields into the form.
-  const switchDraft = (id: string) => {
-    if (id === activeDraftId) return;
-    draftSnapshotsRef.current[activeDraftId] = captureCurrentSnapshot();
-    applyDraftSnapshot(draftSnapshotsRef.current[id] ?? blankDraftSnapshot());
-    setActiveDraftId(id);
-  };
-
-  // "+ New product" — opens a fresh tab for pricing a different product.
-  // If the current product came from a business template, the new one
-  // starts from the SAME category shells (names + groups, e.g. "Direct
-  // Variable Costs") so its dropdown is already scoped to that template —
-  // but with every amount and item list empty, matching the empty-state
-  // rule: no costs are ever pre-filled, the person adds each one
-  // themselves. Renaming a category label on this new product afterward
-  // never affects the product it was copied from, or any other product —
-  // each draft's `categories` is its own independent copy from this point on.
-  // If the outgoing product instead skipped templates entirely, the new
-  // one also starts unlocked (no need to re-answer "my business isn't
-  // listed" for every single product in the same session) but with fresh
-  // blank categories.
-  const addDraft = () => {
-    draftSnapshotsRef.current[activeDraftId] = captureCurrentSnapshot();
-    const id = generateId();
-    const snapshot: DraftSnapshot = appliedTemplateId
-      ? {
-          ...blankDraftSnapshot(),
-          pricingBasis,
-          marginPct,
-          appliedTemplateName,
-          appliedTemplateId,
-          categories: categories.map(c => ({
-            id: generateId(), name: c.name, mode: c.mode, single: '', items: [], group: c.group,
-          })),
-        }
-      : skippedTemplate
-        ? { ...blankDraftSnapshot(), skippedTemplate: true }
-        : blankDraftSnapshot();
-    draftSnapshotsRef.current[id] = snapshot;
-    setDraftIds(prev => [...prev, id]);
-    applyDraftSnapshot(snapshot);
-    setActiveDraftId(id);
-  };
-
-  // Closes a product tab (only when more than one exists, so the form
-  // always has an active product to show).
-  const removeDraft = (id: string) => {
-    setDraftIds(prev => {
-      if (prev.length <= 1) return prev;
-      const next = prev.filter(x => x !== id);
-      delete draftSnapshotsRef.current[id];
-      if (id === activeDraftId) {
-        const fallbackId = next[next.length - 1];
-        applyDraftSnapshot(draftSnapshotsRef.current[fallbackId] ?? blankDraftSnapshot());
-        setActiveDraftId(fallbackId);
-      }
-      return next;
-    });
-  };
-
   useEffect(() => {
     setSaved(loadSaved());
     // Keep the accordion open by default for whatever categories exist
@@ -1207,6 +1061,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       persistSaved(next);
       return next;
     });
+    resetForm();
   };
 
   // Loads a saved record back into the form so it can be edited, instead
@@ -1262,76 +1117,19 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
 
-      {/* Manage Products — a full tab bar only earns its place once
-          there's actually more than one product to switch between.
-          With just one (still-unnamed) draft, showing a whole card with
-          a single non-functional "current product" pill is just noise —
-          a small link to start a second product is enough. */}
-      {draftIds.length > 1 ? (
-      <div className="bg-white rounded-2xl border border-slate-100 p-3 mb-4 shadow-sm">
-        <h3 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-          <Layers className="w-3.5 h-3.5 text-emerald-600" />
-          {L.manageProducts}
-        </h3>
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          {draftIds.map(id => {
-            const isActive = id === activeDraftId;
-            const draftName = isActive ? name : (draftSnapshotsRef.current[id]?.name || '');
-            return (
-              <div key={id} className="relative shrink-0 group">
-                <button
-                  type="button"
-                  onClick={() => switchDraft(id)}
-                  className={`flex items-center gap-1 pl-3 pr-2 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${isActive ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {draftName.trim() || L.unnamedProduct}
-                </button>
-                <button
-                  type="button"
-                  title={L.removeProductTab}
-                  onClick={e => { e.stopPropagation(); removeDraft(id); }}
-                  className={`absolute -top-1.5 ${isRtl ? '-left-1.5' : '-right-1.5'} w-4 h-4 rounded-full flex items-center justify-center text-[10px] leading-none ${isActive ? 'bg-emerald-800' : 'bg-slate-300'} text-white opacity-0 group-hover:opacity-100 transition-opacity`}
-                >
-                  ×
-                </button>
-              </div>
-            );
-          })}
-          <button
-            type="button"
-            onClick={addDraft}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-dashed border-emerald-300 text-emerald-600 hover:bg-emerald-50 text-xs font-semibold whitespace-nowrap shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            {L.newProduct}
-          </button>
-        </div>
-        <p className="text-[10px] text-slate-400 mt-1.5">{L.manageProductsHint}</p>
-      </div>
-      ) : hasChosenStartingPoint ? (
-        <button
-          type="button"
-          onClick={addDraft}
-          className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 mb-4"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          {L.addAnotherProduct}
-        </button>
-      ) : null}
-
-      {editingId && (
-        <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-4">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
-            <PenSquare className="w-3.5 h-3.5" />
-            {L.editingBadge}
+      {(editingId || hasChosenStartingPoint) && (
+        <div className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 mb-4 ${editingId ? 'bg-amber-50 border border-amber-100' : 'bg-slate-50 border border-slate-100'}`}>
+          <span className={`flex items-center gap-1.5 text-xs font-semibold ${editingId ? 'text-amber-700' : 'text-slate-500'}`}>
+            {editingId && <PenSquare className="w-3.5 h-3.5" />}
+            {editingId ? L.editingBadge : (name.trim() || L.unnamedProduct)}
           </span>
           <button
             type="button"
             onClick={resetForm}
-            className="flex items-center gap-1 text-xs font-semibold text-amber-700 hover:text-amber-900"
+            className={`flex items-center gap-1 text-xs font-semibold ${editingId ? 'text-amber-700 hover:text-amber-900' : 'text-emerald-600 hover:text-emerald-700'}`}
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            {L.newEntry}
+            {editingId ? L.newEntry : L.addAnotherProduct}
           </button>
         </div>
       )}
