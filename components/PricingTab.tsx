@@ -1177,7 +1177,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <p className="text-xs text-slate-400 text-center py-2">{L.startingPointRequired}</p>
           )}
 
-          {hasChosenStartingPoint && (
+          {hasChosenStartingPoint && !categories.some(c => c.group === 'hidden') && (
             <button
               type="button"
               onClick={addHiddenCostsSuggestion}
