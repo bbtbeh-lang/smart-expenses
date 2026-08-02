@@ -135,7 +135,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'freelancer',
-    overheadPctOfDirectCost: 30, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 130, // suggested overhead as % of direct costs — folds in allocated internet/home-office cost, since a freelancer's real overhead routinely exceeds their tiny direct-tooling cost
     defaultPricingBasis: 'hour',
     icon: '💻',
     name: { EN: 'Freelancer / Consultant', FR: 'Pigiste / Consultant', FA: 'فریلنسر / مشاور' },
@@ -156,13 +156,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         items: [
           { name: { EN: 'Software Subscriptions (per billable hour)', FR: 'Abonnements logiciels (par heure facturable)', FA: 'اشتراک نرم‌افزار (هر ساعت قابل‌فاکتور)' }, price: 1.5 },
           { name: { EN: 'Cloud / Storage (per hour)', FR: 'Infonuagique / stockage (par heure)', FA: 'فضای ابری (هر ساعت)' }, price: 0.5 },
-        ],
-      },
-      {
-        name: { EN: 'Overhead Per Hour', FR: 'Frais généraux par heure', FA: 'سربار به ازای هر ساعت' },
-        items: [
-          { name: { EN: 'Internet & Phone (allocated)', FR: 'Internet et téléphone (alloué)', FA: 'سهم اینترنت و تلفن' }, price: 1.0 },
-          { name: { EN: 'Home Office Space (allocated)', FR: "Espace de bureau à domicile (alloué)", FA: 'سهم فضای دفتر خانگی' }, price: 1.0 },
         ],
       },
       {
@@ -245,7 +238,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'cleaning_service',
-    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 55, // suggested overhead as % of direct costs — folds in vacuum/mop wear (equipment depreciation)
     defaultPricingBasis: 'hour',
     icon: '🧹',
     name: { EN: 'Cleaning Service (Residential/Commercial)', FR: 'Service de nettoyage', FA: 'خدمات نظافتی (منزل/تجاری)' },
@@ -263,12 +256,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         items: [
           { name: { EN: 'Cleaning Chemicals', FR: 'Produits chimiques de nettoyage', FA: 'مواد شیمیایی نظافتی' }, price: 3.0 },
           { name: { EN: 'Disposables (gloves, cloths, garbage bags)', FR: 'Jetables (gants, chiffons, sacs)', FA: 'یک‌بارمصرف (دستکش، پارچه، کیسه زباله)' }, price: 2.0 },
-        ],
-      },
-      {
-        name: { EN: 'Equipment Wear Per Job', FR: "Usure de l'équipement par contrat", FA: 'استهلاک تجهیزات هر کار' },
-        items: [
-          { name: { EN: 'Vacuum / Mop Wear', FR: 'Usure aspirateur / vadrouille', FA: 'استهلاک جاروبرقی و تی' }, price: 2.0 },
         ],
       },
       {
@@ -294,15 +281,10 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
     // "Per unit" here = one long-haul trip/load.
     recipeCategories: [
       {
-        name: { EN: 'Fuel & Road Costs (per trip)', FR: 'Carburant et frais de route (par voyage)', FA: 'سوخت و هزینه‌های جاده (هر سفر)' },
+        name: { EN: 'Fuel & Vehicle Costs (per trip)', FR: 'Carburant et frais du véhicule (par voyage)', FA: 'سوخت و هزینه‌های خودرو (هر سفر)' },
         items: [
           { name: { EN: 'Diesel Fuel', FR: 'Carburant diesel', FA: 'گازوئیل' }, price: 600 },
           { name: { EN: 'Tolls / Weigh Scale Fees', FR: 'Péages / frais de pesée', FA: 'عوارض جاده و ترازوی وزن' }, price: 40 },
-        ],
-      },
-      {
-        name: { EN: 'Maintenance Reserve (per trip)', FR: "Réserve d'entretien (par voyage)", FA: 'ذخیره تعمیر و نگهداری (هر سفر)' },
-        items: [
           { name: { EN: 'Tire Wear / Oil Reserve', FR: "Usure des pneus / réserve d'huile", FA: 'استهلاک لاستیک و ذخیره روغن' }, price: 80 },
         ],
       },
@@ -329,15 +311,10 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
     // "Per unit" here = one renovation job (e.g. a bathroom reno).
     recipeCategories: [
       {
-        name: { EN: 'Materials Per Job', FR: 'Matériaux par contrat', FA: 'مصالح هر پروژه' },
+        name: { EN: 'Materials & Labour Per Job', FR: "Matériaux et main-d'œuvre par contrat", FA: 'مصالح و نیروی کار هر پروژه' },
         items: [
           { name: { EN: 'Lumber / Drywall / Framing', FR: 'Bois / Placoplâtre / Charpente', FA: 'چوب، گچ‌بری و اسکلت‌بندی' }, price: 800 },
           { name: { EN: 'Fixtures & Finishing Materials', FR: 'Accessoires et matériaux de finition', FA: 'شیرآلات و مصالح نازک‌کاری' }, price: 600 },
-        ],
-      },
-      {
-        name: { EN: 'Labour Per Job', FR: "Main-d'œuvre par contrat", FA: 'نیروی کار هر پروژه' },
-        items: [
           { name: { EN: 'Subcontractor (electrician/plumber)', FR: 'Sous-traitant (électricien/plombier)', FA: 'پیمانکار فرعی (برق‌کار/لوله‌کش)' }, price: 1200 },
         ],
       },
@@ -486,7 +463,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'it_consulting',
-    overheadPctOfDirectCost: 10, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 50, // suggested overhead as % of direct costs — folds in allocated internet/equipment cost
     defaultPricingBasis: 'hour',
     icon: '🖥️',
     name: { EN: 'IT / Software Consulting', FR: 'Consultation informatique/logicielle', FA: 'مشاوره IT / نرم‌افزار' },
@@ -507,12 +484,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Overhead Per Hour', FR: 'Frais généraux par heure', FA: 'سربار به ازای هر ساعت' },
-        items: [
-          { name: { EN: 'Internet & Equipment (allocated)', FR: 'Internet et équipement (alloué)', FA: 'سهم اینترنت و تجهیزات' }, price: 1.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
         items: [],
       },
@@ -520,7 +491,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'photography',
-    overheadPctOfDirectCost: 12, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 68, // suggested overhead as % of direct costs — folds in allocated editing-software cost
     defaultPricingBasis: 'project',
     icon: '📷',
     name: { EN: 'Photography / Videography', FR: 'Photographie / Vidéographie', FA: 'عکاسی / فیلم‌برداری' },
@@ -538,12 +509,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         items: [
           { name: { EN: 'Camera / Lens Depreciation', FR: "Amortissement caméra / objectif", FA: 'استهلاک دوربین و لنز' }, price: 15.0 },
           { name: { EN: 'Memory Cards / Backup Storage', FR: 'Cartes mémoire / stockage de sauvegarde', FA: 'کارت حافظه و بک‌آپ' }, price: 3.0 },
-        ],
-      },
-      {
-        name: { EN: 'Post-Production Per Shoot', FR: 'Post-production par séance', FA: 'ویرایش پس از جلسه' },
-        items: [
-          { name: { EN: 'Editing Software (allocated)', FR: 'Logiciel de montage (alloué)', FA: 'سهم نرم‌افزار ویرایش' }, price: 10.0 },
         ],
       },
       {
@@ -589,7 +554,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'landscaping',
-    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 30, // suggested overhead as % of direct costs — folds in blade sharpening/trimmer-line wear (equipment depreciation)
     defaultPricingBasis: 'area',
     icon: '🌿',
     name: { EN: 'Landscaping / Lawn Care', FR: 'Aménagement paysager', FA: 'باغبانی / نگهداری چمن' },
@@ -611,12 +576,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Equipment Wear Per Job', FR: "Usure de l'équipement par contrat", FA: 'استهلاک تجهیزات هر کار' },
-        items: [
-          { name: { EN: 'Blade Sharpening / Line Trimmer String', FR: 'Affûtage des lames / fil de coupe-bordures', FA: 'تیزکردن تیغه و نخ تریمر' }, price: 2.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
         items: [],
       },
@@ -624,7 +583,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'handyman',
-    overheadPctOfDirectCost: 12, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 28, // suggested overhead as % of direct costs — folds in power-tool depreciation
     defaultPricingBasis: 'project',
     icon: '🛠️',
     name: { EN: 'Handyman / Repair Services', FR: 'Bricoleur / Services de réparation', FA: 'تعمیرکار / خدمات فنی' },
@@ -642,12 +601,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         items: [
           { name: { EN: 'Replacement Parts / Hardware', FR: 'Pièces de rechange / quincaillerie', FA: 'قطعات یدکی و لوازم' }, price: 40.0 },
           { name: { EN: 'Fasteners, Sealant, Small Materials', FR: 'Fixations, scellant, petits matériaux', FA: 'پیچ و مهره، درزگیر و مواد جزئی' }, price: 10.0 },
-        ],
-      },
-      {
-        name: { EN: 'Tool Wear Per Job', FR: 'Usure des outils par contrat', FA: 'استهلاک ابزار هر کار' },
-        items: [
-          { name: { EN: 'Power Tool Depreciation', FR: 'Amortissement des outils électriques', FA: 'استهلاک ابزار برقی' }, price: 8.0 },
         ],
       },
       {
@@ -736,7 +689,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   },
   {
     id: 'private_tutor',
-    overheadPctOfDirectCost: 10, // suggested overhead as % of direct costs
+    overheadPctOfDirectCost: 90, // suggested overhead as % of direct costs — folds in allocated video-platform subscription
     defaultPricingBasis: 'hour',
     icon: '📚',
     name: { EN: 'Private Tutor / Language & Music Teacher', FR: 'Tuteur privé / Professeur de langue et musique', FA: 'معلم خصوصی / تدریس زبان و موسیقی' },
@@ -753,12 +706,6 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         name: { EN: 'Materials Per Lesson', FR: 'Matériel par leçon', FA: 'منابع هر جلسه' },
         items: [
           { name: { EN: 'Worksheets / Printed Materials', FR: "Fiches d'exercices / matériel imprimé", FA: 'برگه تمرین و منابع چاپی' }, price: 1.0 },
-        ],
-      },
-      {
-        name: { EN: 'Platform Cost Per Hour', FR: 'Coût de la plateforme par heure', FA: 'هزینه پلتفرم به ازای هر ساعت' },
-        items: [
-          { name: { EN: 'Video Platform Subscription (allocated)', FR: 'Abonnement plateforme vidéo (alloué)', FA: 'سهم اشتراک پلتفرم ویدیویی' }, price: 0.8 },
         ],
       },
       {
