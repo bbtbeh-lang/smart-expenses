@@ -137,9 +137,6 @@ const LABELS = {
     modeItems: 'Item by item',
     itemName: 'Item name',
     itemPrice: 'Price',
-    itemPricePercent: 'Percent (e.g. 2.5)',
-    kindFlat: 'Flat dollar amount',
-    kindPercent: 'Percent of selling price',
     selectItem: 'Select an item...',
     otherItem: 'Other (type your own)',
     addItem: 'Add item',
@@ -218,9 +215,6 @@ const LABELS = {
     modeItems: 'مورد به مورد',
     itemName: 'نام مورد',
     itemPrice: 'قیمت',
-    itemPricePercent: 'درصد (مثلاً ۲.۵)',
-    kindFlat: 'مبلغ ثابت',
-    kindPercent: 'درصدی از قیمت فروش',
     selectItem: 'یک مورد را انتخاب کنید...',
     otherItem: 'سایر (وارد کردن دستی)',
     addItem: '+ افزودن مورد',
@@ -591,31 +585,13 @@ function CostCategoryEditor({
                   />
                 )}
                 <div className="flex items-center gap-2">
-                  <div className="flex bg-slate-100 rounded-lg p-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                    <button
-                      type="button"
-                      title={labels.kindFlat}
-                      onClick={() => updateItem(it.id, { kind: 'flat' })}
-                      className={`w-6 py-1.5 rounded-md text-[11px] font-bold transition-all ${(it.kind ?? 'flat') === 'flat' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
-                    >
-                      $
-                    </button>
-                    <button
-                      type="button"
-                      title={labels.kindPercent}
-                      onClick={() => updateItem(it.id, { kind: 'percent' })}
-                      className={`w-6 py-1.5 rounded-md text-[11px] font-bold transition-all ${it.kind === 'percent' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400'}`}
-                    >
-                      %
-                    </button>
-                  </div>
                   <input
                     type="number"
                     min="0"
-                    step={it.kind === 'percent' ? '0.1' : '0.01'}
+                    step="0.01"
                     value={it.price}
                     onChange={e => updateItem(it.id, { price: e.target.value })}
-                    placeholder={it.kind === 'percent' ? labels.itemPricePercent : labels.itemPrice}
+                    placeholder={labels.itemPrice}
                     className={`${inputClass} flex-1`}
                     dir="ltr"
                   />
@@ -744,10 +720,9 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setLastTemplateSnapshot(null);
   };
 
-  // Manual shortcut: add a generic hidden/overhead-costs category
-  // (depreciation, energy, internet...) regardless of whether a template
-  // was used. Skips adding a duplicate if a hidden-cost category is
-  // already present.
+  // Manual shortcut: add a generic overhead-% category for when the
+  // person is pricing without a business template. Skips adding a
+  // duplicate if a hidden-cost category is already present.
   const addHiddenCostsSuggestion = () => {
     if (categories.some(c => c.group === 'hidden')) return;
     const cat = hiddenCostsCategory();
