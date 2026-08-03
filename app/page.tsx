@@ -597,7 +597,6 @@ export default function Home() {
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
                 onQuickScan={handleQuickScanClick}
-                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, hasManualAccess: false, hasScanAccess: false, scansUsedToday: 0, tier: 'free' }))}
               />
             )}
             {activeTab === 'transactions' && (

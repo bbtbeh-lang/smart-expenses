@@ -365,8 +365,8 @@ const CONTENT: Record<GLang, Section[]> = {
 };
 
 const UI = {
-  EN: { title: 'FinSnap', subtitle: 'User Guide', jump: 'Jump to a section' },
-  FA: { title: 'فاین‌اسنپ', subtitle: 'راهنمای کاربر', jump: 'برو به یه بخش' },
+  EN: { title: 'FinSnap', subtitle: 'User Guide', jump: 'Jump to a section', back: 'Back to FinSnap' },
+  FA: { title: 'فاین‌اسنپ', subtitle: 'راهنمای کاربر', jump: 'برو به یه بخش', back: 'برگشت به فاین‌اسنپ' },
 };
 
 function GuideContent() {
@@ -385,6 +385,17 @@ function GuideContent() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <div className="bg-slate-900">
+        <div className="max-w-2xl mx-auto px-4 py-2" dir={isRtl ? 'rtl' : 'ltr'}>
+          <a
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white"
+          >
+            <ChevronRight className={`w-3.5 h-3.5 ${isRtl ? '' : 'rotate-180'}`} />
+            {ui.back}
+          </a>
+        </div>
+      </div>
       <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between gap-2" dir="ltr">
           <div className="flex items-center gap-2 shrink-0">
@@ -492,7 +503,7 @@ function GuideContent() {
 
         <p className={`text-[11px] text-slate-400 flex items-center gap-1 ${isRtl ? 'justify-end flex-row-reverse' : ''}`}>
           <ChevronRight className={`w-3 h-3 ${isRtl ? 'rotate-180' : ''}`} />
-          {lang === 'FA' ? 'برای برگشت به برنامه، این تب رو ببند.' : 'Close this tab to go back to the app.'}
+          {lang === 'FA' ? 'برای برگشت به برنامه، از دکمه‌ی بالای صفحه استفاده کن.' : 'Use the back link at the top of the page to return to the app.'}
         </p>
       </div>
     </div>

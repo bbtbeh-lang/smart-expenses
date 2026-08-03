@@ -256,8 +256,6 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
               <a
                 key={label}
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors"
               >
                 <span className="text-sm font-medium text-slate-700">{label}</span>

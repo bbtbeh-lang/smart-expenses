@@ -20,7 +20,6 @@ interface DashboardProps {
   onOpenPlanManager: () => void;
   onOpenBudget: () => void;
   onQuickScan: () => void;
-  onDemoReset: () => void;
 }
 
 const EXPENSE_CATS_PERSONAL = [
@@ -71,7 +70,7 @@ function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
 }
 
 export default function Dashboard({
-  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onOpenPlanManager, onOpenBudget, onQuickScan, onDemoReset,
+  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onOpenPlanManager, onOpenBudget, onQuickScan,
 }: DashboardProps) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -544,16 +543,6 @@ export default function Dashboard({
         >
           <Crown className="w-4 h-4" />
           {state.tier === 'premium' ? `${tr.tier}: ${tr.premium}` : tr.upgradeToPremium}
-        </button>
-      </div>
-
-      <div className="pt-4 flex justify-center">
-        <button
-          onClick={onDemoReset}
-          className="text-xs text-slate-400 border border-dashed border-slate-300 rounded-full px-4 py-1.5 hover:text-rose-500 hover:border-rose-300 transition-colors"
-          dir="rtl"
-        >
-          ریست دمو
         </button>
       </div>
     </div>
