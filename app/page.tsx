@@ -636,7 +636,7 @@ export default function Home() {
       </main>
 
       {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} lang={state.lang} />
+        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} />
       )}
 
       {/* Quick Scan fast-path: always-available shortcut so someone who

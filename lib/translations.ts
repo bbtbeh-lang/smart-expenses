@@ -156,6 +156,8 @@ export const t = {
     // Navigation
     navDashboard: 'Dashboard',
     navTransactions: 'Transactions',
+    navReports: 'Reports',
+    navPricing: 'Profit Calculator',
     navSettings: 'Settings',
     // Transactions tab
     searchTransactions: 'Search transactions...',
@@ -389,6 +391,8 @@ export const t = {
     renewalBannerCta: 'Gérer le plan',
     navDashboard: 'Tableau de bord',
     navTransactions: 'Transactions',
+    navReports: 'Rapports',
+    navPricing: 'Calculateur de profit',
     navSettings: 'Paramètres',
     searchTransactions: 'Rechercher...',
     filterAll: 'Tout',
@@ -618,6 +622,8 @@ export const t = {
     renewalBannerCta: 'مدیریت پلن',
     navDashboard: 'داشبورد',
     navTransactions: 'تراکنش‌ها',
+    navReports: 'گزارش‌ها',
+    navPricing: 'محاسبه‌گر سود',
     navSettings: 'تنظیمات',
     searchTransactions: 'جستجوی تراکنش‌ها...',
     filterAll: 'همه',
