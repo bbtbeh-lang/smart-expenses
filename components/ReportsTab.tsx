@@ -158,11 +158,14 @@ export default function ReportsTab({ transactions, lang, tr }: ReportsTabProps) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthFiltered]);
 
-  // Filter by selected view (income / expense / all) and category
+  // Filter by selected view (income / expense / all) and category, sorted
+  // newest-first (same convention as the Transactions tab) — previously
+  // this just used whatever order the transactions arrived in, which
+  // wasn't necessarily chronological.
   const filtered = useMemo(() => {
     let list = view === 'all' ? monthFiltered : monthFiltered.filter(t => t.type === view);
     if (categoryFilter !== 'all') list = list.filter(t => t.category === categoryFilter);
-    return list;
+    return [...list].sort((a, b) => b.date.localeCompare(a.date));
   }, [monthFiltered, view, categoryFilter]);
 
   // Calculate totals (always computed on the month-filtered set so the summary cards stay consistent)
@@ -192,7 +195,7 @@ export default function ReportsTab({ transactions, lang, tr }: ReportsTabProps) 
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return transactions.filter(t => t.description.toLowerCase().includes(q));
+    return transactions.filter(t => t.description.toLowerCase().includes(q)).sort((a, b) => b.date.localeCompare(a.date));
   }, [transactions, search]);
 
   const searchSpent = searchResults.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
