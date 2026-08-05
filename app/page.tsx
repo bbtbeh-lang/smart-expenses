@@ -611,6 +611,7 @@ export default function Home() {
               <ReportsTab
                 transactions={filteredTransactions}
                 lang={state.lang}
+                tr={tr}
               />
             )}
             {activeTab === 'pricing' && (
