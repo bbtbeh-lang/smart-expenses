@@ -107,11 +107,16 @@ export async function POST(req: Request) {
           },
           {
             type: 'text',
-            text: `You are an expert receipt/invoice scanner. Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency.
+            text: `You are an expert receipt/invoice scanner. Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency. For reference, today's date is ${new Date().toISOString().slice(0, 10)} (YYYY-MM-DD) — receipts are essentially never dated in the future or more than a couple of years in the past, so use that as a sanity check.
 
 Extract:
 1. merchant: store/restaurant/business name
-2. date: date in YYYY-MM-DD format
+2. date: the transaction date printed on the receipt, converted to YYYY-MM-DD.
+   - Numeric dates on Canadian receipts are ambiguous between MM/DD/YYYY and DD/MM/YYYY. Use context to decide: if one of the two numbers is >12 it must be the day; a French-language receipt (TPS/TVQ, Québec) is more likely DD/MM; an English receipt is more likely MM/DD. If genuinely ambiguous, prefer MM/DD/YYYY (the North American default).
+   - If the date is written in the Persian/Jalali (Solar Hijri) calendar (e.g. "۱۴۰۴/۵/۱۴" or "14 مرداد 1404"), convert it to the Gregorian calendar for the output.
+   - If a 2-digit year is printed (e.g. "26" or "٢٦"), expand it to the correct 4-digit year (e.g. 2026), never a different century.
+   - Read each digit carefully — a smudged or low-contrast digit misread as a different one is the most common source of an impossible date (e.g. a wrong century or a future date).
+   - If the date is missing, illegible, or you cannot resolve the ambiguity with reasonable confidence, return "" rather than guessing — do not output a date you are not fairly confident in.
 3. items: EVERY line item with name and price (number only)
 4. amount: final TOTAL (number only, no currency symbol)
 5. tax: the sales tax amount shown on the receipt (e.g. a line labeled "GST", "HST", "QST", "TPS", "TVQ", or "Tax"). Sum multiple tax lines if there are several. Use "" if no tax line is shown.
@@ -134,12 +139,31 @@ Return ONLY valid JSON, no markdown:
       ? (itemNames.length > 0 ? `${parsed.merchant} — ${itemNames.join(', ')}` : parsed.merchant)
       : itemNames.join(', ');
 
+    // Defense in depth: even with explicit prompt guidance, the model can
+    // still misread a digit. A receipt dated more than 2 years ago or more
+    // than a day in the future (allowing for timezones) is almost always a
+    // misread rather than a real transaction — better to drop it and let
+    // the form fall back to today's date (which the person can fix) than
+    // silently record a wrong one.
+    let safeDate = '';
+    if (parsed.date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date)) {
+      const d = new Date(parsed.date + 'T00:00:00Z');
+      const now = new Date();
+      const twoYearsAgo = new Date(now);
+      twoYearsAgo.setFullYear(now.getFullYear() - 2);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      if (!isNaN(d.getTime()) && d >= twoYearsAgo && d <= tomorrow) {
+        safeDate = parsed.date;
+      }
+    }
+
     const duplicateInfo = await duplicateCheckPromise;
 
     return Response.json({
       amount: parsed.amount || '',
       description,
-      date: parsed.date || '',
+      date: safeDate,
       merchant: parsed.merchant || '',
       tax: parsed.tax || '',
       // Best-effort suggestion only — the user can always change it. Falls

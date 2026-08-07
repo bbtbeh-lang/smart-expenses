@@ -248,6 +248,7 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
         <div className="divide-y divide-slate-50">
           {[
             { label: tr.settingsVersion, value: 'v1.0.0', href: null },
+            { label: tr.settingsGuide, value: '→', href: `/guide?lang=${state.lang === 'FA' ? 'FA' : 'EN'}` },
             { label: tr.settingsPrivacy, value: '→', href: '/privacy' },
             { label: tr.settingsTerms, value: '→', href: '/terms' },
           ].map(({ label, value, href }) => (
@@ -255,8 +256,6 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
               <a
                 key={label}
                 href={href}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors"
               >
                 <span className="text-sm font-medium text-slate-700">{label}</span>

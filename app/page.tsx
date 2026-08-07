@@ -51,6 +51,7 @@ function freshState(lang: Lang = 'EN'): AppState {
     totalExpenses: 0,
     budgets: {},
     customCategories: {},
+    customIncomeCategories: {},
     budgetDueDates: {},
     budgetReminders: {},
   };
@@ -596,7 +597,6 @@ export default function Home() {
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
                 onQuickScan={handleQuickScanClick}
-                onDemoReset={() => setState(prev => ({ ...prev, codeActivated: false, hasManualAccess: false, hasScanAccess: false, scansUsedToday: 0, tier: 'free' }))}
               />
             )}
             {activeTab === 'transactions' && (
@@ -611,6 +611,7 @@ export default function Home() {
               <ReportsTab
                 transactions={filteredTransactions}
                 lang={state.lang}
+                tr={tr}
               />
             )}
             {activeTab === 'pricing' && (
@@ -636,7 +637,7 @@ export default function Home() {
       </main>
 
       {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} lang={state.lang} />
+        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} />
       )}
 
       {/* Quick Scan fast-path: always-available shortcut so someone who

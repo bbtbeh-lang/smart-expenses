@@ -1,6 +1,14 @@
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
+      <div className="max-w-2xl mx-auto mb-4">
+        <a
+          href="/"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700"
+        >
+          ← Back to FinSnap
+        </a>
+      </div>
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 p-8 prose prose-slate prose-sm">
         <h1 className="text-2xl font-bold text-slate-900 mb-1">FinSnap Terms of Service</h1>
         <p className="text-slate-400 text-xs mb-8">Last updated: July 2026</p>

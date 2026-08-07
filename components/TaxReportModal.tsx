@@ -18,10 +18,18 @@ interface TaxReportModalProps {
 
 type Tab = 'summary' | 'ledger' | 'tax';
 
-export default function TaxReportModal({ tr, tier, lang, transactions, onClose, onOpenUpgrade }: TaxReportModalProps) {
+export default function TaxReportModal({ tr, tier, lang, transactions: allTransactions, onClose, onOpenUpgrade }: TaxReportModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
+
+  const currentYear = new Date().getFullYear();
+  // Transactions store dates as plain 'YYYY-MM-DD' strings (see
+  // todayLocalDate in lib/utils.ts) specifically to avoid the
+  // new Date("2026-07-27") UTC-midnight parsing bug — so we compare
+  // the year as a string slice here too, instead of re-parsing with
+  // `new Date(t.date)`, to stay consistent with that fix.
+  const transactions = allTransactions.filter(t => t.date.slice(0, 4) === String(currentYear));
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -63,43 +71,75 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
     }
   };
 
+  // Accountant-style monthly report: one block per month, numbered rows,
+  // pre-tax / tax / total split out explicitly, and a subtotal row per
+  // month plus a grand total at the end — the format she hands to her
+  // bookkeeper, not just a flat transaction dump. Pre-tax amount is
+  // derived as amount − taxAmount, since `amount` is stored as the
+  // receipt's final total (see the OCR prompt) and `taxAmount` is the
+  // tax portion within it, not an addition on top.
   const handleDownloadExcel = () => {
     const rows: string[][] = [];
-    
-    // Header
-    rows.push(['Date', 'Type', 'Merchant/Description', 'Category', 'Item', 'Item Price', 'Total Amount']);
-    
-    transactions.slice().reverse().forEach(tx => {
-      if (tx.items && tx.items.length > 0) {
-        tx.items.forEach((item, i) => {
-          rows.push([
-            i === 0 ? tx.date : '',
-            i === 0 ? tx.type : '',
-            i === 0 ? tx.description : '',
-            i === 0 ? tx.category : '',
-            item.name,
-            String(item.price),
-            i === 0 ? String(tx.amount) : '',
-          ]);
-        });
-      } else {
-        rows.push([tx.date, tx.type, tx.description, tx.category, '', '', String(tx.amount)]);
-      }
+    const monthNames = lang === 'FA'
+      ? ['ژانویه', 'فوریه', 'مارس', 'آوریل', 'مه', 'ژوئن', 'ژوئیه', 'اوت', 'سپتامبر', 'اکتبر', 'نوامبر', 'دسامبر']
+      : ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const expenseTx = transactions.filter(t => t.type === 'expense').slice().sort((a, b) => a.date.localeCompare(b.date));
+
+    const byMonth = new Map<string, Transaction[]>();
+    expenseTx.forEach(t => {
+      const key = t.date.slice(0, 7); // YYYY-MM
+      if (!byMonth.has(key)) byMonth.set(key, []);
+      byMonth.get(key)!.push(t);
     });
+
+    let grandPretax = 0, grandTax = 0, grandTotal = 0;
+
+    Array.from(byMonth.keys()).sort().forEach(monthKey => {
+      const monthTx = byMonth.get(monthKey)!;
+      const monthLabel = monthNames[parseInt(monthKey.slice(5, 7), 10) - 1];
+
+      rows.push([`Month ${monthLabel}`]);
+      rows.push(['#', 'Description', 'Date', 'Store', 'Amount', 'Tax', 'Total', 'Document']);
+
+      let mPretax = 0, mTax = 0, mTotal = 0;
+      monthTx.forEach((tx, i) => {
+        const tax = tx.taxAmount || 0;
+        const pretax = tx.amount - tax;
+        mPretax += pretax; mTax += tax; mTotal += tx.amount;
+        const [y, mo, d] = tx.date.split('-');
+        rows.push([
+          String(i + 1),
+          tx.description,
+          `${d}/${mo}/${y}`,
+          tx.merchant || '',
+          pretax.toFixed(2),
+          tax.toFixed(2),
+          tx.amount.toFixed(2),
+          tx.receiptHash ? 'Yes' : '',
+        ]);
+      });
+
+      rows.push(['', '', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), mTotal.toFixed(2)]);
+      rows.push([]);
+      grandPretax += mPretax; grandTax += mTax; grandTotal += mTotal;
+    });
+
+    rows.push(['', '', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), grandTotal.toFixed(2)]);
 
     // Summary rows
     rows.push([]);
-    rows.push(['SUMMARY', '', '', '', '', '', '']);
-    rows.push(['Total Income', '', '', '', '', '', String(totalIncome)]);
-    rows.push(['Total Expenses', '', '', '', '', '', String(totalExpenses)]);
-    rows.push(['Net Profit', '', '', '', '', '', String(netProfit)]);
+    rows.push(['SUMMARY', '', '', '', '', '', '', '']);
+    rows.push(['Total Income', '', '', '', '', '', '', String(totalIncome)]);
+    rows.push(['Total Expenses', '', '', '', '', '', '', String(totalExpenses)]);
+    rows.push(['Net Profit', '', '', '', '', '', '', String(netProfit)]);
 
     if (categoryBreakdown.length > 0) {
       rows.push([]);
-      rows.push(['TAX BY CATEGORY', '', '', '', '', '', '']);
-      rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '']);
+      rows.push(['TAX BY CATEGORY', '', '', '', '', '', '', '']);
+      rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '', '']);
       categoryBreakdown.forEach(([cat, sums]) => {
-        rows.push([cat, String(sums.amount), String(sums.tax), '', '', '', '']);
+        rows.push([cat, String(sums.amount), String(sums.tax), '', '', '', '', '']);
       });
     }
 
@@ -109,7 +149,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'finsnap-report.csv';
+    a.download = 'finsnap-tax-report.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -192,7 +232,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions, onClose, 
           {activeTab === 'summary' && (
             <div className="space-y-3">
               <div className="bg-slate-50 rounded-2xl p-4">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {new Date().getFullYear()}</div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {currentYear}</div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-600">{tr.totalIncome}</span>

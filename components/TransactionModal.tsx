@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2, Lock } from 'lucide-react';
 import { Translations } from '@/lib/translations';
-import { TransactionType, AccountType, Tier, Transaction, ReceiptItem } from '@/lib/types';
+import { TransactionType, AccountType, Tier, Transaction, ReceiptItem, INCOME_OCR_CATEGORIES } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { getOrCreateCategoryKey, todayLocalDate } from '@/lib/utils';
 
@@ -44,13 +44,10 @@ const EXPENSE_CATEGORIES_BUSINESS = [
   'catBusinessMaterials', 'catOffice', 'catMarketing', 'catSoftware',
   'catTravel', 'catRestaurant', 'catTransport', 'catUtilities', 'catOther',
 ];
-const INCOME_CATEGORIES = ['catSalary', 'catFreelance', 'catInvestments', 'catRental', 'catOtherIncome'];
 
 function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
-
-
 
 export default function TransactionModal({
   tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
@@ -88,14 +85,17 @@ export default function TransactionModal({
   const [taxAmount, setTaxAmount] = useState<number | undefined>(editTransaction?.taxAmount);
   const [receiptHash, setReceiptHash] = useState<string | null>(null);
   const [receiptImageBase64, setReceiptImageBase64] = useState<string | null>(null);
+  const [invoiceHash, setInvoiceHash] = useState<string | null>(null);
+  const [invoiceImageBase64, setInvoiceImageBase64] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
   const scanExhausted = scansLeft <= 0;
   const expenseCats = txAccountType === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
   const customExpenseCatKeys = Object.keys(customCategories);
-  const cats = txType === 'income' ? INCOME_CATEGORIES : [...expenseCats, ...customExpenseCatKeys];
+  const cats = txType === 'income' ? [...INCOME_OCR_CATEGORIES] : [...expenseCats, ...customExpenseCatKeys];
 
   const handleConfirmNewCategory = () => {
     const label = newCatLabel.trim();
@@ -109,7 +109,7 @@ export default function TransactionModal({
 
   const handleTypeSelect = (type: TransactionType) => {
     setTxType(type);
-    setCategory(type === 'income' ? 'catSalary' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries'));
+    setCategory(type === 'income' ? 'catSalesRevenue' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries'));
     setStep('receipt');
   };
 
@@ -118,11 +118,6 @@ export default function TransactionModal({
       onScanBlocked();
       return;
     }
-    // The actual, authoritative check-and-consume now happens atomically
-    // inside /api/ocr right before it spends money on the Claude API call
-    // — see runOcr's 403 handling below. This client-side check is just a
-    // fast, friendly guard to avoid an unnecessary round trip when we
-    // already know the answer.
     setStep('ocr');
   };
 
@@ -131,7 +126,6 @@ export default function TransactionModal({
     setOcrProgress(30);
     setOcrBanner(tr.ocrScanning);
     try {
-      // Resize image before sending to reduce size
       const base64 = await new Promise<string>((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
@@ -155,9 +149,22 @@ export default function TransactionModal({
         img.src = url;
       });
       setOcrProgress(60);
-      setReceiptImageBase64(base64);
+
+      // ذخیره تصویر در state مناسب بسته به نوع تراکنش
+      const isIncome = txType === 'income';
+      if (isIncome) {
+        setInvoiceImageBase64(base64);
+      } else {
+        setReceiptImageBase64(base64);
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
-      const response = await fetch('/api/ocr', {
+
+      // مسیر API بر اساس نوع تراکنش انتخاب می‌شه:
+      // درآمد → /api/ocr/income  |  هزینه → /api/ocr
+      const ocrEndpoint = isIncome ? '/api/ocr/income' : '/api/ocr';
+
+      const response = await fetch(ocrEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,24 +191,37 @@ export default function TransactionModal({
       if (parsed.description) setDescription(parsed.description);
       if (parsed.date) setDate(parsed.date);
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
-      if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
-      // Pre-fill the category from the AI's guess, but only if it's one of
-      // the categories currently shown for this account type (personal vs
-      // business use different lists) — otherwise leave whatever default
-      // was already set by handleTypeSelect, and the user picks manually
-      // exactly as before.
-      if (parsed.category && expenseCats.includes(parsed.category)) {
-        setCategory(parsed.category);
-      }
       if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
-      if (parsed.duplicate?.isDuplicate) {
-        setDuplicateWarning({
-          matchedMerchant: parsed.duplicate.matchedMerchant,
-          matchedDate: parsed.duplicate.matchedDate,
-        });
+
+      if (isIncome) {
+        // پر کردن invoiceHash و پردازش داده‌های فاکتور درآمد
+        if (parsed.invoiceHash) setInvoiceHash(parsed.invoiceHash);
+        if (parsed.category && INCOME_OCR_CATEGORIES.includes(parsed.category)) {
+          setCategory(parsed.category);
+        }
+        if (parsed.duplicate?.isDuplicate) {
+          setDuplicateWarning({
+            matchedMerchant: parsed.duplicate.matchedClient ?? null,
+            matchedDate: parsed.duplicate.matchedDate ?? null,
+          });
+        } else {
+          setDuplicateWarning(null);
+        }
       } else {
-        setDuplicateWarning(null);
+        // پر کردن receiptHash و پردازش داده‌های رسید هزینه
+        if (parsed.receiptHash) setReceiptHash(parsed.receiptHash);
+        if (parsed.category && expenseCats.includes(parsed.category)) {
+          setCategory(parsed.category);
+        }
+        if (parsed.duplicate?.isDuplicate) {
+          setDuplicateWarning({
+            matchedMerchant: parsed.duplicate.matchedMerchant ?? null,
+            matchedDate: parsed.duplicate.matchedDate ?? null,
+          });
+        } else {
+          setDuplicateWarning(null);
+        }
       }
 
       setOcrStatus('done');
@@ -213,7 +233,7 @@ export default function TransactionModal({
       setOcrBanner('OCR failed — please enter details manually.');
       setTimeout(() => setStep('manual'), 1200);
     }
-  }, [tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
+  }, [txType, tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
@@ -247,22 +267,42 @@ export default function TransactionModal({
     } else {
       onSaveManual(tx);
     }
-    // Only receipts that actually went through OCR get a fingerprint —
-    // manually-entered transactions have nothing to compare against.
-    if (receiptHash) {
+    // ثبت اسکن در دیتابیس — endpoint بسته به نوع تراکنش انتخاب می‌شه
+    // تا از ثبت تکراری جلوگیری بشه
+    const isIncome = tx.type === 'income';
+    const hashToRecord = isIncome ? invoiceHash : receiptHash;
+
+    if (hashToRecord) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session?.access_token) return;
-        fetch('/api/receipts/record-scan', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({
-            receiptHash,
-            merchant: description,
-            amount: parseFloat(amount),
-            date,
-            image: receiptImageBase64,
-          }),
-        }).catch(() => { /* non-critical — a missed fingerprint just means one fewer future duplicate check */ });
+
+        if (isIncome) {
+          // فاکتور درآمدی → record-income-scan با invoiceHash و invoiceImageBase64
+          fetch('/api/receipts/record-income-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+              invoiceHash,
+              clientName: description,
+              amount: parseFloat(amount),
+              date,
+              image: invoiceImageBase64,
+            }),
+          }).catch(() => {});
+        } else {
+          // رسید هزینه → record-scan با receiptHash و receiptImageBase64
+          fetch('/api/receipts/record-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({
+              receiptHash,
+              merchant: description,
+              amount: parseFloat(amount),
+              date,
+              image: receiptImageBase64,
+            }),
+          }).catch(() => {});
+        }
       });
     }
   };
@@ -315,7 +355,6 @@ export default function TransactionModal({
             </div>
           </div>
 
-          {/* Delete confirmation */}
           {showDeleteConfirm && (
             <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-4 space-y-3">
               <p className="text-sm font-semibold text-rose-800">{tr.confirmDelete}</p>
@@ -336,7 +375,6 @@ export default function TransactionModal({
             </div>
           )}
 
-          {/* Step: type */}
           {step === 'type' && (
             <div className="space-y-3">
               <p className="text-sm text-slate-500 mb-4">Select the transaction type:</p>
@@ -369,7 +407,6 @@ export default function TransactionModal({
             </div>
           )}
 
-          {/* Step: receipt */}
           {step === 'receipt' && (
             <div className="space-y-3">
               <div className="mb-4">
@@ -379,9 +416,6 @@ export default function TransactionModal({
               </div>
               <p className="text-base font-semibold text-slate-800">{tr.receiptQuestion}</p>
 
-              {/* Scan/OCR: exclusively for active paid plans — never shown as a
-                  usable option for free users or daily-code users, per the
-                  rule that OCR must stay exclusive to purchased plans. */}
               {hasScanAccess ? (
                 <button
                   onClick={handleReceiptYes}
@@ -415,8 +449,6 @@ export default function TransactionModal({
                 </button>
               )}
 
-              {/* Manual entry: available to plan holders AND today's daily-code
-                  redeemers — but not to a fully free/locked user. */}
               {hasManualAccess ? (
                 <button
                   onClick={() => setStep('manual')}
@@ -440,7 +472,6 @@ export default function TransactionModal({
             </div>
           )}
 
-          {/* Step: OCR scanner */}
           {step === 'ocr' && (
             <div className="space-y-4">
               <div className={`relative border-2 border-dashed rounded-2xl transition-all duration-200 ${dragging ? 'border-teal-400 bg-teal-50' : 'border-slate-300 hover:border-teal-300 hover:bg-slate-50'}`}
@@ -448,6 +479,20 @@ export default function TransactionModal({
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
               >
+                {/* Two separate hidden inputs instead of one ambiguous
+                    accept="image/*" input — that used to make mobile
+                    browsers pop up their own "Take Photo / Photo Library /
+                    Choose File" menu on every tap, an extra step before the
+                    real camera/gallery even opened. Each button below now
+                    goes straight to the right one. */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -495,13 +540,22 @@ export default function TransactionModal({
               </div>
 
               {ocrStatus === 'idle' && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-teal-200 hover:shadow-teal-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <ScanLine className="w-4 h-4" />
-                  {tr.scanReceipt}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-teal-200 hover:shadow-teal-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                    {tr.scanReceipt}
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2.5 bg-white border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {tr.chooseFromLibrary}
+                  </button>
+                </div>
               )}
 
               <button
@@ -513,7 +567,6 @@ export default function TransactionModal({
             </div>
           )}
 
-          {/* Step: manual entry */}
           {step === 'manual' && (
             <div className="space-y-4">
               <div>
@@ -525,7 +578,6 @@ export default function TransactionModal({
                       type="button"
                       onClick={() => {
                         setTxAccountType(opt);
-                        // Keep the category sane if it doesn't exist in the new bucket's list.
                         if (txType === 'expense') {
                           const nextCats = opt === 'business' ? EXPENSE_CATEGORIES_BUSINESS : EXPENSE_CATEGORIES_PERSONAL;
                           if (!nextCats.includes(category) && !customExpenseCatKeys.includes(category)) {
@@ -574,7 +626,7 @@ export default function TransactionModal({
                       key={t}
                       onClick={() => {
                         setTxType(t);
-                        const defaultCat = t === 'income' ? 'catSalary' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
+                        const defaultCat = t === 'income' ? 'catSalesRevenue' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
                         if (!cats.includes(category)) setCategory(defaultCat);
                       }}
                       className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${txType === t ? (t === 'income' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
@@ -584,7 +636,6 @@ export default function TransactionModal({
                   ))}
                 </div>
               )}
-
 
               {receiptItems.length > 0 && (
                 <div className="bg-slate-50 rounded-xl p-3">

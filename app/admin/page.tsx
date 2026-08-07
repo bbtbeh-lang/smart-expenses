@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { PLANS, PlanId } from '@/lib/plans';
-import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink, Users, TrendingUp } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink, Users, TrendingUp, Gift } from 'lucide-react';
 
 interface CodeStatus {
   code: string | null;
@@ -23,6 +23,7 @@ interface Customer {
   scansUsed: number;
   currentPeriodEnd: string | null;
   stripeCustomerId: string | null;
+  grantedByAdmin: boolean;
 }
 
 const PLAN_BADGE_STYLE: Record<Customer['plan'], string> = {
@@ -50,6 +51,12 @@ export default function AdminPage() {
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState('');
   const [customerFilter, setCustomerFilter] = useState<'all' | 'paying'>('all');
+  const [grantEmail, setGrantEmail] = useState('');
+  const [grantPlan, setGrantPlan] = useState<'basic' | 'pro' | 'business'>('business');
+  const [grantDuration, setGrantDuration] = useState<'1_month' | '3_months' | '1_year' | 'lifetime'>('1_month');
+  const [grantLoading, setGrantLoading] = useState(false);
+  const [grantMessage, setGrantMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [revokingEmail, setRevokingEmail] = useState<string | null>(null);
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -125,6 +132,69 @@ export default function AdminPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleGrant = async () => {
+    if (!grantEmail.trim()) return;
+    setGrantLoading(true);
+    setGrantMessage(null);
+    try {
+      const token = await getToken();
+      if (!token) { setForbidden(true); return; }
+      const res = await fetch('/api/admin/grant-access', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: grantEmail.trim(), plan: grantPlan, duration: grantDuration }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setGrantMessage({ text: data.error || 'Failed to grant access', ok: false });
+        return;
+      }
+      setGrantMessage({ text: `Granted ${grantPlan} access to ${data.email}.`, ok: true });
+      setGrantEmail('');
+      loadCustomers();
+    } catch {
+      setGrantMessage({ text: 'Failed to grant access', ok: false });
+    } finally {
+      setGrantLoading(false);
+    }
+  };
+
+  const handleRevoke = async (email: string) => {
+    setRevokingEmail(email);
+    try {
+      const token = await getToken();
+      if (!token) { setForbidden(true); return; }
+      const res = await fetch('/api/admin/grant-access', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) loadCustomers();
+    } finally {
+      setRevokingEmail(null);
+    }
+  };
+
+  // Monthly-equivalent revenue per active paid subscriber — yearly plans
+  // are annualized (yearlyPriceCAD / 12), matching the fix already applied
+  // to the upgrade/downgrade comparison in /api/stripe/change-plan.
+  // NOTE: this must stay above the early `return`s below — hooks can never
+  // run conditionally, or React throws a client-side exception once the
+  // number of hooks called differs between renders.
+  const { mrr, activeSubscribers } = useMemo(() => {
+    if (!customers) return { mrr: 0, activeSubscribers: 0 };
+    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free');
+    const total = paying.reduce((sum, c) => {
+      const plan = PLANS[c.plan as PlanId];
+      if (!plan) return sum;
+      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : plan.monthlyPriceCAD);
+    }, 0);
+    return { mrr: total, activeSubscribers: paying.length };
+  }, [customers]);
+
+  const formatCAD = (n: number) =>
+    n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 });
+
   if (!authChecked) {
     return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Loading…</div>;
   }
@@ -144,23 +214,6 @@ export default function AdminPage() {
   }
 
   const usagePercent = status?.maxUses ? Math.min(100, (status.uses / status.maxUses) * 100) : 0;
-
-  // Monthly-equivalent revenue per active paid subscriber — yearly plans
-  // are annualized (yearlyPriceCAD / 12), matching the fix already applied
-  // to the upgrade/downgrade comparison in /api/stripe/change-plan.
-  const { mrr, activeSubscribers } = useMemo(() => {
-    if (!customers) return { mrr: 0, activeSubscribers: 0 };
-    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free');
-    const total = paying.reduce((sum, c) => {
-      const plan = PLANS[c.plan as PlanId];
-      if (!plan) return sum;
-      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : plan.monthlyPriceCAD);
-    }, 0);
-    return { mrr: total, activeSubscribers: paying.length };
-  }, [customers]);
-
-  const formatCAD = (n: number) =>
-    n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 });
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10">
@@ -248,6 +301,63 @@ export default function AdminPage() {
         </div>
         </div>
 
+        {/* Grant free access */}
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-6 max-w-md mx-auto">
+          <div className="flex items-center gap-2 mb-1">
+            <Gift className="w-4 h-4 text-slate-400" />
+            <h2 className="text-sm font-bold text-slate-800">Grant free access</h2>
+          </div>
+          <p className="text-xs text-slate-400 mb-4">
+            Give anyone with a FinSnap account full premium access, no payment involved — for
+            testing, partners, or comps. They must have already signed up.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 mb-3">
+            <input
+              type="email"
+              value={grantEmail}
+              onChange={e => setGrantEmail(e.target.value)}
+              placeholder="person@example.com"
+              className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              dir="ltr"
+            />
+            <select
+              value={grantPlan}
+              onChange={e => setGrantPlan(e.target.value as typeof grantPlan)}
+              className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            >
+              <option value="basic">Basic</option>
+              <option value="pro">Pro</option>
+              <option value="business">Business</option>
+            </select>
+            <select
+              value={grantDuration}
+              onChange={e => setGrantDuration(e.target.value as typeof grantDuration)}
+              className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            >
+              <option value="1_month">1 month</option>
+              <option value="3_months">3 months</option>
+              <option value="1_year">1 year</option>
+              <option value="lifetime">Lifetime</option>
+            </select>
+          </div>
+
+          {grantMessage && (
+            <div className={`text-xs rounded-xl px-3 py-2 mb-3 ${grantMessage.ok ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-rose-50 border border-rose-200 text-rose-700'}`}>
+              {grantMessage.text}
+            </div>
+          )}
+
+          <button
+            onClick={handleGrant}
+            disabled={grantLoading || !grantEmail.trim()}
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <Gift className="w-4 h-4" />
+            {grantLoading ? 'Granting…' : 'Grant access'}
+          </button>
+        </div>
+
         {/* Revenue snapshot */}
         <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-6">
           <div className="flex items-center gap-2 mb-4">
@@ -322,6 +432,7 @@ export default function AdminPage() {
                     <th className="pb-2 pr-3">Status</th>
                     <th className="pb-2 pr-3">Scans used</th>
                     <th className="pb-2 pr-3">Renews / signed up</th>
+                    <th className="pb-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -337,6 +448,11 @@ export default function AdminPage() {
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${PLAN_BADGE_STYLE[c.plan]}`}>
                             {c.plan}{c.billingPeriod ? ` · ${c.billingPeriod}` : ''}
                           </span>
+                          {c.grantedByAdmin && (
+                            <span className="ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-pink-100 text-pink-700">
+                              Comp
+                            </span>
+                          )}
                         </td>
                         <td className="py-2.5 pr-3">
                           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${STATUS_BADGE_STYLE[c.status]}`}>
@@ -348,6 +464,17 @@ export default function AdminPage() {
                           {c.currentPeriodEnd
                             ? new Date(c.currentPeriodEnd).toLocaleDateString()
                             : new Date(c.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="py-2.5">
+                          {c.grantedByAdmin && c.status === 'active' && c.email && (
+                            <button
+                              onClick={() => handleRevoke(c.email!)}
+                              disabled={revokingEmail === c.email}
+                              className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                            >
+                              {revokingEmail === c.email ? 'Revoking…' : 'Revoke'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

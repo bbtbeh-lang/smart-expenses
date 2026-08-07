@@ -45,12 +45,23 @@ export interface BusinessTemplate {
   // material costs make sense (a home baker, tailor, jeweller...); for
   // service/time-based businesses `items` alone is fine since there's no
   // single "unit" to break materials down for.
+  // Suggested overhead — indirect costs like electricity, equipment
+  // depreciation, rent share, unbillable admin time, etc. — expressed as
+  // a percentage of direct costs (COGS) rather than itemized dollar
+  // guesses. This is standard small-business practice: nobody actually
+  // meters "how much electricity did this one dish use"; they estimate
+  // overhead as a rule-of-thumb % of direct costs instead. PricingTab
+  // pre-fills the Hidden & Overhead category with this percentage so the
+  // person isn't asked to itemize things they have no practical way to
+  // measure.
+  overheadPctOfDirectCost?: number;
   recipeCategories?: RecipeCategory[];
 }
 
 export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
   {
     id: 'restaurant',
+    overheadPctOfDirectCost: 19, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '🍽️',
     name: { EN: 'Restaurant / Food Service', FR: 'Restaurant / Service alimentaire', FA: 'رستوران / خدمات غذایی' },
@@ -82,16 +93,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Kitchen Utilities (gas/electric share)', FR: "Services publics de cuisine (part)", FA: 'سهم گاز و برق آشپزخانه' }, price: 0.8 },
-          { name: { EN: 'Card Processing Fee (~2.5%)', FR: 'Frais de traitement carte (~2,5 %)', FA: 'کارمزد کارت اعتباری (حدود ۲.۵٪)' }, price: 0.5 },
-          { name: { EN: 'Food Waste / Spoilage Allowance', FR: 'Provision pour perte alimentaire', FA: 'ضایعات و دورریز غذا' }, price: 0.6 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'mobile_car_wash',
+    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '🚗',
     name: { EN: 'Mobile Car Wash / Detailing', FR: 'Lavage auto mobile / Detailing', FA: 'کارواش سیار / دیتیلینگ خودرو' },
@@ -121,16 +129,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Water (per wash)', FR: "Eau (par lavage)", FA: 'آب مصرفی (هر شستشو)' }, price: 1.0 },
-          { name: { EN: 'Fuel to Reach Client', FR: 'Carburant pour se rendre au client', FA: 'سوخت رفت‌وآمد به مشتری' }, price: 3.0 },
-          { name: { EN: 'Equipment Depreciation (pressure washer, etc.)', FR: "Amortissement de l'équipement", FA: 'استهلاک تجهیزات (واتردار و غیره)' }, price: 2.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'freelancer',
+    overheadPctOfDirectCost: 130, // suggested overhead as % of direct costs — folds in allocated internet/home-office cost, since a freelancer's real overhead routinely exceeds their tiny direct-tooling cost
     defaultPricingBasis: 'hour',
     icon: '💻',
     name: { EN: 'Freelancer / Consultant', FR: 'Pigiste / Consultant', FA: 'فریلنسر / مشاور' },
@@ -154,23 +159,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Overhead Per Hour', FR: 'Frais généraux par heure', FA: 'سربار به ازای هر ساعت' },
-        items: [
-          { name: { EN: 'Internet & Phone (allocated)', FR: 'Internet et téléphone (alloué)', FA: 'سهم اینترنت و تلفن' }, price: 1.0 },
-          { name: { EN: 'Home Office Space (allocated)', FR: "Espace de bureau à domicile (alloué)", FA: 'سهم فضای دفتر خانگی' }, price: 1.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Unbillable Admin Time (emails, invoicing)', FR: 'Temps administratif non facturable', FA: 'زمان اداری غیرقابل‌فاکتور (ایمیل، فاکتور)' }, price: 3.0 },
-          { name: { EN: 'CPP Self-Employed Contribution (~11.9%)', FR: 'Cotisation RPC travailleur autonome (~11,9 %)', FA: 'حق بیمه CPP شغل آزاد (حدود ۱۱.۹٪)' }, price: 6.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'real_estate',
+    overheadPctOfDirectCost: 10, // suggested overhead as % of direct costs
     defaultPricingBasis: 'project',
     icon: '🏠',
     name: { EN: 'Real Estate Agent', FR: 'Agent immobilier', FA: 'مشاور املاک' },
@@ -201,15 +197,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Brokerage Split (~30-50% of commission)', FR: 'Partage avec le courtage (~30-50 % de la commission)', FA: 'سهم بروکراژ (حدود ۳۰ تا ۵۰٪ کمیسیون)' }, price: 800 },
-          { name: { EN: 'Mileage / Gas for Showings', FR: 'Kilométrage / essence pour visites', FA: 'کیلومتراژ و بنزین بازدیدها' }, price: 60 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'rideshare_delivery',
+    overheadPctOfDirectCost: 33, // suggested overhead as % of direct costs
     defaultPricingBasis: 'hour',
     icon: '🚕',
     name: { EN: 'Rideshare / Delivery Driver', FR: 'Covoiturage / Livreur', FA: 'راننده اسنپ/دلیوری (Uber/Lyft/DoorDash)' },
@@ -238,15 +232,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'CPP Self-Employed Contribution (~11.9%)', FR: 'Cotisation RPC travailleur autonome (~11,9 %)', FA: 'حق بیمه CPP شغل آزاد (حدود ۱۱.۹٪)' }, price: 2.5 },
-          { name: { EN: 'Idle Time Between Rides (unpaid)', FR: 'Temps mort entre les courses (non payé)', FA: 'زمان بیکاری بین سفرها (بدون درآمد)' }, price: 3.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'cleaning_service',
+    overheadPctOfDirectCost: 55, // suggested overhead as % of direct costs — folds in vacuum/mop wear (equipment depreciation)
     defaultPricingBasis: 'hour',
     icon: '🧹',
     name: { EN: 'Cleaning Service (Residential/Commercial)', FR: 'Service de nettoyage', FA: 'خدمات نظافتی (منزل/تجاری)' },
@@ -267,22 +259,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Equipment Wear Per Job', FR: "Usure de l'équipement par contrat", FA: 'استهلاک تجهیزات هر کار' },
-        items: [
-          { name: { EN: 'Vacuum / Mop Wear', FR: 'Usure aspirateur / vadrouille', FA: 'استهلاک جاروبرقی و تی' }, price: 2.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Travel Time Between Jobs', FR: 'Temps de déplacement entre contrats', FA: 'زمان رفت‌وآمد بین کارها' }, price: 8.0 },
-          { name: { EN: 'Liability Insurance (per job share)', FR: 'Assurance responsabilité (part par contrat)', FA: 'سهم بیمه مسئولیت هر کار' }, price: 4.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'trucking',
+    overheadPctOfDirectCost: 12, // suggested overhead as % of direct costs
     defaultPricingBasis: 'project',
     icon: '🚛',
     name: { EN: 'Trucking / Owner-Operator', FR: 'Camionnage / Propriétaire-exploitant', FA: 'کامیون‌داری / راننده مستقل' },
@@ -297,29 +281,22 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
     // "Per unit" here = one long-haul trip/load.
     recipeCategories: [
       {
-        name: { EN: 'Fuel & Road Costs (per trip)', FR: 'Carburant et frais de route (par voyage)', FA: 'سوخت و هزینه‌های جاده (هر سفر)' },
+        name: { EN: 'Fuel & Vehicle Costs (per trip)', FR: 'Carburant et frais du véhicule (par voyage)', FA: 'سوخت و هزینه‌های خودرو (هر سفر)' },
         items: [
           { name: { EN: 'Diesel Fuel', FR: 'Carburant diesel', FA: 'گازوئیل' }, price: 600 },
           { name: { EN: 'Tolls / Weigh Scale Fees', FR: 'Péages / frais de pesée', FA: 'عوارض جاده و ترازوی وزن' }, price: 40 },
-        ],
-      },
-      {
-        name: { EN: 'Maintenance Reserve (per trip)', FR: "Réserve d'entretien (par voyage)", FA: 'ذخیره تعمیر و نگهداری (هر سفر)' },
-        items: [
           { name: { EN: 'Tire Wear / Oil Reserve', FR: "Usure des pneus / réserve d'huile", FA: 'استهلاک لاستیک و ذخیره روغن' }, price: 80 },
         ],
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Driver Meals / Lodging', FR: "Repas / hébergement du chauffeur", FA: 'غذا و اقامت راننده' }, price: 60 },
-          { name: { EN: 'Empty Return / Deadhead Miles', FR: 'Retour à vide', FA: 'کیلومتراژ بازگشت خالی' }, price: 100 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'construction',
+    overheadPctOfDirectCost: 12, // suggested overhead as % of direct costs
     defaultPricingBasis: 'project',
     icon: '🔨',
     name: { EN: 'Construction / Renovation Contractor', FR: 'Construction / Rénovation', FA: 'ساخت‌وساز / بازسازی' },
@@ -334,30 +311,22 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
     // "Per unit" here = one renovation job (e.g. a bathroom reno).
     recipeCategories: [
       {
-        name: { EN: 'Materials Per Job', FR: 'Matériaux par contrat', FA: 'مصالح هر پروژه' },
+        name: { EN: 'Materials & Labour Per Job', FR: "Matériaux et main-d'œuvre par contrat", FA: 'مصالح و نیروی کار هر پروژه' },
         items: [
           { name: { EN: 'Lumber / Drywall / Framing', FR: 'Bois / Placoplâtre / Charpente', FA: 'چوب، گچ‌بری و اسکلت‌بندی' }, price: 800 },
           { name: { EN: 'Fixtures & Finishing Materials', FR: 'Accessoires et matériaux de finition', FA: 'شیرآلات و مصالح نازک‌کاری' }, price: 600 },
-        ],
-      },
-      {
-        name: { EN: 'Labour Per Job', FR: "Main-d'œuvre par contrat", FA: 'نیروی کار هر پروژه' },
-        items: [
           { name: { EN: 'Subcontractor (electrician/plumber)', FR: 'Sous-traitant (électricien/plombier)', FA: 'پیمانکار فرعی (برق‌کار/لوله‌کش)' }, price: 1200 },
         ],
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Permit Fee', FR: 'Frais de permis', FA: 'هزینه مجوز شهرداری' }, price: 150 },
-          { name: { EN: 'Waste Disposal / Dumpster', FR: 'Élimination des déchets / conteneur', FA: 'دفع نخاله و کانتینر زباله' }, price: 200 },
-          { name: { EN: 'Tool Wear / Depreciation', FR: 'Usure des outils', FA: 'استهلاک ابزار' }, price: 100 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'hair_salon',
+    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '💈',
     name: { EN: 'Hair Salon / Barber', FR: 'Salon de coiffure / Barbier', FA: 'آرایشگاه / سلمانی' },
@@ -385,15 +354,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Chair Rental Share (per service)', FR: 'Part de location de chaise (par service)', FA: 'سهم اجاره صندلی (هر سرویس)' }, price: 4.0 },
-          { name: { EN: 'Sanitation Supplies', FR: 'Fournitures de désinfection', FA: 'لوازم استریل و بهداشتی' }, price: 0.8 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'nail_salon',
+    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '💅',
     name: { EN: 'Nail Salon / Esthetics', FR: 'Salon de manucure / Esthétique', FA: 'سالن ناخن / زیبایی' },
@@ -421,15 +388,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Sterilization / Sanitation', FR: 'Stérilisation / désinfection', FA: 'استریل و ضدعفونی' }, price: 1.0 },
-          { name: { EN: 'Rent Share (per service)', FR: 'Part du loyer (par service)', FA: 'سهم اجاره (هر سرویس)' }, price: 3.5 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'convenience_store',
+    overheadPctOfDirectCost: 12, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '🏪',
     name: { EN: 'Convenience Store / Retail Shop', FR: 'Dépanneur / Commerce de détail', FA: 'سوپرمارکت / مغازه خرده‌فروشی' },
@@ -457,15 +422,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Card Processing Fee (~2.5%)', FR: 'Frais de traitement carte (~2,5 %)', FA: 'کارمزد کارت اعتباری (حدود ۲.۵٪)' }, price: 0.1 },
-          { name: { EN: 'Shrinkage / Theft Allowance', FR: 'Provision pour freinte / vol', FA: 'ضایعات و کسری انبار' }, price: 0.15 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'import_export',
+    overheadPctOfDirectCost: 8, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '📦',
     name: { EN: 'Import / Export Trading', FR: 'Commerce import/export', FA: 'واردات و صادرات' },
@@ -494,15 +457,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Currency Exchange Fee', FR: 'Frais de change', FA: 'کارمزد تبدیل ارز' }, price: 0.3 },
-          { name: { EN: 'Warehousing (allocated)', FR: 'Entreposage (alloué)', FA: 'سهم انبارداری' }, price: 0.5 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'it_consulting',
+    overheadPctOfDirectCost: 50, // suggested overhead as % of direct costs — folds in allocated internet/equipment cost
     defaultPricingBasis: 'hour',
     icon: '🖥️',
     name: { EN: 'IT / Software Consulting', FR: 'Consultation informatique/logicielle', FA: 'مشاوره IT / نرم‌افزار' },
@@ -523,22 +484,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Overhead Per Hour', FR: 'Frais généraux par heure', FA: 'سربار به ازای هر ساعت' },
-        items: [
-          { name: { EN: 'Internet & Equipment (allocated)', FR: 'Internet et équipement (alloué)', FA: 'سهم اینترنت و تجهیزات' }, price: 1.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Unbillable Admin Time', FR: 'Temps administratif non facturable', FA: 'زمان اداری غیرقابل‌فاکتور' }, price: 3.0 },
-          { name: { EN: 'Professional Liability (E&O) Insurance', FR: 'Assurance responsabilité professionnelle', FA: 'بیمه مسئولیت حرفه‌ای' }, price: 2.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'photography',
+    overheadPctOfDirectCost: 68, // suggested overhead as % of direct costs — folds in allocated editing-software cost
     defaultPricingBasis: 'project',
     icon: '📷',
     name: { EN: 'Photography / Videography', FR: 'Photographie / Vidéographie', FA: 'عکاسی / فیلم‌برداری' },
@@ -559,22 +512,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Post-Production Per Shoot', FR: 'Post-production par séance', FA: 'ویرایش پس از جلسه' },
-        items: [
-          { name: { EN: 'Editing Software (allocated)', FR: 'Logiciel de montage (alloué)', FA: 'سهم نرم‌افزار ویرایش' }, price: 10.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Travel / Mileage to Venue', FR: 'Déplacement / kilométrage', FA: 'رفت‌وآمد به محل مراسم' }, price: 25.0 },
-          { name: { EN: 'Equipment Insurance (per-shoot share)', FR: 'Assurance équipement (part par séance)', FA: 'سهم بیمه تجهیزات (هر جلسه)' }, price: 8.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'childcare',
+    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
     defaultPricingBasis: 'hour',
     icon: '🧸',
     name: { EN: 'Childcare / Daycare Provider', FR: 'Garderie', FA: 'مهدکودک / نگهداری کودک' },
@@ -603,15 +548,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Liability Insurance (per child share)', FR: 'Assurance responsabilité (part par enfant)', FA: 'سهم بیمه مسئولیت (هر کودک)' }, price: 2.0 },
-          { name: { EN: 'Facility Utilities (allocated)', FR: 'Services publics (alloués)', FA: 'سهم قبوض محل' }, price: 3.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'landscaping',
+    overheadPctOfDirectCost: 30, // suggested overhead as % of direct costs — folds in blade sharpening/trimmer-line wear (equipment depreciation)
     defaultPricingBasis: 'area',
     icon: '🌿',
     name: { EN: 'Landscaping / Lawn Care', FR: 'Aménagement paysager', FA: 'باغبانی / نگهداری چمن' },
@@ -633,22 +576,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Equipment Wear Per Job', FR: "Usure de l'équipement par contrat", FA: 'استهلاک تجهیزات هر کار' },
-        items: [
-          { name: { EN: 'Blade Sharpening / Line Trimmer String', FR: 'Affûtage des lames / fil de coupe-bordures', FA: 'تیزکردن تیغه و نخ تریمر' }, price: 2.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Vehicle & Trailer Fuel/Wear', FR: 'Carburant et usure du véhicule/remorque', FA: 'سوخت و استهلاک خودرو/تریلر' }, price: 6.0 },
-          { name: { EN: 'Yard Waste Disposal', FR: 'Élimination des déchets verts', FA: 'دفع ضایعات باغبانی' }, price: 4.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'handyman',
+    overheadPctOfDirectCost: 28, // suggested overhead as % of direct costs — folds in power-tool depreciation
     defaultPricingBasis: 'project',
     icon: '🛠️',
     name: { EN: 'Handyman / Repair Services', FR: 'Bricoleur / Services de réparation', FA: 'تعمیرکار / خدمات فنی' },
@@ -669,22 +604,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Tool Wear Per Job', FR: 'Usure des outils par contrat', FA: 'استهلاک ابزار هر کار' },
-        items: [
-          { name: { EN: 'Power Tool Depreciation', FR: 'Amortissement des outils électriques', FA: 'استهلاک ابزار برقی' }, price: 8.0 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Travel / Gas Per Job', FR: 'Déplacement / essence par contrat', FA: 'رفت‌وآمد و بنزین هر کار' }, price: 15.0 },
-          { name: { EN: 'Liability Insurance (per job share)', FR: 'Assurance responsabilité (part par contrat)', FA: 'سهم بیمه مسئولیت هر کار' }, price: 10.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'home_based_food',
+    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
     defaultPricingBasis: 'weight',
     icon: '🍰',
     name: { EN: 'Home-Based Food / Homemade Sweets', FR: 'Cuisine maison / Pâtisseries artisanales', FA: 'غذا و شیرینی خانگی' },
@@ -721,15 +648,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Oven / Mixer (electricity share)', FR: 'Four / Batteur (part électricité)', FA: 'برق فر و همزن (سهمی)' }, price: 1.0 },
-          { name: { EN: 'Delivery / Your Travel Time', FR: 'Livraison / Temps de déplacement', FA: 'رفت‌وآمد یا هزینه‌ی ارسال' }, price: 2.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'home_tailoring',
+    overheadPctOfDirectCost: 12, // suggested overhead as % of direct costs
     defaultPricingBasis: 'quantity',
     icon: '🧵',
     name: { EN: 'Alterations / Home Tailoring', FR: 'Retouches / Couture à domicile', FA: 'خیاطی و تعمیرات لباس خانگی' },
@@ -758,15 +683,13 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Machine Wear & Electricity', FR: 'Usure de la machine et électricité', FA: 'استهلاک چرخ و برق مصرفی' }, price: 1.0 },
-          { name: { EN: 'Delivery / Pickup Trip', FR: 'Livraison / collecte', FA: 'رفت‌وآمد تحویل کار' }, price: 3.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'private_tutor',
+    overheadPctOfDirectCost: 90, // suggested overhead as % of direct costs — folds in allocated video-platform subscription
     defaultPricingBasis: 'hour',
     icon: '📚',
     name: { EN: 'Private Tutor / Language & Music Teacher', FR: 'Tuteur privé / Professeur de langue et musique', FA: 'معلم خصوصی / تدریس زبان و موسیقی' },
@@ -786,22 +709,14 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
         ],
       },
       {
-        name: { EN: 'Platform Cost Per Hour', FR: 'Coût de la plateforme par heure', FA: 'هزینه پلتفرم به ازای هر ساعت' },
-        items: [
-          { name: { EN: 'Video Platform Subscription (allocated)', FR: 'Abonnement plateforme vidéo (alloué)', FA: 'سهم اشتراک پلتفرم ویدیویی' }, price: 0.8 },
-        ],
-      },
-      {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Lesson Prep Time (unbilled)', FR: 'Temps de préparation (non facturé)', FA: 'زمان آماده‌سازی درس (بدون فاکتور)' }, price: 5.0 },
-          { name: { EN: 'Travel (in-person lessons)', FR: 'Déplacement (leçons en personne)', FA: 'رفت‌وآمد (کلاس حضوری)' }, price: 4.0 },
-        ],
+        items: [],
       },
     ],
   },
   {
     id: 'bridal_makeup',
+    overheadPctOfDirectCost: 15, // suggested overhead as % of direct costs
     defaultPricingBasis: 'project',
     icon: '💄',
     name: { EN: 'Bridal / Event Makeup & Henna Artist', FR: 'Maquillage de mariage/événement et henné', FA: 'آرایشگری عروس و مجالس / حنا' },
@@ -829,10 +744,7 @@ export const BUSINESS_TEMPLATES: BusinessTemplate[] = [
       },
       {
         name: { EN: 'Hidden Costs (often forgotten)', FR: 'Coûts cachés (souvent oubliés)', FA: 'هزینه‌های پنهان (معمولاً یادشون میره)' },
-        items: [
-          { name: { EN: 'Disposable Applicators / Sanitation', FR: 'Applicateurs jetables / désinfection', FA: 'ابزار یک‌بارمصرف و ضدعفونی' }, price: 4.0 },
-          { name: { EN: 'Travel to Venue (mobile service)', FR: 'Déplacement au lieu (service mobile)', FA: 'رفت‌وآمد به محل مراسم' }, price: 20.0 },
-        ],
+        items: [],
       },
     ],
   },

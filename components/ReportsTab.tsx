@@ -3,10 +3,12 @@
 import { useState, useMemo } from 'react';
 import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package } from 'lucide-react';
 import { Transaction, Lang } from '@/lib/types';
+import { Translations } from '@/lib/translations';
 
 interface ReportsTabProps {
   transactions: Transaction[];
   lang: Lang;
+  tr: Translations;
 }
 
 type ViewMode = 'all' | 'income' | 'expense';
@@ -34,6 +36,10 @@ const LABELS = {
     exportMatches: 'Export Matches',
     clear: 'Clear',
     noMatches: 'No transactions match your search',
+    fromDate: 'From',
+    toDate: 'To',
+    categoryFilter: 'Category',
+    allCategories: 'All categories',
   },
   FA: {
     title: '📊 گزارش‌های مالی',
@@ -57,15 +63,19 @@ const LABELS = {
     exportMatches: 'خروجی نتایج',
     clear: 'پاک کردن',
     noMatches: 'هیچ تراکنشی با این جستجو مطابقت ندارد',
+    fromDate: 'از تاریخ',
+    toDate: 'تا تاریخ',
+    categoryFilter: 'دسته‌بندی',
+    allCategories: 'همه‌ی دسته‌بندی‌ها',
   },
 };
 
-function exportToCSV(transactions: Transaction[], fileName: string) {
+function exportToCSV(transactions: Transaction[], fileName: string, catLabel: (key: string) => string = k => k) {
   const headers = ['Date', 'Description', 'Category', 'Type', 'Amount'];
   const rows = transactions.map(t => [
     t.date,
     `"${t.description.replace(/"/g, '""')}"`,
-    t.category,
+    catLabel(t.category),
     t.type,
     t.type === 'expense' ? `-${t.amount}` : t.amount
   ]);
@@ -80,7 +90,7 @@ function exportToCSV(transactions: Transaction[], fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-function CategoryBreakdown({ title, entries, total, color }: { title: string; entries: [string, number][]; total: number; color: string; }) {
+function CategoryBreakdown({ title, entries, total, color, catLabel }: { title: string; entries: [string, number][]; total: number; color: string; catLabel: (key: string) => string }) {
   if (entries.length === 0) return null;
   return (
     <div className="bg-white rounded-2xl border border-slate-100 p-4 mb-4 shadow-sm">
@@ -89,7 +99,7 @@ function CategoryBreakdown({ title, entries, total, color }: { title: string; en
         {entries.map(([cat, amount]) => (
           <div key={cat}>
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-600">{cat}</span>
+              <span className="text-slate-600">{catLabel(cat)}</span>
               <span className="font-semibold text-slate-800" dir="ltr">
                 {amount.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' })}
               </span>
@@ -107,14 +117,18 @@ function CategoryBreakdown({ title, entries, total, color }: { title: string; en
   );
 }
 
-export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
+export default function ReportsTab({ transactions, lang, tr }: ReportsTabProps) {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [view, setView] = useState<ViewMode>('all');
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const isRtl = lang === 'FA';
   const L = isRtl ? LABELS.FA : LABELS.EN;
 
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+  const catLabel = (key: string) => (tr as unknown as Record<string, string>)[key] || key;
 
   // Get unique months
   const months = useMemo(() => {
@@ -122,17 +136,37 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
     return Array.from(m).sort().reverse();
   }, [transactions]);
 
-  // Filter by month
+  // A custom date range (both fields set) takes over from the month-pill
+  // selector entirely — it can span partial months or several full
+  // months, which the pills alone can't express. Picking a custom range
+  // resets the month selector back to "all" so the two controls never
+  // fight each other silently.
+  const hasCustomRange = !!(dateFrom && dateTo);
+
+  // Filter by month or custom range
   const monthFiltered = useMemo(() => {
+    if (hasCustomRange) return transactions.filter(t => t.date >= dateFrom && t.date <= dateTo);
     if (selectedMonth === 'all') return transactions;
     return transactions.filter(t => t.date.startsWith(selectedMonth));
-  }, [transactions, selectedMonth]);
+  }, [transactions, selectedMonth, hasCustomRange, dateFrom, dateTo]);
 
-  // Filter by selected view (income / expense / all)
+  // Every category actually present in the current date range, so the
+  // filter only ever offers choices that can return results.
+  const availableCategories = useMemo(() => {
+    const set = new Set(monthFiltered.map(t => t.category));
+    return Array.from(set).sort((a, b) => catLabel(a).localeCompare(catLabel(b)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthFiltered]);
+
+  // Filter by selected view (income / expense / all) and category, sorted
+  // newest-first (same convention as the Transactions tab) — previously
+  // this just used whatever order the transactions arrived in, which
+  // wasn't necessarily chronological.
   const filtered = useMemo(() => {
-    if (view === 'all') return monthFiltered;
-    return monthFiltered.filter(t => t.type === view);
-  }, [monthFiltered, view]);
+    let list = view === 'all' ? monthFiltered : monthFiltered.filter(t => t.type === view);
+    if (categoryFilter !== 'all') list = list.filter(t => t.category === categoryFilter);
+    return [...list].sort((a, b) => b.date.localeCompare(a.date));
+  }, [monthFiltered, view, categoryFilter]);
 
   // Calculate totals (always computed on the month-filtered set so the summary cards stay consistent)
   const income = monthFiltered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -161,7 +195,7 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return [];
-    return transactions.filter(t => t.description.toLowerCase().includes(q));
+    return transactions.filter(t => t.description.toLowerCase().includes(q)).sort((a, b) => b.date.localeCompare(a.date));
   }, [transactions, search]);
 
   const searchSpent = searchResults.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -171,7 +205,7 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
     <div key={t.id} className="flex items-center justify-between px-4 py-2.5">
       <div>
         <p className="text-xs font-semibold text-slate-800">{t.description}</p>
-        <p className="text-[10px] text-slate-400">{t.date} · {t.category}</p>
+        <p className="text-[10px] text-slate-400">{t.date} · {catLabel(t.category)}</p>
       </div>
       <span className={`text-xs font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`} dir="ltr">
         {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
@@ -186,20 +220,57 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
       {/* Month selector */}
       <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
         <button
-          onClick={() => setSelectedMonth('all')}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === 'all' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+          onClick={() => { setSelectedMonth('all'); setDateFrom(''); setDateTo(''); }}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === 'all' && !hasCustomRange ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
         >
           {L.allTime}
         </button>
         {months.map(m => (
           <button
             key={m}
-            onClick={() => setSelectedMonth(m)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+            onClick={() => { setSelectedMonth(m); setDateFrom(''); setDateTo(''); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === m && !hasCustomRange ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
           >
             {new Date(m + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}
           </button>
         ))}
+      </div>
+
+      {/* Custom date range + category filter */}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase mb-1 block">{L.fromDate}</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            dir="ltr"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] font-semibold text-slate-400 uppercase mb-1 block">{L.toDate}</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            dir="ltr"
+          />
+        </div>
+      </div>
+      <div className="mb-4">
+        <label className="text-[10px] font-semibold text-slate-400 uppercase mb-1 block">{L.categoryFilter}</label>
+        <select
+          value={categoryFilter}
+          onChange={e => setCategoryFilter(e.target.value)}
+          className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+        >
+          <option value="all">{L.allCategories}</option>
+          {availableCategories.map(c => (
+            <option key={c} value={c}>{catLabel(c)}</option>
+          ))}
+        </select>
       </div>
 
       {/* Income / Expense / All view toggle */}
@@ -250,10 +321,10 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
 
       {/* Category breakdowns — shown independently per type so income & expense reporting stay fully separated */}
       {(view === 'all' || view === 'income') && (
-        <CategoryBreakdown title={L.topIncomeCats} entries={incomeCategoryBreakdown} total={income} color="bg-emerald-400" />
+        <CategoryBreakdown title={L.topIncomeCats} entries={incomeCategoryBreakdown} total={income} color="bg-emerald-400" catLabel={catLabel} />
       )}
       {(view === 'all' || view === 'expense') && (
-        <CategoryBreakdown title={L.topExpenseCats} entries={expenseCategoryBreakdown} total={expenses} color="bg-rose-400" />
+        <CategoryBreakdown title={L.topExpenseCats} entries={expenseCategoryBreakdown} total={expenses} color="bg-rose-400" catLabel={catLabel} />
       )}
 
       {/* Transactions list */}
@@ -263,7 +334,7 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
             {L.transactions} ({filtered.length})
           </h3>
           <button
-            onClick={() => exportToCSV(filtered, selectedMonth === 'all' ? `All_${view}` : `Report_${selectedMonth}_${view}`)}
+            onClick={() => exportToCSV(filtered, hasCustomRange ? `Report_${dateFrom}_to_${dateTo}_${view}` : selectedMonth === 'all' ? `All_${view}` : `Report_${selectedMonth}_${view}`, catLabel)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
           >
             <Download className="w-3.5 h-3.5" />
@@ -331,7 +402,7 @@ export default function ReportsTab({ transactions, lang }: ReportsTabProps) {
                 <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
                   <span className="text-xs text-slate-500">{searchResults.length} {L.matches}</span>
                   <button
-                    onClick={() => exportToCSV(searchResults, `Product_Report_${search.trim().replace(/[^a-z0-9]+/gi, '_')}`)}
+                    onClick={() => exportToCSV(searchResults, `Product_Report_${search.trim().replace(/[^a-z0-9]+/gi, '_')}`, catLabel)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
                   >
                     <Download className="w-3.5 h-3.5" />
