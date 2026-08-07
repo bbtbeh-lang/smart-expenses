@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Search, X, Download, Pencil } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, parseLocalDate } from '@/lib/utils';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -114,7 +114,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit }: Tran
               onClick={() => setSelectedMonth(m)}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
             >
-              {new Date(m + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}
+              {parseLocalDate(m + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}
             </button>
           ))}
         </div>
