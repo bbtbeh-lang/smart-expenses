@@ -248,6 +248,10 @@ export const t = {
     catInvestments: 'Investments',
     catRental: 'Rental Income',
     catOtherIncome: 'Other Income',
+    catSalesRevenue: 'Sales Revenue',
+    catServiceRevenue: 'Service Revenue',
+    catConsulting: 'Consulting',
+    catCommission: 'Commission',
   },
   FR: {
     appName: 'FinSnap',
@@ -481,6 +485,10 @@ export const t = {
     catInvestments: 'Investissements',
     catRental: 'Revenu Locatif',
     catOtherIncome: 'Autres Revenus',
+    catSalesRevenue: 'Revenu des Ventes',
+    catServiceRevenue: 'Revenu de Services',
+    catConsulting: 'Consultation',
+    catCommission: 'Commission',
   },
   FA: {
     appName: 'فاین اسنپ',
@@ -714,6 +722,10 @@ export const t = {
     catInvestments: 'سرمایه‌گذاری‌ها',
     catRental: 'درآمد اجاره',
     catOtherIncome: 'سایر درآمدها',
+    catSalesRevenue: 'درآمد فروش',
+    catServiceRevenue: 'درآمد خدمات',
+    catConsulting: 'مشاوره',
+    catCommission: 'کمیسیون',
   },
 };
 
