@@ -160,6 +160,7 @@ export const t = {
     // Transactions tab
     searchTransactions: 'Search transactions...',
     filterAll: 'All',
+    allTime: 'All time',
     noResults: 'No matching transactions.',
     exportExcel: 'Export Excel',
     editTransaction: 'Edit Transaction',
@@ -391,6 +392,7 @@ export const t = {
     navSettings: 'Paramètres',
     searchTransactions: 'Rechercher...',
     filterAll: 'Tout',
+    allTime: 'Tout le temps',
     noResults: 'Aucun résultat.',
     exportExcel: 'Exporter Excel',
     editTransaction: 'Modifier la transaction',
@@ -619,6 +621,7 @@ export const t = {
     navSettings: 'تنظیمات',
     searchTransactions: 'جستجوی تراکنش‌ها...',
     filterAll: 'همه',
+    allTime: 'همه زمان‌ها',
     noResults: 'تراکنشی یافت نشد.',
     exportExcel: 'دانلود اکسل',
     editTransaction: 'ویرایش تراکنش',

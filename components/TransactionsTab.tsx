@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Search, X, Download, Pencil } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang } from '@/lib/types';
@@ -44,6 +44,14 @@ function exportToCsv(transactions: Transaction[], tr: Translations) {
 export default function TransactionsTab({ transactions, tr, lang, onEdit }: TransactionsTabProps) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [selectedMonth, setSelectedMonth] = useState('all');
+
+  // Unique months present in the data, newest first — same derivation as
+  // the Reports tab's month selector, so both tabs group months the same way.
+  const months = useMemo(() => {
+    const m = new Set(transactions.map(t => t.date.slice(0, 7)));
+    return Array.from(m).sort().reverse();
+  }, [transactions]);
 
   const filtered = transactions
     .slice()
@@ -51,7 +59,8 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit }: Tran
     .filter(tx => {
       const matchesType = filter === 'all' || tx.type === filter;
       const matchesSearch = !search || tx.description.toLowerCase().includes(search.toLowerCase());
-      return matchesType && matchesSearch;
+      const matchesMonth = selectedMonth === 'all' || tx.date.startsWith(selectedMonth);
+      return matchesType && matchesSearch && matchesMonth;
     });
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -87,6 +96,27 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit }: Tran
             <Download className="w-3.5 h-3.5" />
             {tr.exportExcel}
           </button>
+        </div>
+      )}
+
+      {/* Month selector */}
+      {months.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => setSelectedMonth('all')}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === 'all' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+          >
+            {tr.allTime}
+          </button>
+          {months.map(m => (
+            <button
+              key={m}
+              onClick={() => setSelectedMonth(m)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === m ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+            >
+              {new Date(m + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </button>
+          ))}
         </div>
       )}
 
@@ -127,7 +157,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit }: Tran
       {filtered.length === 0 ? (
         <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-12 text-center">
           <div className="text-3xl mb-2">📋</div>
-          <div className="text-sm text-slate-400">{search ? tr.noResults : tr.noTransactions}</div>
+          <div className="text-sm text-slate-400">{(search || selectedMonth !== 'all') ? tr.noResults : tr.noTransactions}</div>
         </div>
       ) : (
         <div className="space-y-2">
