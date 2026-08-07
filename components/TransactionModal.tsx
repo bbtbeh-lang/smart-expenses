@@ -89,6 +89,7 @@ export default function TransactionModal({
   const [invoiceImageBase64, setInvoiceImageBase64] = useState<string | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<{ matchedMerchant: string | null; matchedDate: string | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const scansLeft = Math.max(0, maxDailyScans - scansUsedToday);
   const scanExhausted = scansLeft <= 0;
@@ -478,6 +479,20 @@ export default function TransactionModal({
                 onDragLeave={() => setDragging(false)}
                 onDrop={handleDrop}
               >
+                {/* Two separate hidden inputs instead of one ambiguous
+                    accept="image/*" input — that used to make mobile
+                    browsers pop up their own "Take Photo / Photo Library /
+                    Choose File" menu on every tap, an extra step before the
+                    real camera/gallery even opened. Each button below now
+                    goes straight to the right one. */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
+                />
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -525,13 +540,22 @@ export default function TransactionModal({
               </div>
 
               {ocrStatus === 'idle' && (
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-teal-200 hover:shadow-teal-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <ScanLine className="w-4 h-4" />
-                  {tr.scanReceipt}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-teal-200 hover:shadow-teal-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    <ScanLine className="w-4 h-4" />
+                    {tr.scanReceipt}
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full py-2.5 bg-white border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {tr.chooseFromLibrary}
+                  </button>
+                </div>
               )}
 
               <button
