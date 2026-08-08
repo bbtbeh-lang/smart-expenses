@@ -147,16 +147,23 @@ export default function Home() {
   // in the UI. Now the mapping is persisted server-side (user_profiles),
   // fetched on sign-in, and merged with whatever's live in memory so a
   // category minted seconds ago (not yet pushed) is never lost either way.
-  const syncUserCustomCategories = useCallback(async (userId: string, localCustomCategories: Record<string, string>) => {
+  // Shared by both expense (customCategories) and income
+  // (customIncomeCategories) custom category maps — same bug, same fix,
+  // just a different state field and API field name.
+  const syncUserCustomCategoryMap = useCallback(async (
+    userId: string,
+    field: 'customCategories' | 'customIncomeCategories',
+    localMap: Record<string, string>
+  ) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) return;
       const res = await fetch('/api/profile', { headers: { Authorization: `Bearer ${session.access_token}` } });
       if (!res.ok) return;
       const data = await res.json();
-      const serverCustomCategories = (data.customCategories ?? {}) as Record<string, string>;
-      const merged = { ...serverCustomCategories, ...localCustomCategories };
-      setState(prev => ({ ...prev, customCategories: merged }));
+      const serverMap = (data[field] ?? {}) as Record<string, string>;
+      const merged = { ...serverMap, ...localMap };
+      setState(prev => ({ ...prev, [field]: merged }));
       // Push back so any locally-minted-but-unsynced categories reach the
       // server too (the PATCH endpoint merges, so this can't clobber
       // labels another device added in the meantime).
@@ -164,7 +171,7 @@ export default function Home() {
         await fetch('/api/profile', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ customCategories: merged }),
+          body: JSON.stringify({ [field]: merged }),
         });
       }
     } catch {
@@ -181,6 +188,9 @@ export default function Home() {
   const customCategoriesRef = useRef<Record<string, string>>(state.customCategories);
   useEffect(() => { customCategoriesRef.current = state.customCategories; }, [state.customCategories]);
 
+  const customIncomeCategoriesRef = useRef<Record<string, string>>(state.customIncomeCategories);
+  useEffect(() => { customIncomeCategoriesRef.current = state.customIncomeCategories; }, [state.customIncomeCategories]);
+
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -189,7 +199,8 @@ export default function Home() {
         setState(prev => ({ ...loaded, screen: 'onboarding', lang: prev.lang }));
         refreshSubscription();
         syncUserTransactions(session.user.id, loaded.transactions);
-        syncUserCustomCategories(session.user.id, loaded.customCategories);
+        syncUserCustomCategoryMap(session.user.id, 'customCategories', loaded.customCategories);
+        syncUserCustomCategoryMap(session.user.id, 'customIncomeCategories', loaded.customIncomeCategories);
       }
     });
 
@@ -212,7 +223,9 @@ export default function Home() {
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           syncUserTransactions(session.user.id, transactionsRef.current.length > 0 ? transactionsRef.current : loaded.transactions);
           const localCats = Object.keys(customCategoriesRef.current).length > 0 ? customCategoriesRef.current : loaded.customCategories;
-          syncUserCustomCategories(session.user.id, localCats);
+          syncUserCustomCategoryMap(session.user.id, 'customCategories', localCats);
+          const localIncomeCats = Object.keys(customIncomeCategoriesRef.current).length > 0 ? customIncomeCategoriesRef.current : loaded.customIncomeCategories;
+          syncUserCustomCategoryMap(session.user.id, 'customIncomeCategories', localIncomeCats);
         }
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
@@ -284,6 +297,29 @@ export default function Home() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.customCategories, state.screen]);
+
+  // Same debounced persistence, for custom income category labels.
+  const customIncomeCategoriesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (state.screen === 'auth' || Object.keys(state.customIncomeCategories).length === 0) return;
+    if (customIncomeCategoriesSaveTimer.current) clearTimeout(customIncomeCategoriesSaveTimer.current);
+    customIncomeCategoriesSaveTimer.current = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ customIncomeCategories: state.customIncomeCategories }),
+      }).catch(() => {
+        // Best-effort — the next sign-in's sync call will retry with
+        // whatever's in memory or localStorage by then.
+      });
+    }, 800);
+    return () => {
+      if (customIncomeCategoriesSaveTimer.current) clearTimeout(customIncomeCategoriesSaveTimer.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.customIncomeCategories, state.screen]);
 
   const tr = t[state.lang];
 

@@ -16,13 +16,14 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('user_profiles')
-    .select('birth_date, custom_categories')
+    .select('birth_date, custom_categories, custom_income_categories')
     .eq('user_id', userId)
     .maybeSingle();
 
   return NextResponse.json({
     birthDate: data?.birth_date ?? null,
     customCategories: data?.custom_categories ?? {},
+    customIncomeCategories: data?.custom_income_categories ?? {},
   });
 }
 
@@ -34,6 +35,7 @@ export async function PATCH(req: NextRequest) {
   const hasBirthDate = Object.prototype.hasOwnProperty.call(body, 'birthDate');
   const birthDate = body.birthDate as string | null;
   const incomingCustomCategories = body.customCategories as Record<string, string> | undefined;
+  const incomingCustomIncomeCategories = body.customIncomeCategories as Record<string, string> | undefined;
 
   // Basic sanity checks: valid YYYY-MM-DD, not in the future, not
   // implausibly old (guards against fat-finger typos like a 1901 year).
@@ -52,16 +54,21 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = { user_id: userId, updated_at: new Date().toISOString() };
   if (hasBirthDate) updates.birth_date = birthDate;
 
-  if (incomingCustomCategories) {
+  if (incomingCustomCategories || incomingCustomIncomeCategories) {
     // Merge rather than overwrite: two devices may have minted different
     // custom categories since the last sync, and neither set should be
     // able to erase the other's labels.
     const { data: existing } = await supabaseAdmin
       .from('user_profiles')
-      .select('custom_categories')
+      .select('custom_categories, custom_income_categories')
       .eq('user_id', userId)
       .maybeSingle();
-    updates.custom_categories = { ...(existing?.custom_categories ?? {}), ...incomingCustomCategories };
+    if (incomingCustomCategories) {
+      updates.custom_categories = { ...(existing?.custom_categories ?? {}), ...incomingCustomCategories };
+    }
+    if (incomingCustomIncomeCategories) {
+      updates.custom_income_categories = { ...(existing?.custom_income_categories ?? {}), ...incomingCustomIncomeCategories };
+    }
   }
 
   const { error } = await supabaseAdmin
@@ -73,5 +80,5 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, customCategories: updates.custom_categories });
+  return NextResponse.json({ success: true, customCategories: updates.custom_categories, customIncomeCategories: updates.custom_income_categories });
 }

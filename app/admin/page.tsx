@@ -183,7 +183,11 @@ export default function AdminPage() {
   // number of hooks called differs between renders.
   const { mrr, activeSubscribers } = useMemo(() => {
     if (!customers) return { mrr: 0, activeSubscribers: 0 };
-    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free');
+    // Admin-granted accounts (Settings → Grant Free Access) are marked
+    // active/paid so they get real feature access, but they generate no
+    // actual revenue — excluded here so a batch of comped accounts
+    // doesn't inflate the MRR number.
+    const paying = customers.filter(c => c.status === 'active' && c.plan !== 'free' && !c.grantedByAdmin);
     const total = paying.reduce((sum, c) => {
       const plan = PLANS[c.plan as PlanId];
       if (!plan) return sum;
