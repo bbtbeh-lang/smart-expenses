@@ -71,18 +71,26 @@ const LABELS = {
   },
 };
 
+// Quotes and escapes every field, not just description — a custom
+// category label (user-typed, unvalidated) can contain a comma just as
+// easily as a transaction description can, and an unquoted comma there
+// silently shifts every column after it.
+const csvField = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+
 function exportToCSV(transactions: Transaction[], fileName: string, catLabel: (key: string) => string = k => k) {
   const headers = ['Date', 'Description', 'Category', 'Type', 'Amount'];
   const rows = transactions.map(t => [
-    t.date,
-    `"${t.description.replace(/"/g, '""')}"`,
-    catLabel(t.category),
-    t.type,
-    t.type === 'expense' ? `-${t.amount}` : t.amount
+    csvField(t.date),
+    csvField(t.description),
+    csvField(catLabel(t.category)),
+    csvField(t.type),
+    csvField(t.type === 'expense' ? `-${t.amount}` : t.amount)
   ]);
 
-  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
+  const csv = [headers.map(csvField), ...rows].map(r => r.join(',')).join('\n');
+  // Leading UTF-8 BOM so Excel on Windows renders Persian/French
+  // characters correctly instead of the system codepage's mojibake.
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

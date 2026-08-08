@@ -54,21 +54,17 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = { user_id: userId, updated_at: new Date().toISOString() };
   if (hasBirthDate) updates.birth_date = birthDate;
 
-  if (incomingCustomCategories || incomingCustomIncomeCategories) {
-    // Merge rather than overwrite: two devices may have minted different
-    // custom categories since the last sync, and neither set should be
-    // able to erase the other's labels.
-    const { data: existing } = await supabaseAdmin
-      .from('user_profiles')
-      .select('custom_categories, custom_income_categories')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (incomingCustomCategories) {
-      updates.custom_categories = { ...(existing?.custom_categories ?? {}), ...incomingCustomCategories };
-    }
-    if (incomingCustomIncomeCategories) {
-      updates.custom_income_categories = { ...(existing?.custom_income_categories ?? {}), ...incomingCustomIncomeCategories };
-    }
+  // Authoritative replace, not merge: the client already reconciled its
+  // local map against the server's on the last sign-in sync (see
+  // syncUserCustomCategoryMap in app/page.tsx), so what it sends here is
+  // the full, current source of truth — including deletions. Merging here
+  // used to make deleted categories immortal: a removed key would survive
+  // server-side and get pulled back into local state on the next sign-in.
+  if (incomingCustomCategories) {
+    updates.custom_categories = incomingCustomCategories;
+  }
+  if (incomingCustomIncomeCategories) {
+    updates.custom_income_categories = incomingCustomIncomeCategories;
   }
 
   const { error } = await supabaseAdmin

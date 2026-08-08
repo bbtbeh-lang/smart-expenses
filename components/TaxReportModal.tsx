@@ -120,12 +120,12 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
         ]);
       });
 
-      rows.push(['', '', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), mTotal.toFixed(2)]);
+      rows.push(['', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), mTotal.toFixed(2), '']);
       rows.push([]);
       grandPretax += mPretax; grandTax += mTax; grandTotal += mTotal;
     });
 
-    rows.push(['', '', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), grandTotal.toFixed(2)]);
+    rows.push(['', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), grandTotal.toFixed(2), '']);
 
     // Summary rows
     rows.push([]);
@@ -146,7 +146,10 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
 
     const NL = String.fromCharCode(10);
     const csvContent = rows.map(r => r.map(c => JSON.stringify(c)).join(',')).join(NL);
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // Leading UTF-8 BOM: without it, Excel on Windows opens this CSV using
+    // the system locale's codepage instead of UTF-8, and Persian/French
+    // characters (merchant names, category labels) render as mojibake.
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

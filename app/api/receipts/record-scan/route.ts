@@ -14,9 +14,19 @@ export async function POST(req: NextRequest) {
   }
   const userId = userData.user.id;
 
-  const body = await req.json();
-  const { receiptHash, merchant, amount, date, image } = body;
-  if (!receiptHash) {
+  // Parsed defensively and type-checked the same way record-income-scan
+  // already does — a malformed body previously could reach the insert
+  // below with the wrong JS type per column (e.g. amount as a string),
+  // which either fails silently against the numeric column or coerces
+  // unexpectedly.
+  const body = await req.json().catch(() => null);
+  const receiptHash: unknown = body?.receiptHash;
+  const merchant: unknown = body?.merchant;
+  const amount: unknown = body?.amount;
+  const date: unknown = body?.date;
+  const image: unknown = body?.image;
+
+  if (!receiptHash || typeof receiptHash !== 'string') {
     return NextResponse.json({ error: 'Missing receiptHash' }, { status: 400 });
   }
 
@@ -24,7 +34,7 @@ export async function POST(req: NextRequest) {
   // business customers have a real supporting document for tax purposes —
   // this is best-effort: if the upload fails, we still record the scan.
   let storagePath: string | null = null;
-  if (image) {
+  if (image && typeof image === 'string') {
     try {
       const path = `${userId}/${receiptHash}.jpg`;
       const buffer = Buffer.from(image, 'base64');
@@ -38,20 +48,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { error: insertError } = await supabaseAdmin.from('receipt_scans').insert({
-    user_id: userId,
-    phash: receiptHash,
-    merchant: merchant || null,
-    amount: amount || null,
-    receipt_date: date || null,
-    storage_path: storagePath,
-  });
-  // Best-effort, same as the image upload above: if this fails, the
-  // receipt/transaction itself is already saved elsewhere, so we don't
-  // fail the request — but log it so a systemic issue (bad column, RLS
-  // change) doesn't go unnoticed the way the earlier subscription-sync
-  // bug did.
-  if (insertError) console.error('receipt_scans insert failed:', insertError);
+  // Best-effort record, same as the image upload above: an OCR scan
+  // already happened and the transaction is already saved by this point,
+  // so a DB hiccup here shouldn't surface as a failure to the person — it
+  // only means duplicate detection loses this one entry.
+  try {
+    const { error: insertError } = await supabaseAdmin.from('receipt_scans').insert({
+      user_id: userId,
+      phash: receiptHash,
+      merchant: typeof merchant === 'string' ? merchant : null,
+      amount: typeof amount === 'number' ? amount : null,
+      receipt_date: typeof date === 'string' ? date : null,
+      storage_path: storagePath,
+    });
+    if (insertError) console.error('receipt_scans insert failed:', insertError);
+  } catch (err) {
+    console.error('receipt_scans insert error:', err);
+  }
 
   return NextResponse.json({ ok: true, storagePath });
 }
