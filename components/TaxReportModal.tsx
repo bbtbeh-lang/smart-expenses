@@ -139,7 +139,8 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
       rows.push(['TAX BY CATEGORY', '', '', '', '', '', '', '']);
       rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '', '']);
       categoryBreakdown.forEach(([cat, sums]) => {
-        rows.push([cat, String(sums.amount), String(sums.tax), '', '', '', '', '']);
+        const label = (tr as any)[cat] || cat;
+        rows.push([label, String(sums.amount), String(sums.tax), '', '', '', '', '']);
       });
     }
 

@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  await supabaseAdmin.from('receipt_scans').insert({
+  const { error: insertError } = await supabaseAdmin.from('receipt_scans').insert({
     user_id: userId,
     phash: receiptHash,
     merchant: merchant || null,
@@ -46,6 +46,12 @@ export async function POST(req: NextRequest) {
     receipt_date: date || null,
     storage_path: storagePath,
   });
+  // Best-effort, same as the image upload above: if this fails, the
+  // receipt/transaction itself is already saved elsewhere, so we don't
+  // fail the request — but log it so a systemic issue (bad column, RLS
+  // change) doesn't go unnoticed the way the earlier subscription-sync
+  // bug did.
+  if (insertError) console.error('receipt_scans insert failed:', insertError);
 
   return NextResponse.json({ ok: true, storagePath });
 }
