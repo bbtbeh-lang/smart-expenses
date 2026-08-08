@@ -15,6 +15,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const code = String(body.code || '').trim().toUpperCase();
+  // The server's own "today" (Postgres current_date, Vercel process clock)
+  // is UTC, not the user's local calendar day — see the migration this
+  // pairs with. Fall back to a UTC-derived date only if the client didn't
+  // send one (older app build mid-rollout), so this never hard-fails.
+  const localDateRaw = typeof body.date === 'string' ? body.date : '';
+  const localDate = /^\d{4}-\d{2}-\d{2}$/.test(localDateRaw)
+    ? localDateRaw
+    : new Date().toISOString().slice(0, 10);
   if (!code) {
     return NextResponse.json({ success: false, message: 'missing_code' }, { status: 400 });
   }
@@ -25,6 +33,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabaseAdmin.rpc('redeem_daily_code', {
     p_user_id: userData.user.id,
     p_code: code,
+    p_local_date: localDate,
   });
 
   if (error) {

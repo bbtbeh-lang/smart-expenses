@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { todayLocalDate } from '@/lib/utils';
 import { PLANS, PlanId } from '@/lib/plans';
 import { ShieldCheck, RefreshCw, Copy, Check, Lock, ExternalLink, Users, TrendingUp, Gift } from 'lucide-react';
 
@@ -67,7 +68,7 @@ export default function AdminPage() {
     setError('');
     const token = await getToken();
     if (!token) { setForbidden(true); setAuthChecked(true); return; }
-    const res = await fetch('/api/admin/code/status', { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`/api/admin/code/status?date=${encodeURIComponent(todayLocalDate())}`, { headers: { Authorization: `Bearer ${token}` } });
     if (res.status === 403 || res.status === 401) {
       setForbidden(true);
       setAuthChecked(true);
@@ -114,7 +115,8 @@ export default function AdminPage() {
       if (!token) { setForbidden(true); return; }
       const res = await fetch('/api/admin/code/generate', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: todayLocalDate() }),
       });
       if (res.status === 403) { setForbidden(true); return; }
       const data = await res.json();

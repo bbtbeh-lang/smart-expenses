@@ -21,6 +21,7 @@ import PlanModal from '@/components/PlanModal';
 import BudgetModal from '@/components/BudgetModal';
 import Toast, { ToastMessage } from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
+import { todayLocalDate } from '@/lib/utils';
 import { syncTransactions, upsertTransaction, deleteTransactionRemote } from '@/lib/transactionSync';
 
 const STORAGE_KEY = 'finsnap_state_v1';
@@ -402,7 +403,7 @@ export default function Home() {
       const res = await fetch('/api/code/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, date: todayLocalDate() }),
       });
       const data = await res.json();
       if (data.success) {

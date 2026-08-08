@@ -12,7 +12,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  // The admin's own local calendar day, sent by the browser — Postgres/
+  // Vercel's "today" is UTC, which flips ~4-5 hours before Toronto
+  // midnight and would show "no code generated yet" for part of the
+  // evening even right after generating one. See the migration this
+  // pairs with.
+  const { searchParams } = new URL(req.url);
+  const localDateRaw = searchParams.get('date') || '';
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(localDateRaw)
+    ? localDateRaw
+    : new Date().toISOString().slice(0, 10);
   const { data: codeRow } = await supabaseAdmin
     .from('daily_codes')
     .select('code, uses, max_uses, valid_date')

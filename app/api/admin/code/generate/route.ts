@@ -13,7 +13,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const body = await req.json().catch(() => ({}) as { date?: string });
+  // Same fix as /api/admin/code/status and /api/code/apply: use the
+  // admin's local calendar day (sent by the browser), not the server's
+  // UTC clock, so a code generated in the Toronto evening is dated
+  // "today" from the admin's perspective and stays redeemable for the
+  // rest of that local day.
+  const localDateRaw = typeof body?.date === 'string' ? body.date : '';
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(localDateRaw)
+    ? localDateRaw
+    : new Date().toISOString().slice(0, 10);
   const code = generateDailyCode();
 
   const { error } = await supabaseAdmin.from('daily_codes').insert({

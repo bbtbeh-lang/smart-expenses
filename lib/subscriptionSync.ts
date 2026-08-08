@@ -29,22 +29,47 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
   const periodEndSeconds =
     subscription.items.data[0]?.current_period_end ??
     (subscription as unknown as { current_period_end?: number }).current_period_end;
+  const currentPeriodEndIso = periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null;
+  const plan = planInfo?.plan || 'free';
+
+  // BUG FIX: this used to reset scans_used_this_period unconditionally on
+  // every call — including customer.subscription.updated events fired for
+  // reasons that have nothing to do with a new billing period (a payment
+  // method update, a coupon applied from the Stripe dashboard, a metadata
+  // edit, etc). Any of those silently refilled a user's scan quota mid-
+  // cycle. Only reset when this call actually represents a new period or
+  // plan: no existing row (first-time subscribe), the plan changed
+  // (upgrade/downgrade), or Stripe's current_period_end moved forward
+  // (a genuine renewal).
+  const { data: existing } = await supabaseAdmin
+    .from('subscriptions')
+    .select('plan, current_period_end')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const isNewPeriod =
+    !existing ||
+    existing.plan !== plan ||
+    existing.current_period_end !== currentPeriodEndIso;
 
   const { error } = await supabaseAdmin
     .from('subscriptions')
     .upsert(
       {
         user_id: userId,
-        plan: planInfo?.plan || 'free',
+        plan,
         billing_period: planInfo?.billingPeriod || null,
         status,
         stripe_customer_id: subscription.customer as string,
         stripe_subscription_id: subscription.id,
-        current_period_end: periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null,
-        // Reset the monthly scan counter whenever a new plan starts or renews.
-        scans_used_this_period: 0,
-        scan_period_start: new Date().toISOString(),
+        current_period_end: currentPeriodEndIso,
         updated_at: new Date().toISOString(),
+        // Only included (and thus only written) when it's a genuine new
+        // period/plan — omitting these keys on a no-op update leaves the
+        // existing counter untouched instead of overwriting it with 0.
+        ...(isNewPeriod
+          ? { scans_used_this_period: 0, scan_period_start: new Date().toISOString() }
+          : {}),
       },
       { onConflict: 'user_id' }
     );
