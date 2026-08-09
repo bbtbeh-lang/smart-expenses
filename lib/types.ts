@@ -60,31 +60,12 @@ export interface AppState {
   budgetReminders: Record<string, boolean>;
 }
 
-export const INITIAL_STATE: AppState = {
-  screen: 'auth',
-  lang: 'EN',
-  accountType: null,
-  tier: 'free',
-  plan: 'free',
-  billingPeriod: null,
-  scansUsedThisPeriod: 0,
-  scanLimit: 0,
-  currentPeriodEnd: null,
-  subscriptionLoaded: false,
-  hasManualAccess: false,
-  hasScanAccess: false,
-  codeActivated: false,
-  scansUsedToday: 2,
-  maxDailyScans: 2,
-  transactions: [],
-  totalIncome: 0,
-  totalExpenses: 0,
-  budgets: {},
-  customCategories: {},
-  customIncomeCategories: {}, // مقدار اولیه خالی برای دسته‌بندی‌های درآمد
-  budgetDueDates: {},
-  budgetReminders: {},
-};
+// NOTE: the actual initial app state lives in freshState() in
+// app/page.tsx — this file used to also export a duplicate INITIAL_STATE
+// constant that nothing ever imported (dead code, and its values had
+// already drifted from freshState()'s real defaults). Removed rather
+// than fixed in place, since keeping two independent copies of the same
+// shape around is exactly what let them drift in the first place.
 
 export const INCOME_OCR_CATEGORIES = [
   'catSalesRevenue',

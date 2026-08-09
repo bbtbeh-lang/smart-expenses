@@ -33,7 +33,7 @@ export default function OnboardingScreen({ tr, onSelect }: OnboardingScreenProps
                 <div className="font-bold text-slate-900 text-base mb-1">{tr.personal}</div>
                 <div className="text-sm text-slate-500 leading-relaxed">{tr.personalDesc}</div>
                 <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
-                  Base Currency: CAD
+                  {tr.onboardingBaseCurrency}
                 </div>
               </div>
             </div>
@@ -54,7 +54,7 @@ export default function OnboardingScreen({ tr, onSelect }: OnboardingScreenProps
                 <div className="font-bold text-slate-900 text-base mb-1">{tr.business}</div>
                 <div className="text-sm text-slate-500 leading-relaxed">{tr.businessDesc}</div>
                 <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
-                  GST / HST / QST Ready
+                  {tr.onboardingGstReady}
                 </div>
               </div>
             </div>
