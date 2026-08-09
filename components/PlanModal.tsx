@@ -29,7 +29,7 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
   };
 
   const planConfig = plan !== 'free' ? PLANS[plan] : null;
-  const renewalDate = currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString() : null;
+  const renewalDate = currentPeriodEnd ? new Date(currentPeriodEnd).toLocaleDateString('en-CA') : null;
   const daysUntilRenewal = currentPeriodEnd
     ? Math.ceil((new Date(currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;

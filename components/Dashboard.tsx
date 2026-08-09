@@ -159,7 +159,7 @@ export default function Dashboard({
     ? Math.ceil((new Date(state.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
   const showRenewalBanner = state.tier === 'premium' && daysUntilRenewal !== null && daysUntilRenewal <= 3 && daysUntilRenewal >= 0;
-  const renewalDateLabel = state.currentPeriodEnd ? new Date(state.currentPeriodEnd).toLocaleDateString() : '';
+  const renewalDateLabel = state.currentPeriodEnd ? new Date(state.currentPeriodEnd).toLocaleDateString('en-CA') : '';
 
   // Bill/installment due-date reminders: for each budget item with a due
   // date + reminder enabled, resolve the next occurrence (recurrence-aware)

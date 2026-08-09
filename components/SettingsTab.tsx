@@ -89,7 +89,7 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
             </div>
             <div>
               <div className="text-white font-bold">{userEmail || '—'}</div>
-              <div className="text-emerald-100 text-xs mt-0.5 capitalize">{state.accountType} account</div>
+              <div className="text-emerald-100 text-xs mt-0.5">{state.accountType === 'business' ? tr.businessAccountLabel : tr.personalAccountLabel}</div>
             </div>
           </div>
         </div>
@@ -230,7 +230,7 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-slate-800">{tr.settingsCurrency}</div>
-              <div className="text-xs text-slate-400">Canadian Dollar</div>
+              <div className="text-xs text-slate-400">{tr.canadianDollarLabel}</div>
             </div>
             <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full" dir="ltr">CAD $</span>
           </div>
