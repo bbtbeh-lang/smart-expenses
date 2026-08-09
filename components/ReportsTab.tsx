@@ -4,12 +4,14 @@ import { useState, useMemo } from 'react';
 import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package } from 'lucide-react';
 import { Transaction, Lang } from '@/lib/types';
 import { Translations } from '@/lib/translations';
-import { parseLocalDate } from '@/lib/utils';
+import { parseLocalDate, resolveCategoryLabel } from '@/lib/utils';
 
 interface ReportsTabProps {
   transactions: Transaction[];
   lang: Lang;
   tr: Translations;
+  customCategories?: Record<string, string>;
+  customIncomeCategories?: Record<string, string>;
 }
 
 type ViewMode = 'all' | 'income' | 'expense';
@@ -126,7 +128,7 @@ function CategoryBreakdown({ title, entries, total, color, catLabel }: { title: 
   );
 }
 
-export default function ReportsTab({ transactions, lang, tr }: ReportsTabProps) {
+export default function ReportsTab({ transactions, lang, tr, customCategories = {}, customIncomeCategories = {} }: ReportsTabProps) {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [view, setView] = useState<ViewMode>('all');
   const [search, setSearch] = useState('');
@@ -137,7 +139,12 @@ export default function ReportsTab({ transactions, lang, tr }: ReportsTabProps) 
   const L = isRtl ? LABELS.FA : LABELS.EN;
 
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
-  const catLabel = (key: string) => (tr as unknown as Record<string, string>)[key] || key;
+  // BUG FIX: this used to only check `tr`, so any user-minted custom
+  // category (see getOrCreateCategoryKey in lib/utils.ts) showed its raw
+  // internal key ("custom_suger_1784775632372") everywhere in this tab —
+  // the category filter dropdown, search results, the breakdown list,
+  // and the CSV export.
+  const catLabel = (key: string) => resolveCategoryLabel(key, tr as unknown as Record<string, string>, customCategories, customIncomeCategories);
 
   // Get unique months
   const months = useMemo(() => {

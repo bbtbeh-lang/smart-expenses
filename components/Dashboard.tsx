@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock,
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
-import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate } from '@/lib/utils';
+import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate, resolveCategoryLabel } from '@/lib/utils';
 import { PLANS } from '@/lib/plans';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -111,7 +111,7 @@ export default function Dashboard({
   const donutData = useMemo(() => {
     const catMap: Record<string, { label: string; value: number }> = {};
     filteredTxs.filter(t => t.type === 'expense').forEach(t => {
-      const label = (tr as any)[t.category] || state.customCategories[t.category] || t.category;
+      const label = resolveCategoryLabel(t.category, tr as unknown as Record<string, string>, state.customCategories, state.customIncomeCategories);
       if (!catMap[t.category]) catMap[t.category] = { label, value: 0 };
       catMap[t.category].value += t.amount;
     });
@@ -520,7 +520,9 @@ export default function Dashboard({
                   <div className={`text-sm font-bold ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`} dir="ltr">
                     {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, state.lang, 2)}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[80px] text-right">{(tr as any)[tx.category] || tx.category}</div>
+                  <div className="text-xs text-slate-400 mt-0.5 truncate max-w-[80px] text-right">
+                    {resolveCategoryLabel(tx.category, tr as unknown as Record<string, string>, state.customCategories, state.customIncomeCategories)}
+                  </div>
                 </div>
               </div>
             ))}

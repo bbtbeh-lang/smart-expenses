@@ -648,6 +648,8 @@ export default function Home() {
                 tr={tr}
                 lang={state.lang}
                 onEdit={tx => setEditingTransaction(tx)}
+                customCategories={state.customCategories}
+                customIncomeCategories={state.customIncomeCategories}
               />
             )}
             {activeTab === 'reports' && (
@@ -655,6 +657,8 @@ export default function Home() {
                 transactions={filteredTransactions}
                 lang={state.lang}
                 tr={tr}
+                customCategories={state.customCategories}
+                customIncomeCategories={state.customIncomeCategories}
               />
             )}
             {activeTab === 'pricing' && (
@@ -769,6 +773,8 @@ export default function Home() {
           transactions={filteredTransactions}
           onClose={() => setShowTaxReport(false)}
           onOpenUpgrade={() => { setShowTaxReport(false); setShowUpgrade(true); }}
+          customCategories={state.customCategories}
+          customIncomeCategories={state.customIncomeCategories}
         />
       )}
 

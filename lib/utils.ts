@@ -125,3 +125,22 @@ export function getOrCreateCategoryKey(
   const slug = trimmed.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_\u0600-\u06FF]/g, '');
   return { key: `custom_${slug}_${Date.now()}`, isNew: true };
 }
+
+// Resolves a transaction/budget category key to its display label.
+// Built-in categories (catGroceries, catOther, etc.) live in the
+// translations file; user-minted custom categories (see
+// getOrCreateCategoryKey above) live in customCategories/
+// customIncomeCategories instead and are NOT in translations — so a
+// lookup that only checks `tr` shows the raw internal key (e.g.
+// "custom_suger_1784775632372") for any custom category. Several
+// components used to reimplement this lookup independently and most of
+// them forgot the custom-category fallback; this is the one place it
+// should happen going forward.
+export function resolveCategoryLabel(
+  key: string,
+  tr: Record<string, string>,
+  customCategories: Record<string, string> = {},
+  customIncomeCategories: Record<string, string> = {}
+): string {
+  return tr[key] || customCategories[key] || customIncomeCategories[key] || key;
+}

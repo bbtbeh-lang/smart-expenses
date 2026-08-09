@@ -4,33 +4,47 @@ import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Search, X, Download, Pencil } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang } from '@/lib/types';
-import { formatCurrency, parseLocalDate } from '@/lib/utils';
+import { formatCurrency, parseLocalDate, resolveCategoryLabel } from '@/lib/utils';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
   tr: Translations;
   lang: Lang;
   onEdit: (tx: Transaction) => void;
+  customCategories?: Record<string, string>;
+  customIncomeCategories?: Record<string, string>;
 }
 
 type FilterType = 'all' | 'income' | 'expense';
 
-function exportToCsv(transactions: Transaction[], tr: Translations) {
+// csvField quotes/escapes every field — a custom category label (user-
+// typed, unvalidated) can contain a comma just as easily as a
+// description can, and an unquoted comma there silently shifts every
+// column after it.
+const csvField = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+
+function exportToCsv(
+  transactions: Transaction[],
+  catLabel: (key: string) => string
+) {
   const header = ['Date', 'Type', 'Description', 'Category', 'Amount', 'Tax', 'Receipt'];
   const rows = transactions
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map(tx => [
-      tx.date,
-      tx.type,
-      `"${tx.description.replace(/"/g, '""')}"`,
-      (tr as any)[tx.category] || tx.category,
-      tx.type === 'income' ? tx.amount.toFixed(2) : (-tx.amount).toFixed(2),
-      tx.taxAmount != null ? tx.taxAmount.toFixed(2) : '',
-      tx.hasReceipt ? 'Yes' : 'No',
+      csvField(tx.date),
+      csvField(tx.type),
+      csvField(tx.description),
+      // BUG FIX: this used to only check `tr`, showing a custom
+      // category's raw internal key ("custom_suger_1784775632372")
+      // instead of the label the person actually typed.
+      csvField(catLabel(tx.category)),
+      csvField(tx.type === 'income' ? tx.amount.toFixed(2) : (-tx.amount).toFixed(2)),
+      csvField(tx.taxAmount != null ? tx.taxAmount.toFixed(2) : ''),
+      csvField(tx.hasReceipt ? 'Yes' : 'No'),
     ]);
 
-  const csv = [header, ...rows].map(r => r.join(',')).join('\r\n');
+  const csv = [header.map(csvField), ...rows].map(r => r.join(',')).join('\r\n');
   const bom = '\uFEFF';
   const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -41,7 +55,8 @@ function exportToCsv(transactions: Transaction[], tr: Translations) {
   URL.revokeObjectURL(url);
 }
 
-export default function TransactionsTab({ transactions, tr, lang, onEdit }: TransactionsTabProps) {
+export default function TransactionsTab({ transactions, tr, lang, onEdit, customCategories = {}, customIncomeCategories = {} }: TransactionsTabProps) {
+  const catLabel = (key: string) => resolveCategoryLabel(key, tr as unknown as Record<string, string>, customCategories, customIncomeCategories);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
@@ -90,7 +105,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit }: Tran
       {transactions.length > 0 && (
         <div className="flex justify-end">
           <button
-            onClick={() => exportToCsv(transactions, tr)}
+            onClick={() => exportToCsv(transactions, catLabel)}
             className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all duration-150 shadow-sm shadow-emerald-200"
           >
             <Download className="w-3.5 h-3.5" />
@@ -172,7 +187,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit }: Tran
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-xs text-slate-400">{tx.date}</span>
                     <span className="w-1 h-1 rounded-full bg-slate-300" />
-                    <span className="text-xs text-slate-400 truncate">{(tr as any)[tx.category] || tx.category}</span>
+                    <span className="text-xs text-slate-400 truncate">{catLabel(tx.category)}</span>
                     {tx.hasReceipt && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-md font-medium">AI</span>}
                   </div>
                 </div>

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Tier, Transaction, Lang } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, resolveCategoryLabel } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 interface TaxReportModalProps {
@@ -14,11 +14,14 @@ interface TaxReportModalProps {
   transactions: Transaction[];
   onClose: () => void;
   onOpenUpgrade: () => void;
+  customCategories?: Record<string, string>;
+  customIncomeCategories?: Record<string, string>;
 }
 
 type Tab = 'summary' | 'ledger' | 'tax';
 
-export default function TaxReportModal({ tr, tier, lang, transactions: allTransactions, onClose, onOpenUpgrade }: TaxReportModalProps) {
+export default function TaxReportModal({ tr, tier, lang, transactions: allTransactions, onClose, onOpenUpgrade, customCategories = {}, customIncomeCategories = {} }: TaxReportModalProps) {
+  const catLabel = (key: string) => resolveCategoryLabel(key, tr as unknown as Record<string, string>, customCategories, customIncomeCategories);
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
@@ -139,7 +142,10 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
       rows.push(['TAX BY CATEGORY', '', '', '', '', '', '', '']);
       rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '', '']);
       categoryBreakdown.forEach(([cat, sums]) => {
-        const label = (tr as any)[cat] || cat;
+        // BUG FIX: this used to only check `tr`, so any custom expense
+        // category showed its raw internal key instead of the label the
+        // person typed — on the report that goes straight to an accountant.
+        const label = catLabel(cat);
         rows.push([label, String(sums.amount), String(sums.tax), '', '', '', '', '']);
       });
     }
@@ -281,7 +287,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
                       <div className={`w-2 h-2 rounded-full shrink-0 ${tx.type === 'income' ? 'bg-emerald-500' : 'bg-rose-400'}`} />
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-slate-800 truncate">{tx.description}</div>
-                        <div className="text-xs text-slate-500">{tx.date} · {tx.category}</div>
+                        <div className="text-xs text-slate-500">{tx.date} · {catLabel(tx.category)}</div>
                       </div>
                       <div className={`text-sm font-bold shrink-0 ${tx.type === 'income' ? 'text-emerald-600' : 'text-rose-500'}`} dir="ltr">
                         {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, lang, 2)}
@@ -340,7 +346,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
                     </div>
                     {categoryBreakdown.map(([cat, sums]) => (
                       <div key={cat} className="flex items-center justify-between bg-white rounded-xl px-3 py-2">
-                        <span className="text-xs font-medium text-slate-700">{(tr as any)[cat] || cat}</span>
+                        <span className="text-xs font-medium text-slate-700">{catLabel(cat)}</span>
                         <span className="text-xs font-semibold text-slate-600" dir="ltr">
                           {formatCurrency(sums.amount, lang, 2)} · {formatCurrency(sums.tax, lang, 2)}
                         </span>
