@@ -22,7 +22,7 @@ import BudgetModal from '@/components/BudgetModal';
 import Toast, { ToastMessage } from '@/components/Toast';
 import { supabase } from '@/lib/supabase';
 import { todayLocalDate } from '@/lib/utils';
-import { syncTransactions, upsertTransaction, deleteTransactionRemote } from '@/lib/transactionSync';
+import { syncTransactions, upsertTransaction, deleteTransactionRemote, markTransactionDeletedLocally, getRecentlyDeletedIds } from '@/lib/transactionSync';
 
 const STORAGE_KEY = 'finsnap_state_v1';
 
@@ -111,7 +111,7 @@ export default function Home() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return;
     try {
-      const res = await fetch('/api/subscription', {
+      const res = await fetch(`/api/subscription?date=${encodeURIComponent(todayLocalDate())}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!res.ok) return;
@@ -137,7 +137,7 @@ export default function Home() {
   // a device with pre-existing local data signs in, pushes those local
   // transactions up once so they aren't lost) — see lib/transactionSync.ts.
   const syncUserTransactions = useCallback(async (userId: string, localTx: Transaction[]) => {
-    const merged = await syncTransactions(userId, localTx);
+    const merged = await syncTransactions(userId, localTx, getRecentlyDeletedIds());
     setState(prev => ({ ...prev, transactions: merged }));
   }, []);
 
@@ -449,6 +449,12 @@ export default function Home() {
   };
 
   const handleDeleteTransaction = (id: string) => {
+    // Tombstone this ID locally *before* anything else — see
+    // syncTransactions/markTransactionDeletedLocally in lib/transactionSync.ts.
+    // Without this, a stale local snapshot on another device/tab could
+    // see the deletion as an unsynced add and push the transaction right
+    // back onto the server.
+    markTransactionDeletedLocally(id);
     setState(prev => {
       const tx = prev.transactions.find(t => t.id === id);
       return {

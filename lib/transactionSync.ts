@@ -54,8 +54,23 @@ function fromRow(row: Record<string, unknown>): Transaction {
  * server is (a) kept in the returned list so it never disappears, and
  * (b) re-pushed to the server, which also self-heals any write that
  * silently failed earlier.
+ *
+ * BUG FIX: that same "local-only = unsynced add" assumption used to
+ * silently resurrect deleted transactions too — a locally-deleted
+ * transaction is *also* "in local state but missing from the server"
+ * for a brief window, and any device/tab holding a stale localStorage
+ * snapshot from before the deletion (an old tab left open for weeks, a
+ * reinstalled PWA, etc.) would see it as an unsynced add and push it
+ * right back. `recentlyDeletedIds` is a local tombstone set (see
+ * handleDeleteTransaction in app/page.tsx) that tells this function
+ * "these IDs were deleted on purpose, don't treat their absence from
+ * the server as something to heal."
  */
-export async function syncTransactions(userId: string, localTransactions: Transaction[]): Promise<Transaction[]> {
+export async function syncTransactions(
+  userId: string,
+  localTransactions: Transaction[],
+  recentlyDeletedIds: Set<string> = new Set()
+): Promise<Transaction[]> {
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
@@ -69,7 +84,9 @@ export async function syncTransactions(userId: string, localTransactions: Transa
 
   const serverTransactions = (data || []).map(fromRow);
   const serverIds = new Set(serverTransactions.map(t => t.id));
-  const missingFromServer = localTransactions.filter(t => !serverIds.has(t.id));
+  const missingFromServer = localTransactions.filter(
+    t => !serverIds.has(t.id) && !recentlyDeletedIds.has(t.id)
+  );
 
   if (missingFromServer.length > 0) {
     const rows = missingFromServer.map(tx => toRow(tx, userId));
@@ -90,4 +107,51 @@ export async function upsertTransaction(tx: Transaction, userId: string) {
 export async function deleteTransactionRemote(id: string) {
   const { error } = await supabase.from('transactions').delete().eq('id', id);
   if (error) console.error('Failed to delete transaction on server:', error);
+}
+
+// --- Local deletion tombstones ---
+// A small localStorage-backed record of recently-deleted transaction IDs,
+// kept separate from the main app-state blob so it survives independently
+// and stays out of the synced payload. Without this, syncTransactions has
+// no way to distinguish "deleted on purpose" from "added but not yet
+// synced" when a stale local snapshot re-appears (see the comment on
+// syncTransactions above). Entries are pruned after 60 days — by then the
+// deletion has long since reached every device, so there's no more
+// resurrection risk to guard against, and the list can't grow forever.
+const DELETED_IDS_KEY = 'finsnap_deleted_tx_ids';
+const DELETED_ID_TTL_MS = 60 * 24 * 60 * 60 * 1000;
+
+export function markTransactionDeletedLocally(id: string) {
+  try {
+    const map = readDeletedIdsMap();
+    map[id] = Date.now();
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+export function getRecentlyDeletedIds(): Set<string> {
+  try {
+    const map = readDeletedIdsMap();
+    const cutoff = Date.now() - DELETED_ID_TTL_MS;
+    const fresh: Record<string, number> = {};
+    const ids = new Set<string>();
+    for (const [id, ts] of Object.entries(map)) {
+      if (ts >= cutoff) { fresh[id] = ts; ids.add(id); }
+    }
+    // Prune expired entries as a side effect of reading, so this doesn't
+    // need its own separate cleanup pass anywhere else.
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(fresh));
+    return ids;
+  } catch {
+    return new Set();
+  }
+}
+
+function readDeletedIdsMap(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(DELETED_IDS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
 }

@@ -31,9 +31,19 @@ export async function GET(req: NextRequest) {
   // hasManualAccess: a paid plan grants it too, OR the user redeemed
   // today's code (checked via code_usages, written only by the atomic
   // redeem_daily_code() function — never trust a client-side flag here).
+  // BUG FIX (regression from the daily-code timezone fix): code_usages.used_date
+  // is now written as the user's local calendar date (see redeem_daily_code
+  // and the migration it pairs with), but this was still comparing against
+  // the server's UTC "today" — meaning right after a user redeemed a code
+  // in the Toronto evening, this check could look for the wrong date and
+  // report hasManualAccess: false even though the redemption succeeded.
   let hasManualAccess = isPlanActive;
   if (!hasManualAccess) {
-    const today = new Date().toISOString().slice(0, 10);
+    const { searchParams } = new URL(req.url);
+    const localDateRaw = searchParams.get('date') || '';
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(localDateRaw)
+      ? localDateRaw
+      : new Date().toISOString().slice(0, 10);
     const { data: usageToday } = await supabaseAdmin
       .from('code_usages')
       .select('id')
