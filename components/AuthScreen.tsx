@@ -9,8 +9,8 @@ interface AuthScreenProps {
   onLogin: (email: string) => void;
 }
 
-function getErrorMessage(message: string): string {
-  return message || 'Something went wrong. Please try again.';
+function getErrorMessage(message: string, tr: Translations): string {
+  return message || tr.authGenericError;
 }
 
 export default function AuthScreen({ tr }: AuthScreenProps) {
@@ -24,7 +24,7 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
       provider: 'google',
       options: { redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
     });
-    if (err) { setLoading(false); setError(getErrorMessage(err.message)); }
+    if (err) { setLoading(false); setError(getErrorMessage(err.message, tr)); }
   };
 
   return (
@@ -57,7 +57,7 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
           )}
-          {loading ? 'Signing in...' : 'Continue with Google'}
+          {loading ? tr.signingIn : tr.continueWithGoogle}
         </button>
 
         {error && (
@@ -65,10 +65,24 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
         )}
 
         <p className="text-xs text-slate-400 mt-6 leading-relaxed">
-          By continuing, you agree to FinSnap's{' '}
-          <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Terms</a>
-          {' '}and{' '}
-          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">Privacy Policy</a>.
+          {(() => {
+            // authTermsAgreement has {terms} and {privacy} placeholders so
+            // the two legal links can be real <a> tags (clickable, with
+            // proper href/target) rather than baked into a plain string —
+            // splitting on the placeholders keeps the surrounding sentence
+            // fully translatable per language.
+            const [before, rest] = tr.authTermsAgreement.split('{terms}');
+            const [between, after] = rest.split('{privacy}');
+            return (
+              <>
+                {before}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">{tr.termsLinkLabel}</a>
+                {between}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">{tr.privacyLinkLabel}</a>
+                {after}
+              </>
+            );
+          })()}
         </p>
       </div>
     </div>

@@ -261,7 +261,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
                 </div>
               </div>
               <div className="bg-slate-50 rounded-2xl p-4">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Transaction Count</div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.transactionCount}</div>
                 <div className="flex gap-3">
                   <div className="flex-1 bg-emerald-50 rounded-xl p-3 text-center">
                     <div className="text-lg font-bold text-emerald-600">{transactions.filter(t => t.type === 'income').length}</div>

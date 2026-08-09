@@ -127,23 +127,44 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
   }, [customItems, sortByDueDate, dueDates]);
 
   const handleSave = () => {
-    const next: Record<string, number> = {};
-    // built-in cats
-    Object.entries(values).forEach(([k, v]) => {
-      const n = parseFloat(v);
-      if (!isNaN(n) && n > 0) next[k] = n;
+    // BUG FIX: this used to build `next` from scratch containing only
+    // this session's category set (the CURRENT account type's built-in
+    // categories + custom items). Since the parent replaces the entire
+    // budgets object with whatever this returns, saving budgets while in
+    // "business" mode used to silently wipe out every "personal"-only
+    // category's budget (catHealth, catEntertainment, etc.) and vice
+    // versa. Starting from a copy of the existing budgets means anything
+    // outside this session's category set — the other account type's
+    // exclusive categories — is left untouched.
+    const next: Record<string, number> = { ...budgets };
+
+    // Built-in categories for the account type currently open in this
+    // modal — safe to fully reconcile (set, or clear if zeroed/blanked).
+    cats.forEach(cat => {
+      const n = parseFloat(values[cat]);
+      if (!isNaN(n) && n > 0) next[cat] = n;
+      else delete next[cat];
     });
-    // custom cats
+
+    // Custom categories are shown regardless of account type (see the
+    // customItems useState initializer below), so this list always
+    // reflects the full, current set — safe to fully reconcile too,
+    // including clearing anything the person just removed.
     const nextCustom: Record<string, string> = {};
     customItems.forEach(item => {
       const n = parseFloat(item.amount);
       if (!isNaN(n) && n > 0) next[item.key] = n;
+      else delete next[item.key];
       if (item.label.trim()) nextCustom[item.key] = item.label.trim();
+    });
+    Object.keys(customCategories).forEach(key => {
+      if (!customItems.some(i => i.key === key)) delete next[key];
     });
 
     // Due dates / reminders only make sense for items that actually have a
     // budget amount set — drop stale entries for anything that got zeroed
-    // out or removed.
+    // out or removed. `next` now correctly retains the other account
+    // type's categories too, so their due dates/reminders survive here.
     const nextDueDates: Record<string, DueDateEntry> = {};
     const nextReminders: Record<string, boolean> = {};
     Object.entries(dueDates).forEach(([k, entry]) => {
@@ -243,7 +264,7 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
           {/* Custom items */}
           {sortedCustomItems.length > 0 && (
             <div className="space-y-3 mb-5">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custom</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{tr.customSectionLabel}</div>
               {sortedCustomItems.map(item => (
                 <div key={item.key} className="rounded-xl">
                   <div className="flex items-center gap-3">

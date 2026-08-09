@@ -230,7 +230,7 @@ export default function TransactionModal({
     } catch (err) {
       console.error('OCR failed:', err);
       setOcrStatus('error');
-      setOcrBanner('OCR failed — please enter details manually.');
+      setOcrBanner(tr.ocrFailed);
       setTimeout(() => setStep('manual'), 1200);
     }
   }, [txType, tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
@@ -377,7 +377,7 @@ export default function TransactionModal({
 
           {step === 'type' && (
             <div className="space-y-3">
-              <p className="text-sm text-slate-500 mb-4">Select the transaction type:</p>
+              <p className="text-sm text-slate-500 mb-4">{tr.selectTransactionType}</p>
               <button
                 onClick={() => handleTypeSelect('income')}
                 className="w-full flex items-center gap-4 p-5 border-2 border-slate-200 hover:border-emerald-400 rounded-2xl text-left transition-all duration-150 hover:bg-emerald-50 active:scale-[0.98] group"
@@ -385,7 +385,7 @@ export default function TransactionModal({
                 <div className="text-3xl">💰</div>
                 <div>
                   <div className="font-bold text-slate-900">{tr.incomeLabel}</div>
-                  <div className="text-sm text-slate-500">Money coming in</div>
+                  <div className="text-sm text-slate-500">{tr.moneyComingIn}</div>
                 </div>
                 <div className="ml-auto w-8 h-8 rounded-full bg-slate-50 group-hover:bg-emerald-500 flex items-center justify-center transition-all">
                   <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
@@ -398,7 +398,7 @@ export default function TransactionModal({
                 <div className="text-3xl">💸</div>
                 <div>
                   <div className="font-bold text-slate-900">{tr.expenseLabel}</div>
-                  <div className="text-sm text-slate-500">Money going out</div>
+                  <div className="text-sm text-slate-500">{tr.moneyGoingOut}</div>
                 </div>
                 <div className="ml-auto w-8 h-8 rounded-full bg-slate-50 group-hover:bg-rose-500 flex items-center justify-center transition-all">
                   <svg className="w-4 h-4 text-slate-400 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
@@ -424,8 +424,10 @@ export default function TransactionModal({
                   <div className="text-3xl">📸</div>
                   <div>
                     <div className="font-bold text-slate-900">{tr.yesUpload}</div>
-                    <div className="text-xs text-slate-500 mt-0.5" dir="ltr">
-                      {scansLeft > 0 ? `${scansLeft} scan${scansLeft !== 1 ? 's' : ''} left this month` : tr.scanLimitReached}
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {scansLeft > 0
+                        ? tr.scansLeftThisMonth.replace('{count}', String(scansLeft)).replace(/\{plural\}/g, scansLeft !== 1 ? 's' : '')
+                        : tr.scanLimitReached}
                     </div>
                   </div>
                   <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
@@ -640,7 +642,7 @@ export default function TransactionModal({
               {receiptItems.length > 0 && (
                 <div className="bg-slate-50 rounded-xl p-3">
                   <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                    {'Receipt Items / آیتم‌های رسید'}
+                    {tr.receiptItemsLabel}
                   </div>
                   <div className="space-y-1">
                     {receiptItems.map((item, i) => (
@@ -674,7 +676,7 @@ export default function TransactionModal({
                   type="text"
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder={txType === 'income' ? 'e.g. Client invoice #12' : 'e.g. Office supplies'}
+                  placeholder={txType === 'income' ? tr.descriptionPlaceholderIncome : tr.descriptionPlaceholderExpense}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                   dir="auto"
                 />
