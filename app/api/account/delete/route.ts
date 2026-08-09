@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { stripe } from '@/lib/stripe';
 
 // Deleting the auth user cascades (via ON DELETE CASCADE foreign keys) to
 // every table that references it — subscriptions, code_usages,
@@ -15,6 +16,28 @@ export async function POST(req: NextRequest) {
   const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
   if (userError || !userData?.user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  // BUG FIX: this used to only delete the Supabase user, whose cascade
+  // wipes the local `subscriptions` row — but never told Stripe anything.
+  // A paying customer deleting their account kept getting billed every
+  // period indefinitely, and once the local row was gone (cascaded away),
+  // there was no longer even a stored stripe_subscription_id to find and
+  // cancel by hand later. Cancel immediately (not at period end) since the
+  // account and all its data are being erased right now, not just
+  // downgraded — best-effort: a Stripe hiccup here shouldn't block the
+  // person from deleting their account, so we log and continue either way.
+  try {
+    const { data: sub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('stripe_subscription_id')
+      .eq('user_id', userData.user.id)
+      .maybeSingle();
+    if (sub?.stripe_subscription_id) {
+      await stripe.subscriptions.cancel(sub.stripe_subscription_id);
+    }
+  } catch (err) {
+    console.error('Stripe subscription cancellation on account deletion failed (continuing anyway):', err);
   }
 
   // Best-effort cleanup of archived receipt/invoice images — Storage

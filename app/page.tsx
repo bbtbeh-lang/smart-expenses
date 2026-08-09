@@ -367,7 +367,7 @@ export default function Home() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!res.ok) {
-        addToast('Failed to delete account. Please try again.', 'error');
+        addToast(tr.deleteAccountFailedError, 'error');
         return;
       }
       await supabase.auth.signOut();
@@ -375,7 +375,7 @@ export default function Home() {
       setState(freshState(state.lang));
       setActiveTab('dashboard');
     } catch {
-      addToast('Failed to delete account. Please try again.', 'error');
+      addToast(tr.deleteAccountFailedError, 'error');
     }
   };
 
@@ -423,7 +423,7 @@ export default function Home() {
       totalExpenses: tx.type === 'expense' ? prev.totalExpenses + tx.amount : prev.totalExpenses,
     }));
     setShowTransactionModal(false);
-    addToast(`${tx.type === 'income' ? '💰' : '💸'} Transaction saved!`, 'success');
+    addToast(`${tx.type === 'income' ? '💰' : '💸'} ${tr.transactionSavedToast}`, 'success');
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) upsertTransaction(tx, user.id);
     });
@@ -442,7 +442,7 @@ export default function Home() {
       };
     });
     setEditingTransaction(null);
-    addToast('Transaction updated!', 'success');
+    addToast(tr.transactionUpdatedToast, 'success');
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) upsertTransaction(tx, user.id);
     });
@@ -465,7 +465,7 @@ export default function Home() {
       };
     });
     setEditingTransaction(null);
-    addToast('Transaction deleted.', 'info');
+    addToast(tr.transactionDeletedToast, 'info');
     deleteTransactionRemote(id);
   };
 
@@ -475,7 +475,11 @@ export default function Home() {
   const handleStartCheckout = async (plan: 'basic' | 'pro' | 'business', billingPeriod: 'monthly' | 'yearly') => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
-      addToast(tr.signingOut, 'error');
+      // BUG FIX: this used to show tr.signingOut ("Signing out...") as the
+      // error message here — a copy-paste mix-up that told someone whose
+      // session had expired that they were being signed out, instead of
+      // telling them what actually happened and what to do about it.
+      addToast(tr.sessionExpiredError, 'error');
       return;
     }
 
@@ -494,7 +498,7 @@ export default function Home() {
           setShowUpgrade(false);
           await refreshSubscription();
         } else {
-          addToast(data.error || 'Plan change failed', 'error');
+          addToast(data.error || tr.planChangeFailedError, 'error');
         }
         return;
       }
@@ -508,10 +512,10 @@ export default function Home() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        addToast(data.error || 'Checkout failed', 'error');
+        addToast(data.error || tr.checkoutFailedError, 'error');
       }
     } catch {
-      addToast('Checkout failed', 'error');
+      addToast(tr.checkoutFailedError, 'error');
     }
   };
 
@@ -532,10 +536,10 @@ export default function Home() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        addToast(data.error || 'Could not open subscription management', 'error');
+        addToast(data.error || tr.manageSubscriptionFailedError, 'error');
       }
     } catch {
-      addToast('Could not open subscription management', 'error');
+      addToast(tr.manageSubscriptionFailedError, 'error');
     }
   };
 
