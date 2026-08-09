@@ -80,7 +80,15 @@ function renderRenewalReminderHtml(
   copy: { subject: string; heading: string; body: (p: RenewalReminderParams) => string; cta: string }
 ): string {
   const dir = params.lang === 'FA' ? 'rtl' : 'ltr';
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://smart-expenses-2026.vercel.app';
+  // This function is only ever called from the Stripe webhook (server-to-
+  // server, no browser Origin header exists at all), so unlike the
+  // checkout/portal routes, this ALWAYS falls through to whichever value
+  // is here whenever NEXT_PUBLIC_APP_URL isn't set — every renewal email's
+  // "Manage subscription" link depends on this being right. Confirmed
+  // against the Vercel dashboard: the real production domain is
+  // finsnap-2026.vercel.app, not the old repo-name-based fallback this
+  // used to have.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://finsnap-2026.vercel.app';
 
   return `
   <div dir="${dir}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff;">

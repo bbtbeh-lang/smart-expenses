@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 404 });
     }
 
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://smart-expenses-2026.vercel.app';
+    // Same fix as /api/stripe/checkout — the real production domain is
+    // finsnap-2026.vercel.app, not the old repo-name-based fallback.
+    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://finsnap-2026.vercel.app';
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
