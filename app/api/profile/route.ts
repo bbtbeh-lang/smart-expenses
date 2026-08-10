@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('user_profiles')
-    .select('birth_date, custom_categories, custom_income_categories')
+    .select('birth_date, custom_categories, custom_income_categories, budget_data')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     birthDate: data?.birth_date ?? null,
     customCategories: data?.custom_categories ?? {},
     customIncomeCategories: data?.custom_income_categories ?? {},
+    budgetData: data?.budget_data ?? {},
   });
 }
 
@@ -36,6 +37,7 @@ export async function PATCH(req: NextRequest) {
   const birthDate = body.birthDate as string | null;
   const incomingCustomCategories = body.customCategories as Record<string, string> | undefined;
   const incomingCustomIncomeCategories = body.customIncomeCategories as Record<string, string> | undefined;
+  const incomingBudgetData = body.budgetData as Record<string, unknown> | undefined;
 
   // Basic sanity checks: valid YYYY-MM-DD, not in the future, not
   // implausibly old (guards against fat-finger typos like a 1901 year).
@@ -66,6 +68,11 @@ export async function PATCH(req: NextRequest) {
   if (incomingCustomIncomeCategories) {
     updates.custom_income_categories = incomingCustomIncomeCategories;
   }
+  // Same authoritative-replace reasoning as the two fields above — the
+  // client always sends its full, already-reconciled budget snapshot.
+  if (incomingBudgetData) {
+    updates.budget_data = incomingBudgetData;
+  }
 
   const { error } = await supabaseAdmin
     .from('user_profiles')
@@ -76,5 +83,10 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, customCategories: updates.custom_categories, customIncomeCategories: updates.custom_income_categories });
+  return NextResponse.json({
+    success: true,
+    customCategories: updates.custom_categories,
+    customIncomeCategories: updates.custom_income_categories,
+    budgetData: updates.budget_data,
+  });
 }

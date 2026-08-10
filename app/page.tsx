@@ -166,8 +166,9 @@ export default function Home() {
       const merged = { ...serverMap, ...localMap };
       setState(prev => ({ ...prev, [field]: merged }));
       // Push back so any locally-minted-but-unsynced categories reach the
-      // server too (the PATCH endpoint merges, so this can't clobber
-      // labels another device added in the meantime).
+      // server too. The PATCH endpoint authoritatively replaces (not
+      // merges) — safe here because `merged` above already folded in
+      // whatever the server had before we overwrite it.
       if (Object.keys(merged).length > 0) {
         await fetch('/api/profile', {
           method: 'PATCH',
@@ -178,6 +179,44 @@ export default function Home() {
     } catch {
       // Network error — keep whatever's already in local state; next
       // sign-in (or the next edit, via the save effect below) will retry.
+    }
+  }, []);
+
+  // Same idea as syncUserCustomCategoryMap above, but for budgets/
+  // budgetDueDates/budgetReminders together (see the migration this
+  // pairs with — these three were never synced to the server at all
+  // before, so signing out silently erased them since localStorage is
+  // cleared on logout).
+  const syncUserBudgetData = useCallback(async (
+    localBudgets: Record<string, number>,
+    localDueDates: AppState['budgetDueDates'],
+    localReminders: Record<string, boolean>
+  ) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/profile', { headers: { Authorization: `Bearer ${session.access_token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      const server = (data.budgetData ?? {}) as {
+        budgets?: Record<string, number>;
+        budgetDueDates?: AppState['budgetDueDates'];
+        budgetReminders?: Record<string, boolean>;
+      };
+      const merged = {
+        budgets: { ...(server.budgets ?? {}), ...localBudgets },
+        budgetDueDates: { ...(server.budgetDueDates ?? {}), ...localDueDates },
+        budgetReminders: { ...(server.budgetReminders ?? {}), ...localReminders },
+      };
+      setState(prev => ({ ...prev, ...merged }));
+      await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ budgetData: merged }),
+      });
+    } catch {
+      // Network error — keep whatever's already in local state; next
+      // sign-in (or the debounced save effect below) will retry.
     }
   }, []);
 
@@ -192,6 +231,13 @@ export default function Home() {
   const customIncomeCategoriesRef = useRef<Record<string, string>>(state.customIncomeCategories);
   useEffect(() => { customIncomeCategoriesRef.current = state.customIncomeCategories; }, [state.customIncomeCategories]);
 
+  const budgetsRef = useRef<Record<string, number>>(state.budgets);
+  useEffect(() => { budgetsRef.current = state.budgets; }, [state.budgets]);
+  const budgetDueDatesRef = useRef<AppState['budgetDueDates']>(state.budgetDueDates);
+  useEffect(() => { budgetDueDatesRef.current = state.budgetDueDates; }, [state.budgetDueDates]);
+  const budgetRemindersRef = useRef<Record<string, boolean>>(state.budgetReminders);
+  useEffect(() => { budgetRemindersRef.current = state.budgetReminders; }, [state.budgetReminders]);
+
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -202,6 +248,7 @@ export default function Home() {
         syncUserTransactions(session.user.id, loaded.transactions);
         syncUserCustomCategoryMap(session.user.id, 'customCategories', loaded.customCategories);
         syncUserCustomCategoryMap(session.user.id, 'customIncomeCategories', loaded.customIncomeCategories);
+        syncUserBudgetData(loaded.budgets, loaded.budgetDueDates, loaded.budgetReminders);
       }
     });
 
@@ -227,6 +274,10 @@ export default function Home() {
           syncUserCustomCategoryMap(session.user.id, 'customCategories', localCats);
           const localIncomeCats = Object.keys(customIncomeCategoriesRef.current).length > 0 ? customIncomeCategoriesRef.current : loaded.customIncomeCategories;
           syncUserCustomCategoryMap(session.user.id, 'customIncomeCategories', localIncomeCats);
+          const localBudgets = Object.keys(budgetsRef.current).length > 0 ? budgetsRef.current : loaded.budgets;
+          const localDueDates = Object.keys(budgetDueDatesRef.current).length > 0 ? budgetDueDatesRef.current : loaded.budgetDueDates;
+          const localReminders = Object.keys(budgetRemindersRef.current).length > 0 ? budgetRemindersRef.current : loaded.budgetReminders;
+          syncUserBudgetData(localBudgets, localDueDates, localReminders);
         }
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
@@ -321,6 +372,38 @@ export default function Home() {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.customIncomeCategories, state.screen]);
+
+  // Same debounced persistence, for budgets/budgetDueDates/budgetReminders
+  // together — see the migration and syncUserBudgetData above for why
+  // this exists: without it, budget data only lived in localStorage and
+  // every sign-out silently erased it.
+  const budgetDataSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (state.screen === 'auth' || Object.keys(state.budgets).length === 0) return;
+    if (budgetDataSaveTimer.current) clearTimeout(budgetDataSaveTimer.current);
+    budgetDataSaveTimer.current = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          budgetData: {
+            budgets: state.budgets,
+            budgetDueDates: state.budgetDueDates,
+            budgetReminders: state.budgetReminders,
+          },
+        }),
+      }).catch(() => {
+        // Best-effort — the next sign-in's syncUserBudgetData call will
+        // retry with whatever's in memory or localStorage by then.
+      });
+    }, 800);
+    return () => {
+      if (budgetDataSaveTimer.current) clearTimeout(budgetDataSaveTimer.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.budgets, state.budgetDueDates, state.budgetReminders, state.screen]);
 
   const tr = t[state.lang];
 
