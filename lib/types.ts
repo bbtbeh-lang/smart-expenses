@@ -66,6 +66,21 @@ export interface AppState {
   // categories where a monthly window doesn't fit (insurance, annual
   // software licenses, etc).
   budgetPeriods: Record<string, 'monthly' | 'quarterly' | 'yearly'>;
+  // Optional fixed term (start/end date) for a recurring budget item —
+  // e.g. a car lease or an apartment rent that's only meant to apply for
+  // a known window rather than indefinitely. Both bounds are optional
+  // and independent: startDate alone means "active from this date on",
+  // endDate alone means "active until this date", both together bound a
+  // finite window, and an absent entry (or an entry with neither bound
+  // set) means the item is active indefinitely — same opt-in shape as
+  // budgetPeriods above, so nothing changes for anyone who doesn't touch
+  // this feature.
+  budgetTerms: Record<string, BudgetTerm>;
+}
+
+export interface BudgetTerm {
+  startDate?: string;
+  endDate?: string;
 }
 
 // NOTE: the actual initial app state lives in freshState() in

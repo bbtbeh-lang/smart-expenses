@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Lang } from './types';
+import { Lang, BudgetTerm } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -137,6 +137,40 @@ export function getNextDueDate(
     candidate = clampToMonth(year + 1, anchor.getMonth(), anchor.getDate());
   }
   return candidate;
+}
+
+export type BudgetTermStatus = 'upcoming' | 'active' | 'ended';
+
+// Where `referenceDate` (a local YYYY-MM-DD string, defaulting to today)
+// sits relative to a fixed term's optional start/end bounds. A term with
+// neither bound set (or no term at all) is always 'active' — plain
+// string comparison is safe here since YYYY-MM-DD sorts lexicographically
+// the same as chronologically. Bounds are inclusive.
+export function getBudgetTermStatus(
+  term: BudgetTerm | undefined,
+  referenceDate: string = todayLocalDate()
+): BudgetTermStatus {
+  if (!term) return 'active';
+  if (term.startDate && referenceDate < term.startDate) return 'upcoming';
+  if (term.endDate && referenceDate > term.endDate) return 'ended';
+  return 'active';
+}
+
+// Caps a recurring due date's next occurrence at a fixed term's end
+// date. getNextDueDate on its own has no concept of a term, so a
+// "monthly" reminder for a car lease or apartment rent would otherwise
+// keep resurfacing forever after the lease/rent term actually ended —
+// this makes the reminder stop once the term is over.
+export function nextDueDateWithinTerm(
+  anchorDate: string,
+  recurrence: 'none' | 'weekly' | 'monthly' | 'yearly',
+  term: BudgetTerm | undefined,
+  today: Date = new Date()
+): Date | null {
+  const next = getNextDueDate(anchorDate, recurrence, today);
+  if (!next || !term?.endDate) return next;
+  const end = parseLocalDate(term.endDate);
+  return next > end ? null : next;
 }
 
 // Custom categories are stored as { key: label }. Every place that lets a

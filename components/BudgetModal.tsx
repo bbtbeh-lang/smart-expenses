@@ -3,8 +3,8 @@
 import { useState, useMemo, useRef } from 'react';
 import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
-import { AccountType, Lang } from '@/lib/types';
-import { getOrCreateCategoryKey, getNextDueDate, BudgetPeriod } from '@/lib/utils';
+import { AccountType, Lang, BudgetTerm } from '@/lib/types';
+import { getOrCreateCategoryKey, getNextDueDate, BudgetPeriod, getBudgetTermStatus } from '@/lib/utils';
 
 const EXPENSE_CATS_PERSONAL = [
   'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
@@ -33,17 +33,19 @@ interface BudgetModalProps {
   budgetDueDates: Record<string, DueDateEntry>;
   budgetReminders: Record<string, boolean>;
   budgetPeriods: Record<string, BudgetPeriod>;
+  budgetTerms: Record<string, BudgetTerm>;
   onSave: (
     budgets: Record<string, number>,
     customCategories: Record<string, string>,
     budgetDueDates: Record<string, DueDateEntry>,
     budgetReminders: Record<string, boolean>,
-    budgetPeriods: Record<string, BudgetPeriod>
+    budgetPeriods: Record<string, BudgetPeriod>,
+    budgetTerms: Record<string, BudgetTerm>
   ) => void;
   onClose: () => void;
 }
 
-export default function BudgetModal({ tr, accountType, budgets, customCategories, budgetDueDates, budgetReminders, budgetPeriods, onSave, onClose }: BudgetModalProps) {
+export default function BudgetModal({ tr, accountType, budgets, customCategories, budgetDueDates, budgetReminders, budgetPeriods, budgetTerms, onSave, onClose }: BudgetModalProps) {
   const cats = accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
 
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -57,6 +59,12 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
   // Starts as a straight copy of whatever's already saved; handleSave
   // below reconciles it the same way it reconciles budgets/due dates.
   const [periods, setPeriods] = useState<Record<string, BudgetPeriod>>(() => ({ ...budgetPeriods }));
+
+  // Optional fixed term (start/end date) — for recurring items that are
+  // only meant to apply for a known window (a car lease, an apartment
+  // rent), rather than indefinitely. Same reconcile-on-save pattern as
+  // periods above.
+  const [terms, setTerms] = useState<Record<string, BudgetTerm>>(() => ({ ...budgetTerms }));
 
   // Due date (calendar date) + recurrence rule, and reminder toggle, per
   // built-in category key.
@@ -97,6 +105,7 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
     setCustomItems(prev => prev.filter(i => i.key !== key));
     setDueDates(prev => { const next = { ...prev }; delete next[key]; return next; });
     setReminders(prev => { const next = { ...prev }; delete next[key]; return next; });
+    setTerms(prev => { const next = { ...prev }; delete next[key]; return next; });
   };
 
   const setDueDate = (key: string, date: string) => {
@@ -104,6 +113,13 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
   };
   const setRecurrence = (key: string, recurrence: Recurrence) => {
     setDueDates(prev => ({ ...prev, [key]: { date: prev[key]?.date || '', recurrence } }));
+  };
+
+  const setTermStart = (key: string, startDate: string) => {
+    setTerms(prev => ({ ...prev, [key]: { ...prev[key], startDate: startDate || undefined } }));
+  };
+  const setTermEnd = (key: string, endDate: string) => {
+    setTerms(prev => ({ ...prev, [key]: { ...prev[key], endDate: endDate || undefined } }));
   };
 
   const toggleReminder = (key: string) => {
@@ -196,7 +212,18 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
       nextPeriods[k] = period;
     });
 
-    onSave(next, nextCustom, nextDueDates, nextReminders, nextPeriods);
+    // Same reconciliation again: only keep a term entry for items that
+    // still have a budget amount, and only if it actually has a bound
+    // set (an item touched then cleared back to blank shouldn't leave a
+    // stray {} entry behind).
+    const nextTerms: Record<string, BudgetTerm> = {};
+    Object.entries(terms).forEach(([k, term]) => {
+      if (next[k] === undefined) return;
+      if (!term.startDate && !term.endDate) return;
+      nextTerms[k] = term;
+    });
+
+    onSave(next, nextCustom, nextDueDates, nextReminders, nextPeriods, nextTerms);
   };
 
   return (
@@ -285,6 +312,12 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                     >
                       {reminders[cat] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
                     </button>
+                    <TermFields
+                      tr={tr}
+                      term={terms[cat]}
+                      onStartChange={d => setTermStart(cat, d)}
+                      onEndChange={d => setTermEnd(cat, d)}
+                    />
                   </div>
                 )}
               </div>
@@ -366,6 +399,12 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                       >
                         {reminders[item.key] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
                       </button>
+                      <TermFields
+                        tr={tr}
+                        term={terms[item.key]}
+                        onStartChange={d => setTermStart(item.key, d)}
+                        onEndChange={d => setTermEnd(item.key, d)}
+                      />
                     </div>
                   )}
                 </div>
@@ -406,5 +445,43 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
         </div>
       </div>
     </div>
+  );
+}
+
+// Start/end date pair for a budget item's optional fixed term, plus a
+// small badge when the term is upcoming or already ended — shared by
+// both the built-in category rows and the custom item rows above so the
+// two stay in sync rather than drifting apart as separate copies.
+function TermFields({ tr, term, onStartChange, onEndChange }: {
+  tr: Translations;
+  term?: BudgetTerm;
+  onStartChange: (date: string) => void;
+  onEndChange: (date: string) => void;
+}) {
+  const status = getBudgetTermStatus(term);
+  const hasBound = !!(term?.startDate || term?.endDate);
+  return (
+    <span className="flex items-center gap-1.5 flex-wrap">
+      <input
+        type="date"
+        value={term?.startDate ?? ''}
+        onChange={e => onStartChange(e.target.value)}
+        title={tr.budgetStartDate}
+        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all w-[7.2rem]"
+      />
+      <span className="text-slate-300 text-xs">–</span>
+      <input
+        type="date"
+        value={term?.endDate ?? ''}
+        onChange={e => onEndChange(e.target.value)}
+        title={tr.budgetEndDate}
+        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all w-[7.2rem]"
+      />
+      {hasBound && status !== 'active' && (
+        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold shrink-0 ${status === 'ended' ? 'bg-slate-100 text-slate-400' : 'bg-sky-100 text-sky-600'}`}>
+          {status === 'ended' ? tr.termStatusEnded : tr.termStatusUpcoming}
+        </span>
+      )}
+    </span>
   );
 }

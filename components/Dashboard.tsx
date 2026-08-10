@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock,
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
-import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate, resolveCategoryLabel, isDateInCurrentBudgetPeriod, currentBudgetPeriodLabel } from '@/lib/utils';
+import { formatCurrency, currentLocalYearMonth, parseLocalDate, resolveCategoryLabel, isDateInCurrentBudgetPeriod, currentBudgetPeriodLabel, getBudgetTermStatus, nextDueDateWithinTerm } from '@/lib/utils';
 import { PLANS } from '@/lib/plans';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -129,6 +129,7 @@ export default function Dashboard({
         spent: state.transactions.filter(t => t.type === 'expense' && t.category === cat && isDateInCurrentBudgetPeriod(t.date, period)).reduce((s, t) => s + t.amount, 0),
         budget: state.budgets[cat] ?? 0,
         periodLabel: currentBudgetPeriodLabel(period),
+        termStatus: getBudgetTermStatus(state.budgetTerms?.[cat]),
       };
     }),
     ...Object.entries(state.customCategories).map(([key, label]) => {
@@ -139,9 +140,17 @@ export default function Dashboard({
         spent: state.transactions.filter(t => t.type === 'expense' && t.category === key && isDateInCurrentBudgetPeriod(t.date, period)).reduce((s, t) => s + t.amount, 0),
         budget: state.budgets[key] ?? 0,
         periodLabel: currentBudgetPeriodLabel(period),
+        termStatus: getBudgetTermStatus(state.budgetTerms?.[key]),
       };
     }),
-  ].filter(x => x.spent > 0 || x.budget > 0), [state.transactions, state.budgets, state.budgetPeriods, state.customCategories, expenseCatKeys, tr, currentYm]);
+  ]
+    // A fixed-term item (car lease, apartment rent, etc.) that hasn't
+    // started yet or has already ended shouldn't count as an unmet
+    // budget — otherwise an ended lease keeps nagging as "$0 of $800
+    // spent" forever, and an upcoming one shows up before it's relevant.
+    .filter(x => x.termStatus === 'active')
+    .filter(x => x.spent > 0 || x.budget > 0),
+    [state.transactions, state.budgets, state.budgetPeriods, state.budgetTerms, state.customCategories, expenseCatKeys, tr, currentYm]);
 
   const handleApplyCode = async () => {
     if (!code.trim()) return;
@@ -181,7 +190,7 @@ export default function Dashboard({
       const entry = state.budgetDueDates?.[key];
       if (!entry?.date) return;
 
-      const next = getNextDueDate(entry.date, entry.recurrence, today);
+      const next = nextDueDateWithinTerm(entry.date, entry.recurrence, state.budgetTerms?.[key], today);
       if (!next) return;
       const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const daysUntil = Math.round((next.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24));
@@ -192,7 +201,7 @@ export default function Dashboard({
     });
 
     return items.sort((a, b) => a.daysUntil - b.daysUntil);
-  }, [state.budgetReminders, state.budgetDueDates, state.customCategories, tr]);
+  }, [state.budgetReminders, state.budgetDueDates, state.budgetTerms, state.customCategories, tr]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 pt-5 pb-40 space-y-4">
