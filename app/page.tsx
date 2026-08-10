@@ -413,6 +413,44 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.budgets, state.budgetDueDates, state.budgetReminders, state.budgetPeriods, state.screen]);
 
+  // BUG FIX: handleLogout used to call supabase.auth.signOut() and wipe
+  // localStorage right away, with no regard for whether the debounced
+  // save effects above (customCategories/customIncomeCategories/budgets)
+  // had actually fired yet. Signing out shortly after an edit — a very
+  // realistic sequence when someone edits something and then immediately
+  // signs out to test it, or just to leave — canceled the pending
+  //800ms-debounced save (its cleanup fires when state resets on
+  // SIGNED_OUT) before it ever reached the server, so the edit was lost
+  // the moment localStorage was cleared. This flushes the current values
+  // synchronously, in one request, before sign-out is allowed to proceed.
+  const flushPendingProfileSaves = useCallback(async () => {
+    if (customCategoriesSaveTimer.current) clearTimeout(customCategoriesSaveTimer.current);
+    if (customIncomeCategoriesSaveTimer.current) clearTimeout(customIncomeCategoriesSaveTimer.current);
+    if (budgetDataSaveTimer.current) clearTimeout(budgetDataSaveTimer.current);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+      await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          customCategories: customCategoriesRef.current,
+          customIncomeCategories: customIncomeCategoriesRef.current,
+          budgetData: {
+            budgets: budgetsRef.current,
+            budgetDueDates: budgetDueDatesRef.current,
+            budgetReminders: budgetRemindersRef.current,
+            budgetPeriods: budgetPeriodsRef.current,
+          },
+        }),
+      });
+    } catch {
+      // If this fails (offline, etc.), signing out proceeds anyway below
+      // rather than trapping the person — worst case is the same
+      // pre-existing risk this function exists to shrink, not eliminate.
+    }
+  }, []);
+
   const tr = t[state.lang];
 
   const addToast = useCallback((message: string, type: ToastMessage['type'] = 'info') => {
@@ -438,6 +476,7 @@ export default function Home() {
   const handleLogout = () => {
     addToast(tr.signingOut, 'info');
     setTimeout(async () => {
+      await flushPendingProfileSaves();
       await supabase.auth.signOut();
       localStorage.removeItem(STORAGE_KEY);
       setState(freshState(state.lang));
