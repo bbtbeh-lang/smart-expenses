@@ -23,6 +23,42 @@ export function currentLocalYearMonth(): string {
   return todayLocalDate().slice(0, 7);
 }
 
+export type BudgetPeriod = 'monthly' | 'quarterly' | 'yearly';
+
+// Whether a transaction date falls inside the CURRENT calendar window for
+// a given budget period — 'monthly' keeps the original behavior (this
+// calendar month), 'quarterly' widens it to the current calendar quarter
+// (Jan-Mar, Apr-Jun, Jul-Sep, Oct-Dec), 'yearly' to the current calendar
+// year. Calendar-aligned (not a rolling N-month window from whenever the
+// budget was created) so it's predictable and needs no extra stored
+// state — same principle as todayLocalDate() above, using local date
+// parts rather than UTC to avoid the same day/month-boundary drift.
+export function isDateInCurrentBudgetPeriod(dateStr: string, period: BudgetPeriod = 'monthly'): boolean {
+  const today = todayLocalDate();
+  if (period === 'monthly') return dateStr.startsWith(today.slice(0, 7));
+  if (period === 'yearly') return dateStr.startsWith(today.slice(0, 4));
+  // quarterly
+  const [txYear, txMonth] = dateStr.split('-').map(Number);
+  const [curYear, curMonth] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))];
+  const txQuarter = Math.ceil(txMonth / 3);
+  const curQuarter = Math.ceil(curMonth / 3);
+  return txYear === curYear && txQuarter === curQuarter;
+}
+
+// Human-readable label for the current window a period resolves to right
+// now (e.g. "Q3 2026", "2026") — used next to non-monthly budget amounts
+// so it's clear at a glance what timeframe the number covers, since
+// unlike the monthly default it isn't otherwise obvious from context.
+export function currentBudgetPeriodLabel(period: BudgetPeriod): string | null {
+  if (period === 'monthly') return null;
+  const today = todayLocalDate();
+  const year = today.slice(0, 4);
+  if (period === 'yearly') return year;
+  const month = Number(today.slice(5, 7));
+  const quarter = Math.ceil(month / 3);
+  return `Q${quarter} ${year}`;
+}
+
 // `new Date("2026-07-27")` parses a date-only string as UTC midnight, not
 // local midnight — the classic JS date gotcha. For a user west of UTC that
 // shifts every stored transaction date backward by several hours when

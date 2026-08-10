@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import { X, Wallet, Plus, Trash2, Bell, BellOff, ArrowUpDown, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AccountType, Lang } from '@/lib/types';
-import { getOrCreateCategoryKey, getNextDueDate } from '@/lib/utils';
+import { getOrCreateCategoryKey, getNextDueDate, BudgetPeriod } from '@/lib/utils';
 
 const EXPENSE_CATS_PERSONAL = [
   'catGroceries', 'catRestaurant', 'catTransport', 'catUtilities',
@@ -32,16 +32,18 @@ interface BudgetModalProps {
   customCategories: Record<string, string>;
   budgetDueDates: Record<string, DueDateEntry>;
   budgetReminders: Record<string, boolean>;
+  budgetPeriods: Record<string, BudgetPeriod>;
   onSave: (
     budgets: Record<string, number>,
     customCategories: Record<string, string>,
     budgetDueDates: Record<string, DueDateEntry>,
-    budgetReminders: Record<string, boolean>
+    budgetReminders: Record<string, boolean>,
+    budgetPeriods: Record<string, BudgetPeriod>
   ) => void;
   onClose: () => void;
 }
 
-export default function BudgetModal({ tr, accountType, budgets, customCategories, budgetDueDates, budgetReminders, onSave, onClose }: BudgetModalProps) {
+export default function BudgetModal({ tr, accountType, budgets, customCategories, budgetDueDates, budgetReminders, budgetPeriods, onSave, onClose }: BudgetModalProps) {
   const cats = accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
 
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -49,6 +51,12 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
     cats.forEach(c => { init[c] = budgets[c] ? String(budgets[c]) : ''; });
     return init;
   });
+
+  // Per-category period (monthly/quarterly/yearly) the budget amount is
+  // compared against — see lib/utils.ts isDateInCurrentBudgetPeriod.
+  // Starts as a straight copy of whatever's already saved; handleSave
+  // below reconciles it the same way it reconciles budgets/due dates.
+  const [periods, setPeriods] = useState<Record<string, BudgetPeriod>>(() => ({ ...budgetPeriods }));
 
   // Due date (calendar date) + recurrence rule, and reminder toggle, per
   // built-in category key.
@@ -176,7 +184,19 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
       if (v) nextReminders[k] = true;
     });
 
-    onSave(next, nextCustom, nextDueDates, nextReminders);
+    // Same reconciliation as budgets above: only keep a period entry for
+    // items that still have a budget amount, but preserve entries outside
+    // this session's category set (the other account type's categories),
+    // and only store non-default values — 'monthly' is the implicit
+    // default, so leaving it out keeps the common case unchanged from
+    // before this feature existed.
+    const nextPeriods: Record<string, BudgetPeriod> = {};
+    Object.entries(periods).forEach(([k, period]) => {
+      if (next[k] === undefined || period === 'monthly') return;
+      nextPeriods[k] = period;
+    });
+
+    onSave(next, nextCustom, nextDueDates, nextReminders, nextPeriods);
   };
 
   return (
@@ -229,6 +249,16 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                 </div>
                 {values[cat] && parseFloat(values[cat]) > 0 && (
                   <div className="flex items-center gap-2 mt-1.5 pl-0.5 flex-wrap" dir="ltr">
+                    <select
+                      value={periods[cat] ?? 'monthly'}
+                      onChange={e => setPeriods(prev => ({ ...prev, [cat]: e.target.value as BudgetPeriod }))}
+                      title={tr.budgetPeriodLabel}
+                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                    >
+                      <option value="monthly">{tr.budgetPeriodMonthly}</option>
+                      <option value="quarterly">{tr.budgetPeriodQuarterly}</option>
+                      <option value="yearly">{tr.budgetPeriodYearly}</option>
+                    </select>
                     <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <input
                       type="date"
@@ -300,6 +330,16 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                   </div>
                   {item.amount && parseFloat(item.amount) > 0 && (
                     <div className="flex items-center gap-2 mt-1.5 pl-7 flex-wrap" dir="ltr">
+                      <select
+                        value={periods[item.key] ?? 'monthly'}
+                        onChange={e => setPeriods(prev => ({ ...prev, [item.key]: e.target.value as BudgetPeriod }))}
+                        title={tr.budgetPeriodLabel}
+                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                      >
+                        <option value="monthly">{tr.budgetPeriodMonthly}</option>
+                        <option value="quarterly">{tr.budgetPeriodQuarterly}</option>
+                        <option value="yearly">{tr.budgetPeriodYearly}</option>
+                      </select>
                       <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <input
                         type="date"

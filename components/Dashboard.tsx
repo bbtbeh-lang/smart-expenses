@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock,
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
-import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate, resolveCategoryLabel } from '@/lib/utils';
+import { formatCurrency, getNextDueDate, currentLocalYearMonth, parseLocalDate, resolveCategoryLabel, isDateInCurrentBudgetPeriod, currentBudgetPeriodLabel } from '@/lib/utils';
 import { PLANS } from '@/lib/plans';
 
 type DateFilter = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'all';
@@ -121,19 +121,27 @@ export default function Dashboard({
   // Category spending vs budget
   const currentYm = currentLocalYearMonth();
   const allCategorySpending = useMemo(() => [
-    ...expenseCatKeys.map(cat => ({
-      cat,
-      label: (tr as any)[cat] as string,
-      spent: state.transactions.filter(t => t.type === 'expense' && t.category === cat && t.date.startsWith(currentYm)).reduce((s, t) => s + t.amount, 0),
-      budget: state.budgets[cat] ?? 0,
-    })),
-    ...Object.entries(state.customCategories).map(([key, label]) => ({
-      cat: key,
-      label,
-      spent: state.transactions.filter(t => t.type === 'expense' && t.category === key && t.date.startsWith(currentYm)).reduce((s, t) => s + t.amount, 0),
-      budget: state.budgets[key] ?? 0,
-    })),
-  ].filter(x => x.spent > 0 || x.budget > 0), [state.transactions, state.budgets, state.customCategories, expenseCatKeys, tr, currentYm]);
+    ...expenseCatKeys.map(cat => {
+      const period = state.budgetPeriods?.[cat] ?? 'monthly';
+      return {
+        cat,
+        label: (tr as any)[cat] as string,
+        spent: state.transactions.filter(t => t.type === 'expense' && t.category === cat && isDateInCurrentBudgetPeriod(t.date, period)).reduce((s, t) => s + t.amount, 0),
+        budget: state.budgets[cat] ?? 0,
+        periodLabel: currentBudgetPeriodLabel(period),
+      };
+    }),
+    ...Object.entries(state.customCategories).map(([key, label]) => {
+      const period = state.budgetPeriods?.[key] ?? 'monthly';
+      return {
+        cat: key,
+        label,
+        spent: state.transactions.filter(t => t.type === 'expense' && t.category === key && isDateInCurrentBudgetPeriod(t.date, period)).reduce((s, t) => s + t.amount, 0),
+        budget: state.budgets[key] ?? 0,
+        periodLabel: currentBudgetPeriodLabel(period),
+      };
+    }),
+  ].filter(x => x.spent > 0 || x.budget > 0), [state.transactions, state.budgets, state.budgetPeriods, state.customCategories, expenseCatKeys, tr, currentYm]);
 
   const handleApplyCode = async () => {
     if (!code.trim()) return;
@@ -447,13 +455,16 @@ export default function Dashboard({
             </button>
           </div>
           <div className="space-y-3">
-            {allCategorySpending.map(({ cat, label, spent, budget }) => {
+            {allCategorySpending.map(({ cat, label, spent, budget, periodLabel }) => {
               const pct = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
               const over = budget > 0 && spent > budget;
               return (
                 <div key={cat}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-slate-600">{label}</span>
+                    <span className="text-xs font-medium text-slate-600">
+                      {label}
+                      {periodLabel && <span className="text-slate-400 font-normal"> · {periodLabel}</span>}
+                    </span>
                     <span className={`text-xs font-semibold ${over ? 'text-rose-500' : 'text-slate-500'}`} dir="ltr">
                       {formatCurrency(spent, state.lang)}{budget > 0 ? ` / ${formatCurrency(budget, state.lang)}` : ''}
                       {over && <span className="ml-1">!</span>}

@@ -55,6 +55,7 @@ function freshState(lang: Lang = 'EN'): AppState {
     customIncomeCategories: {},
     budgetDueDates: {},
     budgetReminders: {},
+    budgetPeriods: {},
   };
 }
 
@@ -190,7 +191,8 @@ export default function Home() {
   const syncUserBudgetData = useCallback(async (
     localBudgets: Record<string, number>,
     localDueDates: AppState['budgetDueDates'],
-    localReminders: Record<string, boolean>
+    localReminders: Record<string, boolean>,
+    localPeriods: AppState['budgetPeriods']
   ) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -202,11 +204,13 @@ export default function Home() {
         budgets?: Record<string, number>;
         budgetDueDates?: AppState['budgetDueDates'];
         budgetReminders?: Record<string, boolean>;
+        budgetPeriods?: AppState['budgetPeriods'];
       };
       const merged = {
         budgets: { ...(server.budgets ?? {}), ...localBudgets },
         budgetDueDates: { ...(server.budgetDueDates ?? {}), ...localDueDates },
         budgetReminders: { ...(server.budgetReminders ?? {}), ...localReminders },
+        budgetPeriods: { ...(server.budgetPeriods ?? {}), ...localPeriods },
       };
       setState(prev => ({ ...prev, ...merged }));
       await fetch('/api/profile', {
@@ -237,6 +241,8 @@ export default function Home() {
   useEffect(() => { budgetDueDatesRef.current = state.budgetDueDates; }, [state.budgetDueDates]);
   const budgetRemindersRef = useRef<Record<string, boolean>>(state.budgetReminders);
   useEffect(() => { budgetRemindersRef.current = state.budgetReminders; }, [state.budgetReminders]);
+  const budgetPeriodsRef = useRef<AppState['budgetPeriods']>(state.budgetPeriods);
+  useEffect(() => { budgetPeriodsRef.current = state.budgetPeriods; }, [state.budgetPeriods]);
 
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
@@ -248,7 +254,7 @@ export default function Home() {
         syncUserTransactions(session.user.id, loaded.transactions);
         syncUserCustomCategoryMap(session.user.id, 'customCategories', loaded.customCategories);
         syncUserCustomCategoryMap(session.user.id, 'customIncomeCategories', loaded.customIncomeCategories);
-        syncUserBudgetData(loaded.budgets, loaded.budgetDueDates, loaded.budgetReminders);
+        syncUserBudgetData(loaded.budgets, loaded.budgetDueDates, loaded.budgetReminders, loaded.budgetPeriods);
       }
     });
 
@@ -277,7 +283,8 @@ export default function Home() {
           const localBudgets = Object.keys(budgetsRef.current).length > 0 ? budgetsRef.current : loaded.budgets;
           const localDueDates = Object.keys(budgetDueDatesRef.current).length > 0 ? budgetDueDatesRef.current : loaded.budgetDueDates;
           const localReminders = Object.keys(budgetRemindersRef.current).length > 0 ? budgetRemindersRef.current : loaded.budgetReminders;
-          syncUserBudgetData(localBudgets, localDueDates, localReminders);
+          const localPeriods = Object.keys(budgetPeriodsRef.current).length > 0 ? budgetPeriodsRef.current : loaded.budgetPeriods;
+          syncUserBudgetData(localBudgets, localDueDates, localReminders, localPeriods);
         }
       } else {
         setState(prev => ({ ...freshState(prev.lang), screen: 'auth' }));
@@ -392,6 +399,7 @@ export default function Home() {
             budgets: state.budgets,
             budgetDueDates: state.budgetDueDates,
             budgetReminders: state.budgetReminders,
+            budgetPeriods: state.budgetPeriods,
           },
         }),
       }).catch(() => {
@@ -403,7 +411,7 @@ export default function Home() {
       if (budgetDataSaveTimer.current) clearTimeout(budgetDataSaveTimer.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.budgets, state.budgetDueDates, state.budgetReminders, state.screen]);
+  }, [state.budgets, state.budgetDueDates, state.budgetReminders, state.budgetPeriods, state.screen]);
 
   const tr = t[state.lang];
 
@@ -630,9 +638,10 @@ export default function Home() {
     budgets: Record<string, number>,
     customCategories: Record<string, string>,
     budgetDueDates: AppState['budgetDueDates'],
-    budgetReminders: Record<string, boolean>
+    budgetReminders: Record<string, boolean>,
+    budgetPeriods: AppState['budgetPeriods']
   ) => {
-    setState(prev => ({ ...prev, budgets, customCategories, budgetDueDates, budgetReminders }));
+    setState(prev => ({ ...prev, budgets, customCategories, budgetDueDates, budgetReminders, budgetPeriods }));
     setShowBudget(false);
     addToast(tr.saveBudgets, 'success');
   };
@@ -895,6 +904,7 @@ export default function Home() {
           customCategories={state.customCategories}
           budgetDueDates={state.budgetDueDates}
           budgetReminders={state.budgetReminders}
+          budgetPeriods={state.budgetPeriods}
           onSave={handleSaveBudgets}
           onClose={() => setShowBudget(false)}
         />

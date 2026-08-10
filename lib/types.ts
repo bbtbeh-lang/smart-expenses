@@ -58,6 +58,14 @@ export interface AppState {
   // Whether an in-app reminder banner should fire within 3 days of the
   // item's (next) due date. Optional per category key, defaults to off.
   budgetReminders: Record<string, boolean>;
+  // How often a category's budget amount resets/recalculates against
+  // spending. Optional per category key — absent (or 'monthly') keeps
+  // the original behavior exactly as before: budget vs. this calendar
+  // month's spending. 'quarterly'/'yearly' compare the same amount
+  // against the current calendar quarter's/year's spending instead, for
+  // categories where a monthly window doesn't fit (insurance, annual
+  // software licenses, etc).
+  budgetPeriods: Record<string, 'monthly' | 'quarterly' | 'yearly'>;
 }
 
 // NOTE: the actual initial app state lives in freshState() in
