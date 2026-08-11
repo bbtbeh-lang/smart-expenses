@@ -3,7 +3,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Zap } from 'lucide-react';
-import { AppState, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
+import { AppState, AppScreen, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
 import NavBar, { NavTab } from '@/components/NavBar';
@@ -30,9 +30,19 @@ function generateId() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
+// A brand-new session starts in 'loading', not 'auth' — this avoids a
+// flash of the sign-in screen for a user who actually has a valid
+// session and is about to land on their dashboard a moment later. Every
+// place that used to gate on `screen === 'auth'` to mean "not logged in
+// yet" now goes through isPreAuthScreen() so 'loading' is treated the
+// same way (no premature save/sync while we don't know who's signed in).
+function isPreAuthScreen(screen: AppScreen): boolean {
+  return screen === 'loading' || screen === 'auth';
+}
+
 function freshState(lang: Lang = 'EN'): AppState {
   return {
-    screen: 'auth',
+    screen: 'loading',
     lang,
     accountType: null,
     tier: 'free',
@@ -253,9 +263,15 @@ export default function Home() {
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user && state.screen === 'auth') {
+      if (session?.user && state.screen === 'loading') {
         const loaded = loadState();
-        setState(prev => ({ ...loaded, screen: 'onboarding', lang: prev.lang }));
+        // BUG FIX: this used to always send a returning sign-in to
+        // 'onboarding', forcing every user to re-pick Personal/Business on
+        // every single app load even though they'd already chosen one and
+        // it was sitting right there in loaded.accountType. Go straight to
+        // the dashboard when we already know the account type; only show
+        // onboarding for an actual first-time choice.
+        setState(prev => ({ ...loaded, screen: loaded.accountType ? 'dashboard' : 'onboarding', lang: prev.lang }));
         refreshSubscription();
         syncUserTransactions(session.user.id, loaded.transactions);
         syncUserCustomCategoryMap(session.user.id, 'customCategories', loaded.customCategories);
@@ -268,8 +284,11 @@ export default function Home() {
       if (session?.user) {
         const loaded = loadState();
         setState(prev => {
-          if (prev.screen === 'auth') {
-            return { ...loaded, screen: 'onboarding', lang: prev.lang };
+          if (isPreAuthScreen(prev.screen)) {
+            // Same fix as above, for the auth-state-change path (this is
+            // what actually fires first in practice on a page load with an
+            // existing session, since getSession() above races it).
+            return { ...loaded, screen: loaded.accountType ? 'dashboard' : 'onboarding', lang: prev.lang };
           }
           return prev;
         });
@@ -332,7 +351,7 @@ export default function Home() {
 
   // Save to localStorage whenever state changes
   useEffect(() => {
-    if (state.screen !== 'auth') {
+    if (!isPreAuthScreen(state.screen)) {
       saveState(state);
     }
   }, [state]);
@@ -344,7 +363,7 @@ export default function Home() {
   // another device added since our last fetch.
   const customCategoriesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (state.screen === 'auth' || Object.keys(state.customCategories).length === 0) return;
+    if (isPreAuthScreen(state.screen) || Object.keys(state.customCategories).length === 0) return;
     if (customCategoriesSaveTimer.current) clearTimeout(customCategoriesSaveTimer.current);
     customCategoriesSaveTimer.current = setTimeout(async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -367,7 +386,7 @@ export default function Home() {
   // Same debounced persistence, for custom income category labels.
   const customIncomeCategoriesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (state.screen === 'auth' || Object.keys(state.customIncomeCategories).length === 0) return;
+    if (isPreAuthScreen(state.screen) || Object.keys(state.customIncomeCategories).length === 0) return;
     if (customIncomeCategoriesSaveTimer.current) clearTimeout(customIncomeCategoriesSaveTimer.current);
     customIncomeCategoriesSaveTimer.current = setTimeout(async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -393,7 +412,7 @@ export default function Home() {
   // every sign-out silently erased it.
   const budgetDataSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (state.screen === 'auth' || Object.keys(state.budgets).length === 0) return;
+    if (isPreAuthScreen(state.screen) || Object.keys(state.budgets).length === 0) return;
     if (budgetDataSaveTimer.current) clearTimeout(budgetDataSaveTimer.current);
     budgetDataSaveTimer.current = setTimeout(async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -488,7 +507,11 @@ export default function Home() {
       await flushPendingProfileSaves();
       await supabase.auth.signOut();
       localStorage.removeItem(STORAGE_KEY);
-      setState(freshState(state.lang));
+      // Explicit 'auth', not just freshState(lang) — freshState() defaults
+      // to 'loading' (for the initial-mount case), which would leave a
+      // just-signed-out user stuck on the loading spinner forever since
+      // nothing else is going to come along and resolve it.
+      setState({ ...freshState(state.lang), screen: 'auth' });
       setActiveTab('dashboard');
     }, 1000);
   };
@@ -511,7 +534,7 @@ export default function Home() {
       }
       await supabase.auth.signOut();
       localStorage.removeItem(STORAGE_KEY);
-      setState(freshState(state.lang));
+      setState({ ...freshState(state.lang), screen: 'auth' });
       setActiveTab('dashboard');
     } catch {
       addToast(tr.deleteAccountFailedError, 'error');
@@ -717,7 +740,7 @@ export default function Home() {
   );
 
   const isRtl = state.lang === 'FA';
-  const isLoggedIn = state.screen !== 'auth';
+  const isLoggedIn = !isPreAuthScreen(state.screen);
 
   // Quick Scan entry point (fast-path shortcut for tax-prep receipts):
   // paid-plan users go straight into the OCR capture screen; anyone
@@ -764,6 +787,12 @@ export default function Home() {
       />
 
       <main>
+        {state.screen === 'loading' && (
+          <div className="min-h-[calc(100vh-56px)] flex items-center justify-center">
+            <div className="w-8 h-8 border-2 border-slate-200 border-t-emerald-500 rounded-full animate-spin" role="status" aria-label={tr.loadingLabel} />
+          </div>
+        )}
+
         {state.screen === 'auth' && (
           <AuthScreen tr={tr} onLogin={handleLogin} />
         )}

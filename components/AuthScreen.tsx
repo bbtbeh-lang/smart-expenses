@@ -61,7 +61,7 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
         </button>
 
         {error && (
-          <div className="text-xs font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5 mt-4">{error}</div>
+          <div role="alert" className="text-xs font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5 mt-4">{error}</div>
         )}
 
         <p className="text-xs text-slate-400 mt-6 leading-relaxed">

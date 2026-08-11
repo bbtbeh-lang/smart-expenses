@@ -4,7 +4,7 @@ export type Tier = 'free' | 'premium';
 export type PlanId = 'free' | 'basic' | 'pro' | 'business';
 export type BillingPeriod = 'monthly' | 'yearly' | null;
 export type TransactionType = 'income' | 'expense';
-export type AppScreen = 'auth' | 'onboarding' | 'dashboard';
+export type AppScreen = 'loading' | 'auth' | 'onboarding' | 'dashboard';
 
 export interface ReceiptItem {
   name: string;
