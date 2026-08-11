@@ -276,50 +276,60 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                   </div>
                 </div>
                 {values[cat] && parseFloat(values[cat]) > 0 && (
-                  <div className="flex items-center gap-2 mt-1.5 pl-0.5 flex-wrap" dir="ltr">
-                    <select
-                      value={periods[cat] ?? 'monthly'}
-                      onChange={e => setPeriods(prev => ({ ...prev, [cat]: e.target.value as BudgetPeriod }))}
-                      title={tr.budgetPeriodLabel}
-                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                    >
-                      <option value="monthly">{tr.budgetPeriodMonthly}</option>
-                      <option value="quarterly">{tr.budgetPeriodQuarterly}</option>
-                      <option value="yearly">{tr.budgetPeriodYearly}</option>
-                    </select>
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <input
-                      type="date"
-                      value={dueDates[cat]?.date ?? ''}
-                      onChange={e => setDueDate(cat, e.target.value)}
-                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                    />
-                    <select
-                      value={dueDates[cat]?.recurrence ?? 'none'}
-                      onChange={e => setRecurrence(cat, e.target.value as Recurrence)}
-                      disabled={!dueDates[cat]?.date}
-                      className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-40"
-                    >
-                      <option value="none">{tr.recurrenceNone}</option>
-                      <option value="weekly">{tr.recurrenceWeekly}</option>
-                      <option value="monthly">{tr.recurrenceMonthly}</option>
-                      <option value="yearly">{tr.recurrenceYearly}</option>
-                    </select>
-                    <button
-                      onClick={() => toggleReminder(cat)}
-                      disabled={!dueDates[cat]?.date}
-                      title={tr.reminderToggle}
-                      aria-label={tr.reminderToggle}
-                      className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[cat] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
-                    >
-                      {reminders[cat] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
-                    </button>
-                    <TermFields
-                      tr={tr}
-                      term={terms[cat]}
-                      onStartChange={d => setTermStart(cat, d)}
-                      onEndChange={d => setTermEnd(cat, d)}
-                    />
+                  <div className="mt-1.5 pl-0.5 space-y-2">
+                    <div>
+                      <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{tr.dueDateSectionLabel}</div>
+                      <div className="flex items-center gap-2 flex-wrap" dir="ltr">
+                        <select
+                          value={periods[cat] ?? 'monthly'}
+                          onChange={e => setPeriods(prev => ({ ...prev, [cat]: e.target.value as BudgetPeriod }))}
+                          title={tr.budgetPeriodLabel}
+                          className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                        >
+                          <option value="monthly">{tr.budgetPeriodMonthly}</option>
+                          <option value="quarterly">{tr.budgetPeriodQuarterly}</option>
+                          <option value="yearly">{tr.budgetPeriodYearly}</option>
+                        </select>
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <input
+                          type="date"
+                          value={dueDates[cat]?.date ?? ''}
+                          onChange={e => setDueDate(cat, e.target.value)}
+                          title={tr.dueDateFieldTitle}
+                          className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                        />
+                        <select
+                          value={dueDates[cat]?.recurrence ?? 'none'}
+                          onChange={e => setRecurrence(cat, e.target.value as Recurrence)}
+                          disabled={!dueDates[cat]?.date}
+                          title={tr.recurrenceFieldTitle}
+                          className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-40"
+                        >
+                          <option value="none">{tr.recurrenceNone}</option>
+                          <option value="weekly">{tr.recurrenceWeekly}</option>
+                          <option value="monthly">{tr.recurrenceMonthly}</option>
+                          <option value="yearly">{tr.recurrenceYearly}</option>
+                        </select>
+                        <button
+                          onClick={() => toggleReminder(cat)}
+                          disabled={!dueDates[cat]?.date}
+                          title={tr.reminderToggle}
+                          aria-label={tr.reminderToggle}
+                          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[cat] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
+                        >
+                          {reminders[cat] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{tr.termSectionLabel}</div>
+                      <TermFields
+                        tr={tr}
+                        term={terms[cat]}
+                        onStartChange={d => setTermStart(cat, d)}
+                        onEndChange={d => setTermEnd(cat, d)}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -366,50 +376,60 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                     </button>
                   </div>
                   {item.amount && parseFloat(item.amount) > 0 && (
-                    <div className="flex items-center gap-2 mt-1.5 pl-7 flex-wrap" dir="ltr">
-                      <select
-                        value={periods[item.key] ?? 'monthly'}
-                        onChange={e => setPeriods(prev => ({ ...prev, [item.key]: e.target.value as BudgetPeriod }))}
-                        title={tr.budgetPeriodLabel}
-                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                      >
-                        <option value="monthly">{tr.budgetPeriodMonthly}</option>
-                        <option value="quarterly">{tr.budgetPeriodQuarterly}</option>
-                        <option value="yearly">{tr.budgetPeriodYearly}</option>
-                      </select>
-                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <input
-                        type="date"
-                        value={dueDates[item.key]?.date ?? ''}
-                        onChange={e => setDueDate(item.key, e.target.value)}
-                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
-                      />
-                      <select
-                        value={dueDates[item.key]?.recurrence ?? 'none'}
-                        onChange={e => setRecurrence(item.key, e.target.value as Recurrence)}
-                        disabled={!dueDates[item.key]?.date}
-                        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-40"
-                      >
-                        <option value="none">{tr.recurrenceNone}</option>
-                        <option value="weekly">{tr.recurrenceWeekly}</option>
-                        <option value="monthly">{tr.recurrenceMonthly}</option>
-                        <option value="yearly">{tr.recurrenceYearly}</option>
-                      </select>
-                      <button
-                        onClick={() => toggleReminder(item.key)}
-                        disabled={!dueDates[item.key]?.date}
-                        title={tr.reminderToggle}
-                        aria-label={tr.reminderToggle}
-                        className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[item.key] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
-                      >
-                        {reminders[item.key] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
-                      </button>
-                      <TermFields
-                        tr={tr}
-                        term={terms[item.key]}
-                        onStartChange={d => setTermStart(item.key, d)}
-                        onEndChange={d => setTermEnd(item.key, d)}
-                      />
+                    <div className="mt-1.5 pl-7 space-y-2">
+                      <div>
+                        <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{tr.dueDateSectionLabel}</div>
+                        <div className="flex items-center gap-2 flex-wrap" dir="ltr">
+                          <select
+                            value={periods[item.key] ?? 'monthly'}
+                            onChange={e => setPeriods(prev => ({ ...prev, [item.key]: e.target.value as BudgetPeriod }))}
+                            title={tr.budgetPeriodLabel}
+                            className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                          >
+                            <option value="monthly">{tr.budgetPeriodMonthly}</option>
+                            <option value="quarterly">{tr.budgetPeriodQuarterly}</option>
+                            <option value="yearly">{tr.budgetPeriodYearly}</option>
+                          </select>
+                          <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <input
+                            type="date"
+                            value={dueDates[item.key]?.date ?? ''}
+                            onChange={e => setDueDate(item.key, e.target.value)}
+                            title={tr.dueDateFieldTitle}
+                            className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                          />
+                          <select
+                            value={dueDates[item.key]?.recurrence ?? 'none'}
+                            onChange={e => setRecurrence(item.key, e.target.value as Recurrence)}
+                            disabled={!dueDates[item.key]?.date}
+                            title={tr.recurrenceFieldTitle}
+                            className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all disabled:opacity-40"
+                          >
+                            <option value="none">{tr.recurrenceNone}</option>
+                            <option value="weekly">{tr.recurrenceWeekly}</option>
+                            <option value="monthly">{tr.recurrenceMonthly}</option>
+                            <option value="yearly">{tr.recurrenceYearly}</option>
+                          </select>
+                          <button
+                            onClick={() => toggleReminder(item.key)}
+                            disabled={!dueDates[item.key]?.date}
+                            title={tr.reminderToggle}
+                            aria-label={tr.reminderToggle}
+                            className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[item.key] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
+                          >
+                            {reminders[item.key] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{tr.termSectionLabel}</div>
+                        <TermFields
+                          tr={tr}
+                          term={terms[item.key]}
+                          onStartChange={d => setTermStart(item.key, d)}
+                          onEndChange={d => setTermEnd(item.key, d)}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -468,24 +488,29 @@ function TermFields({ tr, term, onStartChange, onEndChange }: {
   const status = getBudgetTermStatus(term);
   const hasBound = !!(term?.startDate || term?.endDate);
   return (
-    <span className="flex items-center gap-1.5 flex-wrap">
-      <input
-        type="date"
-        value={term?.startDate ?? ''}
-        onChange={e => onStartChange(e.target.value)}
-        title={tr.budgetStartDate}
-        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all w-[7.2rem]"
-      />
-      <span className="text-slate-300 text-xs">–</span>
-      <input
-        type="date"
-        value={term?.endDate ?? ''}
-        onChange={e => onEndChange(e.target.value)}
-        title={tr.budgetEndDate}
-        className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all w-[7.2rem]"
-      />
+    <span className="flex items-end gap-1.5 flex-wrap">
+      <span className="flex flex-col gap-0.5">
+        <label className="text-[9px] text-slate-400">{tr.termFromLabel}</label>
+        <input
+          type="date"
+          value={term?.startDate ?? ''}
+          onChange={e => onStartChange(e.target.value)}
+          title={tr.budgetStartDate}
+          className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all w-[7.2rem]"
+        />
+      </span>
+      <span className="flex flex-col gap-0.5">
+        <label className="text-[9px] text-slate-400">{tr.termToLabel}</label>
+        <input
+          type="date"
+          value={term?.endDate ?? ''}
+          onChange={e => onEndChange(e.target.value)}
+          title={tr.budgetEndDate}
+          className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all w-[7.2rem]"
+        />
+      </span>
       {hasBound && status !== 'active' && (
-        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold shrink-0 ${status === 'ended' ? 'bg-slate-100 text-slate-400' : 'bg-sky-100 text-sky-600'}`}>
+        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold shrink-0 mb-1 ${status === 'ended' ? 'bg-slate-100 text-slate-400' : 'bg-sky-100 text-sky-600'}`}>
           {status === 'ended' ? tr.termStatusEnded : tr.termStatusUpcoming}
         </span>
       )}
