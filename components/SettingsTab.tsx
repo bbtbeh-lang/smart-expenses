@@ -222,6 +222,9 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
             </div>
             <button
               onClick={() => setNotifications(n => !n)}
+              role="switch"
+              aria-checked={notifications}
+              aria-label={tr.settingsNotifications}
               className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${notifications ? 'bg-emerald-500' : 'bg-slate-200'}`}
             >
               <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${notifications ? 'left-5' : 'left-0.5'}`} />

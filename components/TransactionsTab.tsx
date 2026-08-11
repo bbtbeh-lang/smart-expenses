@@ -148,7 +148,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
             dir="auto"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            <button onClick={() => setSearch('')} title={tr.clearSearch} aria-label={tr.clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
               <X className="w-4 h-4" />
             </button>
           )}
@@ -197,11 +197,13 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
                       {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, lang, 2)}
                     </div>
                     {tx.taxAmount && (
-                      <div className="text-xs text-slate-400 mt-0.5" dir="ltr">tax {formatCurrency(tx.taxAmount, lang, 2)}</div>
+                      <div className="text-xs text-slate-400 mt-0.5" dir="ltr">{tr.taxInlineLabel} {formatCurrency(tx.taxAmount, lang, 2)}</div>
                     )}
                   </div>
                   <button
                     onClick={() => onEdit(tx)}
+                    title={tr.editTransaction}
+                    aria-label={tr.editTransaction}
                     className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all active:scale-95"
                   >
                     <Pencil className="w-3.5 h-3.5" />

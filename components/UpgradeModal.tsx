@@ -48,6 +48,8 @@ export default function UpgradeModal({ tr, currentPlan, onClose, onSelectPlan }:
           <div className="absolute -bottom-4 -left-4 w-24 h-24 rounded-full bg-teal-500/10" />
           <button
             onClick={onClose}
+            title={tr.closeModal}
+            aria-label={tr.closeModal}
             className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
           >
             <X className="w-4 h-4 text-white" />

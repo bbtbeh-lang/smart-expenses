@@ -246,11 +246,12 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
               <button
                 onClick={() => setSortByDueDate(s => !s)}
                 title={tr.sortByDueDate}
+                aria-label={tr.sortByDueDate}
                 className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${sortByDueDate ? 'bg-emerald-100 text-emerald-600' : 'hover:bg-slate-100 text-slate-500'}`}
               >
                 <ArrowUpDown className="w-4 h-4" />
               </button>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+              <button onClick={onClose} title={tr.closeModal} aria-label={tr.closeModal} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
                 <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
@@ -308,6 +309,7 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                       onClick={() => toggleReminder(cat)}
                       disabled={!dueDates[cat]?.date}
                       title={tr.reminderToggle}
+                      aria-label={tr.reminderToggle}
                       className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[cat] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
                     >
                       {reminders[cat] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
@@ -356,6 +358,8 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                     </div>
                     <button
                       onClick={() => handleRemoveCustom(item.key)}
+                      title={tr.removeItem}
+                      aria-label={tr.removeItem}
                       className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-400 transition-all shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -395,6 +399,7 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                         onClick={() => toggleReminder(item.key)}
                         disabled={!dueDates[item.key]?.date}
                         title={tr.reminderToggle}
+                        aria-label={tr.reminderToggle}
                         className={`w-7 h-7 flex items-center justify-center rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed ${reminders[item.key] ? 'bg-amber-100 text-amber-600' : 'hover:bg-slate-100 text-slate-300'}`}
                       >
                         {reminders[item.key] ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
@@ -429,6 +434,8 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
               <button
                 onClick={handleAddCustom}
                 disabled={!newLabel.trim()}
+                title={tr.addCustomItem}
+                aria-label={tr.addCustomItem}
                 className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
               >
                 <Plus className="w-4 h-4" />

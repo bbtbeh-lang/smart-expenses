@@ -109,6 +109,7 @@ const LABELS = {
     addCategory: '+ Add Cost Category',
     suggestHidden: '+ Suggest hidden costs',
     removeCategory: 'Remove category',
+    removeItem: 'Remove item',
     quantity: 'Quantity (units, clients, or jobs)',
     totalCost: 'Total Cost',
     costPerUnit: 'Cost per Unit',
@@ -187,6 +188,7 @@ const LABELS = {
     addCategory: '+ افزودن دسته‌ی هزینه',
     suggestHidden: '+ پیشنهاد هزینه‌های پنهان',
     removeCategory: 'حذف دسته',
+    removeItem: 'حذف ردیف',
     quantity: 'تعداد (واحد، مشتری، یا سرویس)',
     totalCost: 'مجموع هزینه',
     costPerUnit: 'هزینه هر واحد',
@@ -461,6 +463,7 @@ function CostCategoryEditor({
                 type="button"
                 onClick={e => { e.stopPropagation(); onRemove(); }}
                 title={labels.removeCategory}
+                aria-label={labels.removeCategory}
                 className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
               >
                 <Trash2 className="w-4 h-4" />
@@ -501,6 +504,7 @@ function CostCategoryEditor({
             type="button"
             onClick={e => { e.stopPropagation(); onRemove(); }}
             title={labels.removeCategory}
+            aria-label={labels.removeCategory}
             className="text-slate-300 hover:text-rose-500 transition-colors p-1.5 shrink-0"
           >
             <Trash2 className="w-4 h-4" />
@@ -598,6 +602,8 @@ function CostCategoryEditor({
                   <button
                     type="button"
                     onClick={() => removeItem(it.id)}
+                    title={labels.removeCategory}
+                    aria-label={labels.removeCategory}
                     className="text-slate-300 hover:text-rose-500 transition-colors p-1 shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1546,6 +1552,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                     <button
                       type="button"
                       title={L.edit}
+                      aria-label={L.edit}
                       onClick={e => { e.stopPropagation(); handleSelectSaved(p); }}
                       className="text-slate-300 hover:text-emerald-600 transition-colors p-1.5"
                     >
@@ -1554,6 +1561,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
                     <button
                       type="button"
                       title={L.delete}
+                      aria-label={L.delete}
                       onClick={e => { e.stopPropagation(); handleDelete(p.id); }}
                       className="text-slate-300 hover:text-rose-500 transition-colors p-1.5"
                     >

@@ -960,7 +960,7 @@ export default function Home() {
         />
       )}
 
-      <Toast toasts={toasts} onRemove={removeToast} />
+      <Toast toasts={toasts} onRemove={removeToast} tr={tr} />
     </div>
   );
 }

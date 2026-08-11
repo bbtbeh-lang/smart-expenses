@@ -27,6 +27,7 @@ export default function NavBar({ activeTab, onTabChange, tr }: NavBarProps) {
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
+            aria-current={activeTab === tab.id ? 'page' : undefined}
             className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150 rounded-xl mx-0.5 my-1 ${
               activeTab === tab.id
                 ? 'text-emerald-600 bg-emerald-50'

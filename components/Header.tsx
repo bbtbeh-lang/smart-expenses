@@ -16,6 +16,7 @@ interface HeaderProps {
 }
 
 const LANGS: Lang[] = ['EN', 'FR', 'FA'];
+const LANG_NAMES: Record<Lang, string> = { EN: 'English', FR: 'Français', FA: 'فارسی' };
 
 export default function Header({ lang, tr, onLangToggle, onLogout, isLoggedIn, accountType, onChangeAccountType, showAccountTypeSwitch }: HeaderProps) {
   return (
@@ -36,6 +37,7 @@ export default function Header({ lang, tr, onLangToggle, onLogout, isLoggedIn, a
               <button
                 key={opt}
                 onClick={() => onChangeAccountType(opt)}
+                aria-label={opt === 'business' ? tr.business : tr.personal}
                 className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-150 ${
                   (accountType || 'personal') === opt ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
                 }`}
@@ -54,6 +56,7 @@ export default function Header({ lang, tr, onLangToggle, onLogout, isLoggedIn, a
               <button
                 key={l}
                 onClick={() => onLangToggle(l)}
+                aria-label={LANG_NAMES[l]}
                 className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-all duration-150 ${
                   lang === l
                     ? 'bg-white text-emerald-600 shadow-sm'

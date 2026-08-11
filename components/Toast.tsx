@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, X } from 'lucide-react';
+import { Translations } from '@/lib/translations';
 
 export interface ToastMessage {
   id: string;
@@ -12,19 +13,20 @@ export interface ToastMessage {
 interface ToastProps {
   toasts: ToastMessage[];
   onRemove: (id: string) => void;
+  tr: Translations;
 }
 
-export default function Toast({ toasts, onRemove }: ToastProps) {
+export default function Toast({ toasts, onRemove, tr }: ToastProps) {
   return (
-    <div className="fixed top-16 right-4 left-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm mx-auto">
+    <div className="fixed top-16 right-4 left-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-sm mx-auto" role="status" aria-live="polite">
       {toasts.map(toast => (
-        <ToastItem key={toast.id} toast={toast} onRemove={onRemove} />
+        <ToastItem key={toast.id} toast={toast} onRemove={onRemove} tr={tr} />
       ))}
     </div>
   );
 }
 
-function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: string) => void }) {
+function ToastItem({ toast, onRemove, tr }: { toast: ToastMessage; onRemove: (id: string) => void; tr: Translations }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: (id: st
     >
       {icons[toast.type]}
       <span className="flex-1">{toast.message}</span>
-      <button onClick={() => { setVisible(false); setTimeout(() => onRemove(toast.id), 300); }} className="ml-1 opacity-60 hover:opacity-100">
+      <button onClick={() => { setVisible(false); setTimeout(() => onRemove(toast.id), 300); }} title={tr.closeModal} aria-label={tr.closeModal} className="ml-1 opacity-60 hover:opacity-100">
         <X className="w-3.5 h-3.5" />
       </button>
     </div>

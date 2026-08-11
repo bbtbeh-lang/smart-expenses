@@ -512,8 +512,8 @@ export default function Dashboard({
       {/* Recent Transactions */}
       <div>
         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-1">
-          Recent Transactions
-          {filteredTxs.length > 0 && <span className="ml-2 text-slate-400 font-normal normal-case">({filteredTxs.length} total)</span>}
+          {tr.recentTransactions}
+          {filteredTxs.length > 0 && <span className="ml-2 text-slate-400 font-normal normal-case">({tr.totalCountLabel.replace('{count}', String(filteredTxs.length))})</span>}
         </div>
         {filteredTxs.length === 0 ? (
           <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center">

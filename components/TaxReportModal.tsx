@@ -221,7 +221,7 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
                 <p className="text-xs text-slate-500">{tr.taxReportSub}</p>
               </div>
             </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+            <button onClick={onClose} title={tr.closeModal} aria-label={tr.closeModal} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>

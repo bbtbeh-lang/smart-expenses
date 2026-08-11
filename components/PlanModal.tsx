@@ -48,7 +48,7 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
         {/* Header */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 px-6 pt-7 pb-6 relative overflow-hidden">
           <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-amber-500/10" />
-          <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+          <button onClick={onClose} title={tr.closeModal} aria-label={tr.closeModal} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
             <X className="w-4 h-4 text-white" />
           </button>
           <div className="flex items-center gap-2 mb-2">

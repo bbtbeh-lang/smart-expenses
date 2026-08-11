@@ -43,6 +43,35 @@ const LABELS = {
     toDate: 'To',
     categoryFilter: 'Category',
     allCategories: 'All categories',
+    clearSearch: 'Clear search',
+  },
+  FR: {
+    title: '📊 Rapports financiers',
+    allTime: 'Toute la période',
+    income: 'Revenus',
+    expenses: 'Dépenses',
+    all: 'Tout',
+    profit: 'Profit',
+    topIncomeCats: 'Principales catégories de revenus',
+    topExpenseCats: 'Principales catégories de dépenses',
+    transactions: 'Transactions',
+    exportCSV: 'Exporter en CSV',
+    noTransactions: 'Aucune transaction',
+    searchTitle: 'Rechercher par produit / commande',
+    searchPlaceholder: 'p. ex. « Commande #1024 » ou « Coque iPhone »',
+    searchHint: 'Trouvez tous les revenus et dépenses liés à un produit ou une commande précise, selon la description de la transaction.',
+    matches: 'résultats',
+    totalSpent: 'Total dépensé',
+    totalReceived: 'Total reçu',
+    netForItem: 'Net pour cet article',
+    exportMatches: 'Exporter les résultats',
+    clear: 'Effacer',
+    noMatches: 'Aucune transaction ne correspond à votre recherche',
+    fromDate: 'Du',
+    toDate: 'Au',
+    categoryFilter: 'Catégorie',
+    allCategories: 'Toutes les catégories',
+    clearSearch: 'Effacer la recherche',
   },
   FA: {
     title: '📊 گزارش‌های مالی',
@@ -70,6 +99,7 @@ const LABELS = {
     toDate: 'تا تاریخ',
     categoryFilter: 'دسته‌بندی',
     allCategories: 'همه‌ی دسته‌بندی‌ها',
+    clearSearch: 'پاک کردن جستجو',
   },
 };
 
@@ -136,7 +166,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const isRtl = lang === 'FA';
-  const L = isRtl ? LABELS.FA : LABELS.EN;
+  const L = LABELS[lang] ?? LABELS.EN;
 
   const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
   // BUG FIX: this used to only check `tr`, so any user-minted custom
@@ -385,6 +415,8 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
             {search && (
               <button
                 onClick={() => setSearch('')}
+                title={L.clearSearch}
+                aria-label={L.clearSearch}
                 className={`absolute top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 ${isRtl ? 'left-3' : 'right-3'}`}
               >
                 <X className="w-4 h-4" />

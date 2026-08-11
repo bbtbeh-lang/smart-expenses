@@ -333,6 +333,8 @@ export default function TransactionModal({
                     else if (step === 'manual') setStep('receipt');
                     else setStep('type');
                   }}
+                  title={tr.back}
+                  aria-label={tr.back}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5 text-slate-500" />
@@ -344,12 +346,14 @@ export default function TransactionModal({
               {isEditMode && onDelete && (
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
+                  title={tr.deleteTransaction}
+                  aria-label={tr.deleteTransaction}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-rose-50 transition-colors"
                 >
                   <Trash2 className="w-4 h-4 text-rose-400" />
                 </button>
               )}
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+              <button onClick={onClose} title={tr.closeModal} aria-label={tr.closeModal} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
                 <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
@@ -615,7 +619,7 @@ export default function TransactionModal({
                         .replace('{date}', duplicateWarning.matchedDate || '')}
                     </div>
                   </div>
-                  <button onClick={() => setDuplicateWarning(null)} className="shrink-0">
+                  <button onClick={() => setDuplicateWarning(null)} title={tr.closeModal} aria-label={tr.closeModal} className="shrink-0">
                     <X className="w-3.5 h-3.5 text-amber-500" />
                   </button>
                 </div>
@@ -727,6 +731,8 @@ export default function TransactionModal({
                     <button
                       type="button"
                       onClick={() => { setShowNewCatInput(false); setNewCatLabel(''); }}
+                      title={tr.closeModal}
+                      aria-label={tr.closeModal}
                       className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition-all"
                     >
                       ✕
