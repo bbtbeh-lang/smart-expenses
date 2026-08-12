@@ -78,7 +78,7 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-5 pb-28 space-y-5">
+    <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 lg:px-6 pt-5 pb-28 lg:pb-12 space-y-5">
 
       {/* Account Card */}
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">

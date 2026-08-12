@@ -21,7 +21,7 @@ const LANG_NAMES: Record<Lang, string> = { EN: 'English', FR: 'Français', FA: '
 export default function Header({ lang, tr, onLangToggle, onLogout, isLoggedIn, accountType, onChangeAccountType, showAccountTypeSwitch }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
-      <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between gap-2">
+      <div className="max-w-2xl lg:max-w-none mx-auto px-4 lg:px-6 h-14 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
             <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />

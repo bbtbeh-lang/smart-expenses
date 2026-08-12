@@ -260,7 +260,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
   );
 
   return (
-    <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="px-4 lg:px-6 pt-4 pb-28 lg:pb-12 max-w-2xl lg:max-w-4xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <h2 className="text-xl font-bold text-slate-900 mb-4">{L.title}</h2>
 
       {/* Month selector */}

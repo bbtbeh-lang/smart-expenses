@@ -82,7 +82,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-5 pb-40 space-y-4">
+    <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 lg:px-6 pt-5 pb-40 lg:pb-12 space-y-4">
       {/* Summary pills */}
       <div className="flex gap-3">
         <div className="flex-1 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 flex items-center gap-2">

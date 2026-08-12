@@ -204,7 +204,7 @@ export default function Dashboard({
   }, [state.budgetReminders, state.budgetDueDates, state.budgetTerms, state.customCategories, tr]);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 pt-5 pb-40 space-y-4">
+    <div className="max-w-2xl lg:max-w-4xl mx-auto px-4 lg:px-6 pt-5 pb-40 lg:pb-12 space-y-4">
 
       {/* Tier Badge + Scan Status */}
       <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">

@@ -1159,7 +1159,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // thing to price, so show guidance instead of the calculator.
   if (accountType === 'personal') {
     return (
-      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+      <div className="px-4 lg:px-6 pt-4 pb-28 lg:pb-12 max-w-2xl lg:max-w-4xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
         <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
         <div className="bg-white rounded-2xl border border-slate-100 p-6 mt-4 shadow-sm text-center">
           <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center mx-auto mb-3">
@@ -1173,7 +1173,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   }
 
   return (
-    <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className="px-4 lg:px-6 pt-4 pb-28 lg:pb-12 max-w-2xl lg:max-w-4xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <h2 className="text-xl font-bold text-slate-900 mb-1">{L.title}</h2>
       <p className="text-xs text-slate-500 mb-4">{L.subtitle}</p>
 
