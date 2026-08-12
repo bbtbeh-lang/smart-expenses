@@ -262,32 +262,35 @@ export default function Home() {
 
   // Listen for Supabase auth changes (Google redirect, email verification, etc.)
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user && state.screen === 'loading') {
-        const loaded = loadState();
-        // BUG FIX: this used to always send a returning sign-in to
-        // 'onboarding', forcing every user to re-pick Personal/Business on
-        // every single app load even though they'd already chosen one and
-        // it was sitting right there in loaded.accountType. Go straight to
-        // the dashboard when we already know the account type; only show
-        // onboarding for an actual first-time choice.
-        setState(prev => ({ ...loaded, screen: loaded.accountType ? 'dashboard' : 'onboarding', lang: prev.lang }));
-        refreshSubscription();
-        syncUserTransactions(session.user.id, loaded.transactions);
-        syncUserCustomCategoryMap(session.user.id, 'customCategories', loaded.customCategories);
-        syncUserCustomCategoryMap(session.user.id, 'customIncomeCategories', loaded.customIncomeCategories);
-        syncUserBudgetData(loaded.budgets, loaded.budgetDueDates, loaded.budgetReminders, loaded.budgetPeriods, loaded.budgetTerms);
-      }
-    });
-
+    // BUG FIX: this file used to also call supabase.auth.getSession().then(...)
+    // here, running its own near-duplicate of everything below. The two
+    // raced on every sign-in, and whichever resolved LAST won — usually
+    // onAuthStateChange, per the removed code's own comment, but not
+    // always. When getSession() won the race right after a sign-out (when
+    // localStorage had just been cleared), it would setState(prev =>
+    // ({ ...loaded, ... })) with an EMPTY `loaded` object, wiping out
+    // whatever onAuthStateChange had just correctly merged in from the
+    // server a moment earlier — budgets, transactions, everything. That's
+    // exactly why a saved budget could vanish after a sign-out/sign-in
+    // cycle. onAuthStateChange already fires an 'INITIAL_SESSION' event
+    // with the current session immediately on subscribing below, so it
+    // covers the getSession() case on its own — and does it more safely
+    // (refs for "what's live in memory right now" instead of only
+    // localStorage, plus a functional setState that checks fresh
+    // prev.screen instead of a stale closured value). Removing the
+    // redundant call removes the race entirely instead of just hoping
+    // the "right" one wins.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         const loaded = loadState();
         setState(prev => {
           if (isPreAuthScreen(prev.screen)) {
-            // Same fix as above, for the auth-state-change path (this is
-            // what actually fires first in practice on a page load with an
-            // existing session, since getSession() above races it).
+            // BUG FIX: this used to always send a returning sign-in to
+            // 'onboarding', forcing every user to re-pick Personal/Business
+            // on every single app load even though they'd already chosen
+            // one and it was sitting right there in loaded.accountType. Go
+            // straight to the dashboard when we already know the account
+            // type; only show onboarding for an actual first-time choice.
             return { ...loaded, screen: loaded.accountType ? 'dashboard' : 'onboarding', lang: prev.lang };
           }
           return prev;
