@@ -529,9 +529,9 @@ export default function Dashboard({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-slate-800 truncate">{tx.description}</div>
-                  <div className="text-xs text-slate-400 mt-0.5">{tx.date}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{tx.date}</div>
                   {tx.items && tx.items.length > 0 && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    <div className="text-xs text-slate-500 mt-0.5 truncate">
                       {tx.items.map(i => i.name).join(' · ')}
                     </div>
                   )}

@@ -185,9 +185,9 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-slate-800 truncate">{tx.description}</div>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-slate-400">{tx.date}</span>
+                    <span className="text-xs text-slate-500">{tx.date}</span>
                     <span className="w-1 h-1 rounded-full bg-slate-300" />
-                    <span className="text-xs text-slate-400 truncate">{catLabel(tx.category)}</span>
+                    <span className="text-xs text-slate-500 truncate">{catLabel(tx.category)}</span>
                     {tx.hasReceipt && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-md font-medium">AI</span>}
                   </div>
                 </div>

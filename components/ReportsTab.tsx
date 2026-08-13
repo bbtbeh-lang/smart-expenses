@@ -251,7 +251,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
     <div key={t.id} className="flex items-center justify-between px-4 py-2.5">
       <div>
         <p className="text-xs font-semibold text-slate-800">{t.description}</p>
-        <p className="text-[10px] text-slate-400">{t.date} · {catLabel(t.category)}</p>
+        <p className="text-xs text-slate-500">{t.date} · {catLabel(t.category)}</p>
       </div>
       <span className={`text-xs font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`} dir="ltr">
         {t.type === 'income' ? '+' : '-'}{fmt(t.amount)}
@@ -263,23 +263,22 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
     <div className="px-4 lg:px-6 pt-4 pb-28 lg:pb-12 max-w-2xl lg:max-w-4xl mx-auto" dir={isRtl ? 'rtl' : 'ltr'}>
       <h2 className="text-xl font-bold text-slate-900 mb-4">{L.title}</h2>
 
-      {/* Month selector */}
-      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-        <button
-          onClick={() => { setSelectedMonth('all'); setDateFrom(''); setDateTo(''); }}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === 'all' && !hasCustomRange ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+      {/* Month selector — a plain dropdown rather than one pill per
+          month, since a pill row keeps growing sideways forever as
+          transaction history accumulates across years. */}
+      <div className="mb-3">
+        <select
+          value={hasCustomRange ? '' : selectedMonth}
+          onChange={e => { setSelectedMonth(e.target.value || 'all'); setDateFrom(''); setDateTo(''); }}
+          className="w-full sm:w-64 px-3 py-2 bg-slate-100 border-0 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
         >
-          {L.allTime}
-        </button>
-        {months.map(m => (
-          <button
-            key={m}
-            onClick={() => { setSelectedMonth(m); setDateFrom(''); setDateTo(''); }}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${selectedMonth === m && !hasCustomRange ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'}`}
-          >
-            {parseLocalDate(m + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}
-          </button>
-        ))}
+          <option value="all">{L.allTime}</option>
+          {months.map(m => (
+            <option key={m} value={m}>
+              {parseLocalDate(m + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Custom date range + category filter */}
@@ -356,12 +355,12 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
           </div>
           <p className="text-sm font-bold text-rose-700" dir="ltr">{fmt(expenses)}</p>
         </div>
-        <div className={`rounded-2xl p-3 ${profit >= 0 ? 'bg-indigo-50' : 'bg-orange-50'}`}>
+        <div className={`rounded-2xl p-3 ${profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50'}`}>
           <div className="flex items-center gap-1 mb-1">
             <DollarSign className="w-3.5 h-3.5 text-indigo-600" />
             <span className="text-[10px] font-semibold text-indigo-600 uppercase">{L.profit}</span>
           </div>
-          <p className={`text-sm font-bold ${profit >= 0 ? 'text-indigo-700' : 'text-orange-700'}`} dir="ltr">{fmt(profit)}</p>
+          <p className={`text-sm font-bold ${profit >= 0 ? 'text-indigo-700' : 'text-rose-600'}`} dir="ltr">{fmt(profit)}</p>
         </div>
       </div>
 
@@ -442,7 +441,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
                   </div>
                   <div className={`rounded-xl p-2.5 ${searchReceived - searchSpent >= 0 ? 'bg-indigo-50' : 'bg-orange-50'}`}>
                     <p className="text-[9px] font-semibold text-indigo-600 uppercase mb-0.5">{L.netForItem}</p>
-                    <p className={`text-xs font-bold ${searchReceived - searchSpent >= 0 ? 'text-indigo-700' : 'text-orange-700'}`} dir="ltr">
+                    <p className={`text-xs font-bold ${searchReceived - searchSpent >= 0 ? 'text-indigo-700' : 'text-rose-600'}`} dir="ltr">
                       {fmt(searchReceived - searchSpent)}
                     </p>
                   </div>

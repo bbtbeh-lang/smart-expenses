@@ -789,7 +789,7 @@ export default function Home() {
         showAccountTypeSwitch={state.screen === 'dashboard'}
       />
 
-      <main className="lg:pl-60">
+      <main className="lg:pl-60 lg:rtl:pl-0 lg:rtl:pr-60">
         {state.screen === 'loading' && (
           <div className="min-h-[calc(100vh-56px)] flex items-center justify-center">
             <div className="w-8 h-8 border-2 border-slate-200 border-t-emerald-500 rounded-full animate-spin" role="status" aria-label={tr.loadingLabel} />
@@ -861,7 +861,7 @@ export default function Home() {
       </main>
 
       {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} />
+        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} lang={state.lang} onLangToggle={toggleLang} onLogout={handleLogout} isLoggedIn={isLoggedIn} />
       )}
 
       {/* Quick Scan fast-path: always-available shortcut so someone who
@@ -887,7 +887,7 @@ export default function Home() {
       )}
 
       {state.screen === 'dashboard' && activeTab === 'dashboard' && (
-        <div className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-8 z-30 max-w-sm lg:w-72 mx-auto lg:mx-0 lg:bottom-8">
+        <div className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-8 lg:rtl:right-auto lg:rtl:left-8 z-30 max-w-sm lg:w-72 mx-auto lg:mx-0 lg:bottom-8">
           <button
             onClick={() => setShowTransactionModal(true)}
             className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-2xl text-sm shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2"
@@ -901,7 +901,7 @@ export default function Home() {
       )}
 
       {state.screen === 'dashboard' && activeTab === 'transactions' && (
-        <div className="fixed bottom-20 right-4 z-30">
+        <div className="fixed bottom-20 right-4 rtl:right-auto rtl:left-4 lg:bottom-8 lg:right-8 lg:rtl:right-auto lg:rtl:left-8 z-30">
           <button
             onClick={() => setShowTransactionModal(true)}
             className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 active:scale-[0.95] transition-all duration-150 flex items-center justify-center"

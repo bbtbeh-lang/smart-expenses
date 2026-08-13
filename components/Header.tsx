@@ -49,8 +49,11 @@ export default function Header({ lang, tr, onLangToggle, onLogout, isLoggedIn, a
           </div>
         )}
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Language switcher — always LTR */}
+        <div className="flex items-center gap-2 shrink-0 lg:hidden">
+          {/* Language switcher + logout — hidden on desktop (lg+), where
+              they live at the bottom of the sidebar instead, so the top
+              bar isn't competing for space with the app name and the
+              Personal/Business switch. */}
           <div className="flex items-center bg-slate-100 rounded-full p-1 gap-0.5" dir="ltr">
             {LANGS.map((l, i) => (
               <button

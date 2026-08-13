@@ -80,11 +80,15 @@ export function getCurrencySymbol(_lang: Lang): string {
 
 // Returns e.g. "$1,234.00" — always CAD, with thousands separators.
 export function formatCurrency(amount: number, _lang: Lang, decimals = 2): string {
-  const formatted = amount.toLocaleString('en-CA', {
+  // BUG FIX: toLocaleString() puts the minus sign first, so a negative
+  // amount used to render as "$-730.80" (sign after the currency
+  // symbol) instead of the standard "-$730.80".
+  const isNegative = amount < 0;
+  const formatted = Math.abs(amount).toLocaleString('en-CA', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-  return `$${formatted}`;
+  return `${isNegative ? '-' : ''}$${formatted}`;
 }
 
 // Given an anchor due date (YYYY-MM-DD) and a recurrence rule, returns the
