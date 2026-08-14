@@ -36,12 +36,12 @@ const DONUT_COLORS = [
   '#3b82f6', '#a855f7', '#ec4899', '#14b8a6', '#84cc16',
 ];
 
-const DATE_FILTERS: { key: DateFilter; label: string }[] = [
-  { key: 'today', label: 'Today' },
-  { key: 'this_week', label: 'Week' },
-  { key: 'this_month', label: 'Month' },
-  { key: 'last_3_months', label: '3 Mo' },
-  { key: 'all', label: 'All' },
+const DATE_FILTERS: { key: DateFilter }[] = [
+  { key: 'today' },
+  { key: 'this_week' },
+  { key: 'this_month' },
+  { key: 'last_3_months' },
+  { key: 'all' },
 ];
 
 function getDateRange(filter: DateFilter): { from: Date; to: Date } {
@@ -78,6 +78,14 @@ export default function Dashboard({
 
   const scansLeft = Math.max(0, state.scanLimit - state.scansUsedThisPeriod);
 
+  const dateFilterLabels: Record<DateFilter, string> = {
+    today: tr.filterToday,
+    this_week: tr.filterWeek,
+    this_month: tr.filterMonth,
+    last_3_months: tr.filter3Months,
+    all: tr.filterAll,
+  };
+
   // Filtered transactions
   const filteredTxs = useMemo(() => filterTxByDate(state.transactions, dateFilter), [state.transactions, dateFilter]);
 
@@ -95,7 +103,7 @@ export default function Dashboard({
       d.setDate(1);
       d.setMonth(d.getMonth() - i);
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleString('default', { month: 'short' });
+      const label = tr.monthsShort[d.getMonth()];
       const txs = state.transactions.filter((t: Transaction) => t.date.startsWith(ym));
       result.push({
         month: label,
@@ -104,7 +112,7 @@ export default function Dashboard({
       });
     }
     return result;
-  }, [state.transactions]);
+  }, [state.transactions, tr]);
 
   // Donut chart data — expenses by category for filtered period
   const expenseCatKeys = state.accountType === 'business' ? EXPENSE_CATS_BUSINESS : EXPENSE_CATS_PERSONAL;
@@ -348,7 +356,7 @@ export default function Dashboard({
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
           >
-            {f.label}
+            {dateFilterLabels[f.key]}
           </button>
         ))}
       </div>
@@ -397,7 +405,12 @@ export default function Dashboard({
             <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 12 }} labelStyle={{ fontWeight: 700, color: '#1e293b' }} />
-            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+              formatter={(value: string) => (value === 'income' ? tr.totalIncome : value === 'expenses' ? tr.totalExpenses : value)}
+            />
             <Line type="monotone" dataKey="income" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
             <Line type="monotone" dataKey="expenses" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3, fill: '#f43f5e' }} activeDot={{ r: 5 }} />
           </LineChart>
