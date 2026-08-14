@@ -27,6 +27,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'missing_code' }, { status: 400 });
   }
 
+  // Throttle guesses before touching redeem_daily_code() at all — up to
+  // 10 attempts per rolling 60s per user. This is separate from the
+  // one-redemption-per-user-per-day rule: that limits successes, this
+  // limits how fast someone can spray guesses trying to find one.
+  const { data: allowed, error: rateLimitError } = await supabaseAdmin.rpc('check_code_rate_limit', {
+    p_user_id: userData.user.id,
+  });
+  if (rateLimitError) {
+    console.error('check_code_rate_limit error:', rateLimitError);
+    return NextResponse.json({ success: false, message: 'server_error' }, { status: 500 });
+  }
+  if (!allowed) {
+    return NextResponse.json({ success: false, message: 'rate_limited' }, { status: 429 });
+  }
+
   // redeem_daily_code() does the validity/cap/already-used checks and the
   // write in a single atomically-locked database call — see the migration
   // for why this can't safely be split into separate check-then-write steps.
