@@ -861,7 +861,7 @@ export default function Home() {
       </main>
 
       {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} lang={state.lang} onLangToggle={toggleLang} onLogout={handleLogout} isLoggedIn={isLoggedIn} />
+        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} onLogout={handleLogout} isLoggedIn={isLoggedIn} />
       )}
 
       {/* Quick Scan fast-path: always-available shortcut so someone who
