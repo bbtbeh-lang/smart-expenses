@@ -61,24 +61,8 @@ export default function NavBar({ activeTab, onTabChange, tr, lang, onLangToggle,
       {/* Desktop-only: language switcher + logout, moved out of the top
           header where they used to compete for space with the app name
           and the Personal/Business switch. */}
-      {(onLangToggle || onLogout) && (
+      {(onLogout) && (
         <div className="hidden lg:block border-t border-slate-100 px-3 py-3 space-y-2">
-          {onLangToggle && lang && (
-            <div className="flex items-center bg-slate-100 rounded-full p-1 gap-0.5" dir="ltr">
-              {LANGS.map(l => (
-                <button
-                  key={l}
-                  onClick={() => onLangToggle(l)}
-                  aria-label={LANG_NAMES[l]}
-                  className={`flex-1 text-xs font-semibold px-2 py-1.5 rounded-full transition-all duration-150 ${
-                    lang === l ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'
-                  }`}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          )}
           {isLoggedIn && onLogout && (
             <button
               onClick={onLogout}
