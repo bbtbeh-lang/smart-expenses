@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Tier, Transaction, Lang } from '@/lib/types';
-import { formatCurrency, resolveCategoryLabel } from '@/lib/utils';
+import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 interface TaxReportModalProps {
@@ -113,9 +113,9 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
         const [y, mo, d] = tx.date.split('-');
         rows.push([
           String(i + 1),
-          tx.description,
+          neutralizeCsvFormula(tx.description),
           `${d}/${mo}/${y}`,
-          tx.merchant || '',
+          neutralizeCsvFormula(tx.merchant || ''),
           pretax.toFixed(2),
           tax.toFixed(2),
           tx.amount.toFixed(2),
@@ -145,13 +145,20 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
         // BUG FIX: this used to only check `tr`, so any custom expense
         // category showed its raw internal key instead of the label the
         // person typed — on the report that goes straight to an accountant.
-        const label = catLabel(cat);
+        const label = neutralizeCsvFormula(catLabel(cat));
         rows.push([label, String(sums.amount), String(sums.tax), '', '', '', '', '']);
       });
     }
 
     const NL = String.fromCharCode(10);
-    const csvContent = rows.map(r => r.map(c => JSON.stringify(c)).join(',')).join(NL);
+    // BUG FIX: this used to build each cell with JSON.stringify(c), which
+    // escapes an internal quote as \" (backslash) — not valid CSV, where
+    // RFC4180 requires doubling it ("") instead. A description containing
+    // a literal quote character would silently corrupt the row's column
+    // boundaries when opened in Excel. csvField does the correct escaping;
+    // formula-injection neutralization already happened above, at push
+    // time, for the specific free-text cells that needed it.
+    const csvContent = rows.map(r => r.map(c => csvField(c)).join(',')).join(NL);
     // Leading UTF-8 BOM: without it, Excel on Windows opens this CSV using
     // the system locale's codepage instead of UTF-8, and Persian/French
     // characters (merchant names, category labels) render as mojibake.

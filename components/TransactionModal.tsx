@@ -248,12 +248,22 @@ export default function TransactionModal({
   };
 
   const handleSave = () => {
-    if (!amount || !description) return;
+    // BUG FIX: this used to only check `!amount || !description`, which
+    // let a negative or zero amount through — the number input has no
+    // min set, so typing "-100" passed both this check (truthy string)
+    // and parseFloat happily returns -100. Since sign here comes from
+    // `type` (income/expense), not from the amount itself, a negative
+    // amount doesn't just look wrong in the list — it silently flips
+    // the sign in every downstream sum (Dashboard totals, Reports,
+    // budgets, the tax CSV export), corrupting real financial numbers
+    // for a finance app. Guard on the parsed value, not the raw string.
+    const parsedAmount = parseFloat(amount);
+    if (!description || !isFinite(parsedAmount) || parsedAmount <= 0) return;
     const tx: Transaction = {
       id: editTransaction?.id ?? generateId(),
       type: txType,
       accountType: txAccountType,
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       description,
       category,
       date,
@@ -284,7 +294,7 @@ export default function TransactionModal({
             body: JSON.stringify({
               invoiceHash,
               clientName: description,
-              amount: parseFloat(amount),
+              amount: parsedAmount,
               date,
               image: invoiceImageBase64,
             }),
@@ -297,7 +307,7 @@ export default function TransactionModal({
             body: JSON.stringify({
               receiptHash,
               merchant: description,
-              amount: parseFloat(amount),
+              amount: parsedAmount,
               date,
               image: receiptImageBase64,
             }),
@@ -666,6 +676,8 @@ export default function TransactionModal({
                   <input
                     type="number"
                     inputMode="decimal"
+                    min="0"
+                    step="0.01"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                     placeholder="0.00"
@@ -754,7 +766,7 @@ export default function TransactionModal({
 
               <button
                 onClick={handleSave}
-                disabled={!amount || !description}
+                disabled={!description || !isFinite(parseFloat(amount)) || parseFloat(amount) <= 0}
                 className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold rounded-xl text-sm shadow-lg shadow-emerald-200 hover:shadow-emerald-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isEditMode ? tr.updateTransaction : tr.save}

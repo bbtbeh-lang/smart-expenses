@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package } from 'lucide-react';
 import { Transaction, Lang } from '@/lib/types';
 import { Translations } from '@/lib/translations';
-import { parseLocalDate, resolveCategoryLabel } from '@/lib/utils';
+import { parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
 
 interface ReportsTabProps {
   transactions: Transaction[];
@@ -103,18 +103,18 @@ const LABELS = {
   },
 };
 
-// Quotes and escapes every field, not just description — a custom
-// category label (user-typed, unvalidated) can contain a comma just as
-// easily as a transaction description can, and an unquoted comma there
-// silently shifts every column after it.
-const csvField = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-
+// SECURITY: description and category label go through csvTextField
+// (neutralizes a leading =/+/-/@ so Excel can't run it as a formula —
+// see lib/utils.ts). date/type/amount go through plain csvField since
+// they're computed by this app, not free-text: a legitimate negative
+// amount string like "-42" must NOT be prefixed, or it stops being a
+// number in the spreadsheet.
 function exportToCSV(transactions: Transaction[], fileName: string, catLabel: (key: string) => string = k => k) {
   const headers = ['Date', 'Description', 'Category', 'Type', 'Amount'];
   const rows = transactions.map(t => [
     csvField(t.date),
-    csvField(t.description),
-    csvField(catLabel(t.category)),
+    csvTextField(t.description),
+    csvTextField(catLabel(t.category)),
     csvField(t.type),
     csvField(t.type === 'expense' ? `-${t.amount}` : t.amount)
   ]);

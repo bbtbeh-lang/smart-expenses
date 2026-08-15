@@ -6,6 +6,40 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Quotes/escapes a CSV cell (doubles internal quotes) — safe for values
+// this app computed itself: dates, type strings, amounts formatted as
+// "-42.00" for an expense row. Use csvTextField instead for anything
+// that came from free-text the user (or a scanned receipt) typed, since
+// a leading '-' here is legitimate negative-amount formatting, not
+// something to neutralize.
+export function csvField(v: string | number): string {
+  return `"${String(v).replace(/"/g, '""')}"`;
+}
+
+// Raw half of the formula-injection fix — see csvTextField below for
+// why this exists. Exported separately for callers that need to
+// neutralize a value now but quote/escape it later in a batch (see
+// TaxReportModal's exportToCsv), instead of doing both at once.
+export function neutralizeCsvFormula(v: string | number): string {
+  const s = String(v);
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+}
+
+// SECURITY: CSV formula injection (OWASP CSV Injection). A text field
+// that starts with =, +, -, @, or a tab/CR is interpreted as an active
+// formula by Excel/Sheets when the CSV is opened — not neutralized by
+// quoting or comma/quote-escaping alone, which only stops a cell from
+// breaking column boundaries, not from being parsed as a formula.
+// tx.description and tx.merchant here aren't just user-typed text: OCR
+// reads merchant names straight off a photographed receipt, i.e.
+// third-party-controlled input a person didn't type themselves and has
+// no reason to inspect before it lands in a spreadsheet they (or their
+// accountant) open. Use this (not csvField) for description, merchant,
+// and category-label cells in every CSV export in the app.
+export function csvTextField(v: string | number): string {
+  return csvField(neutralizeCsvFormula(v));
+}
+
 // `new Date().toISOString()` is always UTC. For a user west of UTC (e.g.
 // Toronto, UTC-4/-5), that rolls over to tomorrow's date hours before
 // midnight local time — a transaction added at 9pm was silently dated one

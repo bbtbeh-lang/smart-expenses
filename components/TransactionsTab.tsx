@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { TrendingUp, TrendingDown, Search, X, Download, Pencil } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang } from '@/lib/types';
-import { formatCurrency, parseLocalDate, resolveCategoryLabel } from '@/lib/utils';
+import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -17,12 +17,12 @@ interface TransactionsTabProps {
 
 type FilterType = 'all' | 'income' | 'expense';
 
-// csvField quotes/escapes every field — a custom category label (user-
-// typed, unvalidated) can contain a comma just as easily as a
-// description can, and an unquoted comma there silently shifts every
-// column after it.
-const csvField = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-
+// SECURITY: description and category label go through csvTextField
+// (neutralizes a leading =/+/-/@ so Excel can't run it as a formula —
+// see lib/utils.ts). date/type/amount/tax go through plain csvField
+// since they're computed by this app, not free-text: the legitimate
+// "-42.00" expense-amount formatting below must NOT be prefixed, or it
+// stops being a number in the spreadsheet.
 function exportToCsv(
   transactions: Transaction[],
   catLabel: (key: string) => string
@@ -34,11 +34,11 @@ function exportToCsv(
     .map(tx => [
       csvField(tx.date),
       csvField(tx.type),
-      csvField(tx.description),
+      csvTextField(tx.description),
       // BUG FIX: this used to only check `tr`, showing a custom
       // category's raw internal key ("custom_suger_1784775632372")
       // instead of the label the person actually typed.
-      csvField(catLabel(tx.category)),
+      csvTextField(catLabel(tx.category)),
       csvField(tx.type === 'income' ? tx.amount.toFixed(2) : (-tx.amount).toFixed(2)),
       csvField(tx.taxAmount != null ? tx.taxAmount.toFixed(2) : ''),
       csvField(tx.hasReceipt ? 'Yes' : 'No'),
