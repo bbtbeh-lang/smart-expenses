@@ -510,11 +510,14 @@ export default function Home() {
       await flushPendingProfileSaves();
       await supabase.auth.signOut();
       localStorage.removeItem(STORAGE_KEY);
-      // Explicit 'auth', not just freshState(lang) — freshState() defaults
-      // to 'loading' (for the initial-mount case), which would leave a
-      // just-signed-out user stuck on the loading spinner forever since
-      // nothing else is going to come along and resolve it.
-      setState({ ...freshState(state.lang), screen: 'auth' });
+      // No manual setState here: supabase.auth.signOut() fires the
+      // 'SIGNED_OUT' event on onAuthStateChange synchronously as part of
+      // resolving its promise, and that listener's else-branch (line
+      // ~319) already does the exact same
+      // `{ ...freshState(prev.lang), screen: 'auth' }` reset — using
+      // prev.lang from the state updater instead of this closure's
+      // `state.lang`, which is the safer of the two after a 1s timeout.
+      // Keeping both was pure duplication, not a safety net.
       setActiveTab('dashboard');
     }, 1000);
   };
