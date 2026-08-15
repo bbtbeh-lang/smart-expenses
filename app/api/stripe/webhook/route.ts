@@ -19,6 +19,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Idempotency guard: if Stripe already delivered this exact event.id
+    // once (a redelivery after a slow/missed 200), skip reprocessing
+    // entirely. Insert-first-wins via the primary key — if another
+    // concurrent delivery of the same event already inserted this id,
+    // the insert below fails with a unique-violation and we treat that
+    // exactly like "already processed".
+    const { error: dedupeError } = await supabaseAdmin
+      .from('processed_stripe_events')
+      .insert({ event_id: event.id, event_type: event.type });
+    if (dedupeError) {
+      if (dedupeError.code === '23505') {
+        // Unique violation — this event.id was already processed (by
+        // this request or a concurrent one). Acknowledge and stop.
+        return NextResponse.json({ received: true, deduped: true });
+      }
+      // Any other insert failure: fail closed on the dedupe table itself
+      // would risk silently dropping real events, so log and continue
+      // processing rather than blocking on a non-critical bookkeeping
+      // table.
+      console.error('processed_stripe_events insert error:', dedupeError);
+    }
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
