@@ -18,7 +18,7 @@ interface Customer {
   email: string | null;
   createdAt: string;
   birthDate: string | null;
-  plan: 'free' | 'basic' | 'pro' | 'business';
+  plan: 'free' | 'starter' | 'basic' | 'pro' | 'business';
   billingPeriod: 'monthly' | 'yearly' | null;
   status: 'inactive' | 'active' | 'past_due' | 'canceled';
   scansUsed: number;
@@ -29,6 +29,7 @@ interface Customer {
 
 const PLAN_BADGE_STYLE: Record<Customer['plan'], string> = {
   free: 'bg-slate-100 text-slate-500',
+  starter: 'bg-teal-100 text-teal-700',
   basic: 'bg-sky-100 text-sky-700',
   pro: 'bg-violet-100 text-violet-700',
   business: 'bg-amber-100 text-amber-700',
@@ -53,7 +54,7 @@ export default function AdminPage() {
   const [customersError, setCustomersError] = useState('');
   const [customerFilter, setCustomerFilter] = useState<'all' | 'paying'>('all');
   const [grantEmail, setGrantEmail] = useState('');
-  const [grantPlan, setGrantPlan] = useState<'basic' | 'pro' | 'business'>('business');
+  const [grantPlan, setGrantPlan] = useState<'starter' | 'basic' | 'pro' | 'business'>('business');
   const [grantDuration, setGrantDuration] = useState<'1_month' | '3_months' | '1_year' | 'lifetime'>('1_month');
   const [grantLoading, setGrantLoading] = useState(false);
   const [grantMessage, setGrantMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -332,6 +333,7 @@ export default function AdminPage() {
               onChange={e => setGrantPlan(e.target.value as typeof grantPlan)}
               className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
             >
+              <option value="starter">Starter</option>
               <option value="basic">Basic</option>
               <option value="pro">Pro</option>
               <option value="business">Business</option>

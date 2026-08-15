@@ -70,7 +70,7 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
                 </div>
                 <div className="text-xs text-amber-600">
                   {billingPeriod === 'yearly' ? tr.billingYearly : tr.billingMonthly}
-                  {planConfig && ` · ${planConfig.scanLimit} ${tr.scansPerMonth.replace('{count}', '').trim()}`}
+                  {planConfig && ` · ${planConfig.scanLimit > 0 ? `${planConfig.scanLimit} ${tr.scansPerMonth.replace('{count}', '').trim()}` : tr.manualEntryOnly}`}
                 </div>
               </div>
               <span className="ml-auto text-xs font-bold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">{tr.planActive}</span>

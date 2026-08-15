@@ -640,7 +640,7 @@ export default function Home() {
   // Starts a brand-new Stripe subscription (free users) via Checkout, OR
   // upgrades/downgrades an existing active subscription in-place with
   // proration (no duplicate subscriptions, no double billing).
-  const handleStartCheckout = async (plan: 'basic' | 'pro' | 'business', billingPeriod: 'monthly' | 'yearly') => {
+  const handleStartCheckout = async (plan: 'starter' | 'basic' | 'pro' | 'business', billingPeriod: 'monthly' | 'yearly') => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) {
       // BUG FIX: this used to show tr.signingOut ("Signing out...") as the

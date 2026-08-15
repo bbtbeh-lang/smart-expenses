@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdminEmail } from '@/lib/adminAuth';
 
-type GrantPlan = 'basic' | 'pro' | 'business';
-const VALID_PLANS: GrantPlan[] = ['basic', 'pro', 'business'];
+type GrantPlan = 'starter' | 'basic' | 'pro' | 'business';
+const VALID_PLANS: GrantPlan[] = ['starter', 'basic', 'pro', 'business'];
 
 // Duration presets. 'lifetime' just means "far enough in the future that
 // it never practically expires" — current_period_end is only used for
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 });
   }
   if (!plan || !VALID_PLANS.includes(plan as GrantPlan)) {
-    return NextResponse.json({ error: 'Plan must be basic, pro, or business' }, { status: 400 });
+    return NextResponse.json({ error: 'Plan must be starter, basic, pro, or business' }, { status: 400 });
   }
 
   let targetUser;

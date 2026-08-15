@@ -1,4 +1,4 @@
-export type PlanId = 'basic' | 'pro' | 'business';
+export type PlanId = 'starter' | 'basic' | 'pro' | 'business';
 export type BillingPeriod = 'monthly' | 'yearly';
 
 export interface PlanConfig {
@@ -14,12 +14,21 @@ export interface PlanConfig {
 // Price IDs come from the Stripe Dashboard (Product catalog).
 // These are safe to expose on the client — they are not secret.
 export const PLANS: Record<PlanId, PlanConfig> = {
+  starter: {
+    id: 'starter',
+    name: 'Starter',
+    scanLimit: 0,
+    monthlyPriceId: 'price_1U4iAcJdj7e5h39Ze9OFVCPa',
+    yearlyPriceId: 'price_1U4iCAJdj7e5h39Z5qPFTiBN',
+    monthlyPriceCAD: 1.99,
+    yearlyPriceCAD: 16.99,
+  },
   basic: {
     id: 'basic',
     name: 'Basic',
     scanLimit: 50,
-    monthlyPriceId: 'price_1TwncgJdj7e5h39Zrz9auR2O',
-    yearlyPriceId: 'price_1TwndwJdj7e5h39ZaCpxAydP',
+    monthlyPriceId: 'price_1Twk1jJdj7e5h39ZoMGojgJD',
+    yearlyPriceId: 'price_1TwkBEJdj7e5h39ZO2kmZnf0',
     monthlyPriceCAD: 6.99,
     yearlyPriceCAD: 69,
   },
@@ -27,8 +36,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     id: 'pro',
     name: 'Pro',
     scanLimit: 250,
-    monthlyPriceId: 'price_1Twnd1Jdj7e5h39ZHtaKtzAE',
-    yearlyPriceId: 'price_1TwneGJdj7e5h39ZCHItnnTG',
+    monthlyPriceId: 'price_1Twk48Jdj7e5h39ZLpSxHJQK',
+    yearlyPriceId: 'price_1TwkByJdj7e5h39Z2WDjicVd',
     monthlyPriceCAD: 19.99,
     yearlyPriceCAD: 199,
   },
@@ -36,8 +45,8 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     id: 'business',
     name: 'Business',
     scanLimit: 600,
-    monthlyPriceId: 'price_1TwndGJdj7e5h39ZbdrePWrP',
-    yearlyPriceId: 'price_1TwnecJdj7e5h39ZubzXouya',
+    monthlyPriceId: 'price_1Twk4VJdj7e5h39Z21RhWlfQ',
+    yearlyPriceId: 'price_1TwkCTJdj7e5h39ZWCQRg730',
     monthlyPriceCAD: 39.99,
     yearlyPriceCAD: 399,
   },
