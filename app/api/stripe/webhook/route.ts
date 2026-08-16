@@ -6,6 +6,13 @@ import { planFromPriceId } from '@/lib/plans';
 import { sendRenewalReminderEmail } from '@/lib/email';
 import Stripe from 'stripe';
 
+// حیاتی برای صحت signature verification: این روت باید حتماً روی
+// Node.js runtime اجرا بشه، نه Edge. Edge runtime می‌تونه بدنه‌ی خام
+// درخواست رو طوری هندل کنه که با بایت‌هایی که Stripe امضا کرده مطابقت
+// نداشته باشه و constructEvent با خطای Invalid signature fail بشه.
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const signature = req.headers.get('stripe-signature') || '';
