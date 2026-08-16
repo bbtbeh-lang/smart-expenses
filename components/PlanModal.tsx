@@ -11,12 +11,13 @@ interface PlanModalProps {
   plan: PlanId;
   billingPeriod: BillingPeriod;
   currentPeriodEnd: string | null;
+  hasStripeSubscription: boolean;
   onClose: () => void;
   onManageSubscription: () => Promise<void> | void;
   onOpenUpgrade: () => void;
 }
 
-export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, onClose, onManageSubscription, onOpenUpgrade }: PlanModalProps) {
+export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, hasStripeSubscription, onClose, onManageSubscription, onOpenUpgrade }: PlanModalProps) {
   const [loading, setLoading] = useState(false);
 
   const handleManage = async () => {
@@ -99,10 +100,11 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
           </button>
 
           {/* Stripe-hosted portal — payment method, invoices, cancellation.
-              Free-plan users never went through Stripe checkout, so they have
-              no stripe_customer_id and the portal API would 404. Only show
-              this for paid plans. */}
-          {plan !== 'free' && (
+              Free-plan users, AND admin-granted paid plans with no real
+              Stripe subscription behind them, have no stripe_customer_id —
+              the portal API would 404 for both. Only show this when a real
+              Stripe subscription exists. */}
+          {hasStripeSubscription && (
             <button
               onClick={handleManage}
               disabled={loading}

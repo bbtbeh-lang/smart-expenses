@@ -64,9 +64,19 @@ export async function GET(req: NextRequest) {
       currentPeriodEnd: null,
       hasManualAccess,
       hasScanAccess,
+      hasStripeSubscription: false,
     });
   }
 
+  // Distinguishes a real Stripe-billed subscription from an active plan
+  // row with no Stripe subscription behind it (admin-granted access via
+  // /api/admin/grant-access, which deliberately leaves stripe_subscription_id
+  // null). The client needs this to decide whether "Change plan" should hit
+  // /api/stripe/change-plan (which requires an existing Stripe subscription
+  // to modify) or /api/stripe/checkout (which starts a new one) — and
+  // whether the Stripe customer portal is even reachable. Plan !== 'free'
+  // alone isn't enough: an admin-granted 'starter' plan is active but has
+  // nothing in Stripe to change or manage.
   return NextResponse.json({
     plan: sub.plan,
     billingPeriod: sub.billing_period,
@@ -76,5 +86,6 @@ export async function GET(req: NextRequest) {
     currentPeriodEnd: sub.current_period_end,
     hasManualAccess,
     hasScanAccess,
+    hasStripeSubscription: !!sub.stripe_subscription_id,
   });
 }

@@ -54,6 +54,7 @@ function freshState(lang: Lang = 'EN'): AppState {
     subscriptionLoaded: false,
     hasManualAccess: false,
     hasScanAccess: false,
+    hasStripeSubscription: false,
     codeActivated: false,
     scansUsedToday: 0,
     maxDailyScans: 10,
@@ -139,6 +140,7 @@ export default function Home() {
         tier: sub.plan === 'free' ? 'free' : 'premium',
         hasManualAccess: !!sub.hasManualAccess,
         hasScanAccess: !!sub.hasScanAccess,
+        hasStripeSubscription: !!sub.hasStripeSubscription,
       }));
     } catch {
       // Network error — leave existing state as-is, will retry on next auth event.
@@ -651,7 +653,14 @@ export default function Home() {
       return;
     }
 
-    const hasActivePlan = state.plan && state.plan !== 'free';
+    // Only route through change-plan (which modifies an EXISTING Stripe
+    // subscription) when one actually exists. An admin-granted plan
+    // (state.plan !== 'free' but hasStripeSubscription === false) has
+    // nothing in Stripe to change, so it must go through checkout instead
+    // to create a real subscription — previously this checked state.plan
+    // !== 'free' alone, which sent admin-granted accounts into change-plan
+    // and failed with "No active subscription to change".
+    const hasActivePlan = state.hasStripeSubscription;
 
     try {
       if (hasActivePlan) {
@@ -973,6 +982,7 @@ export default function Home() {
           plan={state.plan}
           billingPeriod={state.billingPeriod}
           currentPeriodEnd={state.currentPeriodEnd}
+          hasStripeSubscription={state.hasStripeSubscription}
           onClose={() => setShowPlanManager(false)}
           onManageSubscription={handleManageSubscription}
           onOpenUpgrade={() => { setShowPlanManager(false); setShowUpgrade(true); }}

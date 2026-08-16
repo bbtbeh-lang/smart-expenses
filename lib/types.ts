@@ -42,6 +42,7 @@ export interface AppState {
   subscriptionLoaded: boolean;
   hasManualAccess: boolean;
   hasScanAccess: boolean;
+  hasStripeSubscription: boolean;
   codeActivated: boolean;
   scansUsedToday: number;
   maxDailyScans: number;
