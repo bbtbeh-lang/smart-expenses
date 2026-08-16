@@ -98,19 +98,24 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, o
             {tr.changePlanBtn}
           </button>
 
-          {/* Stripe-hosted portal — payment method, invoices, cancellation */}
-          <button
-            onClick={handleManage}
-            disabled={loading}
-            className="w-full py-3.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
-            ) : (
-              <ExternalLink className="w-4 h-4" />
-            )}
-            {tr.manageSubscriptionBtn}
-          </button>
+          {/* Stripe-hosted portal — payment method, invoices, cancellation.
+              Free-plan users never went through Stripe checkout, so they have
+              no stripe_customer_id and the portal API would 404. Only show
+              this for paid plans. */}
+          {plan !== 'free' && (
+            <button
+              onClick={handleManage}
+              disabled={loading}
+              className="w-full py-3.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-sm active:scale-[0.98] transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+              ) : (
+                <ExternalLink className="w-4 h-4" />
+              )}
+              {tr.manageSubscriptionBtn}
+            </button>
+          )}
         </div>
       </div>
     </div>
