@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
       // admin panel shouldn't be crawled or indexed.
       disallow: ['/api/', '/admin'],
     },
-    sitemap: 'https://finsnap.pixflow.one/sitemap.xml',
+    sitemap: 'https://fin.pixflow.one/sitemap.xml',
   };
 }

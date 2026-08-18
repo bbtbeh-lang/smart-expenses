@@ -43,13 +43,13 @@ export async function POST(req: NextRequest) {
       customerId = customer.id;
     }
 
-    // finsnap.pixflow.one is the real production domain (custom domain,
+    // fin.pixflow.one is the real production domain (custom domain,
     // confirmed against the Vercel dashboard) — this hardcoded value is
     // only a last-resort fallback for when both the Origin header AND
     // NEXT_PUBLIC_APP_URL are missing; it previously pointed at
     // smart-expenses-2026.vercel.app, a stale/wrong domain left over
     // from the repo's old name.
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://finsnap.pixflow.one';
+    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://fin.pixflow.one';
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

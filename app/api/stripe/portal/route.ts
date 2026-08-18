@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Same fix as /api/stripe/checkout — the real production domain is
-    // finsnap.pixflow.one, not the old repo-name-based fallback.
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://finsnap.pixflow.one';
+    // fin.pixflow.one, not the old repo-name-based fallback.
+    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://fin.pixflow.one';
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
