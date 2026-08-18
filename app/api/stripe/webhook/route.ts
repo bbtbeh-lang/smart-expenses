@@ -26,26 +26,31 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Idempotency guard: if Stripe already delivered this exact event.id
-    // once (a redelivery after a slow/missed 200), skip reprocessing
-    // entirely. Insert-first-wins via the primary key — if another
-    // concurrent delivery of the same event already inserted this id,
-    // the insert below fails with a unique-violation and we treat that
-    // exactly like "already processed".
-    const { error: dedupeError } = await supabaseAdmin
+    // Idempotency guard: if Stripe already FULLY processed this exact
+    // event.id (a redelivery after a slow/missed 200), skip reprocessing.
+    // This is deliberately a read-only check here — the dedupe row is
+    // only INSERTed further down, after the switch/case below completes
+    // without throwing.
+    //
+    // BUG FIX: this used to INSERT the dedupe row up front, before doing
+    // any real work. That meant a delivery attempt that inserted the row
+    // and then failed partway through processing (subscription upsert
+    // error, transient DB issue, etc.) had already marked itself
+    // "processed" — every one of Stripe's automatic retries for that
+    // same event then hit the unique-violation branch below and returned
+    // a no-op 200 without ever actually creating/updating the
+    // subscription. From Stripe's side the delivery looked successful;
+    // from ours, nothing had happened. This is exactly what happened to
+    // a real Starter-plan checkout: the first attempt failed, and every
+    // retry after that silently deduped instead of retrying the actual
+    // work, leaving the customer's subscription row missing entirely.
+    const { data: alreadyProcessed } = await supabaseAdmin
       .from('processed_stripe_events')
-      .insert({ event_id: event.id, event_type: event.type });
-    if (dedupeError) {
-      if (dedupeError.code === '23505') {
-        // Unique violation — this event.id was already processed (by
-        // this request or a concurrent one). Acknowledge and stop.
-        return NextResponse.json({ received: true, deduped: true });
-      }
-      // Any other insert failure: fail closed on the dedupe table itself
-      // would risk silently dropping real events, so log and continue
-      // processing rather than blocking on a non-critical bookkeeping
-      // table.
-      console.error('processed_stripe_events insert error:', dedupeError);
+      .select('event_id')
+      .eq('event_id', event.id)
+      .maybeSingle();
+    if (alreadyProcessed) {
+      return NextResponse.json({ received: true, deduped: true });
     }
 
     switch (event.type) {
@@ -92,6 +97,19 @@ export async function POST(req: NextRequest) {
 
       default:
         break;
+    }
+
+    // Record this event as processed now that every side effect above
+    // has completed without throwing. Insert-first-wins via the primary
+    // key — if a concurrent delivery of the same event already inserted
+    // this id in the meantime, this fails with a unique-violation, which
+    // just means the work was already done by that other request; either
+    // way it's safe to tell Stripe we're done.
+    const { error: dedupeError } = await supabaseAdmin
+      .from('processed_stripe_events')
+      .insert({ event_id: event.id, event_type: event.type });
+    if (dedupeError && dedupeError.code !== '23505') {
+      console.error('processed_stripe_events insert error:', dedupeError);
     }
 
     return NextResponse.json({ received: true });
