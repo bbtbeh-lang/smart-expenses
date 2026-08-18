@@ -86,9 +86,9 @@ function renderRenewalReminderHtml(
   // is here whenever NEXT_PUBLIC_APP_URL isn't set — every renewal email's
   // "Manage subscription" link depends on this being right. Confirmed
   // against the Vercel dashboard: the real production domain is
-  // finsnap-2026.vercel.app, not the old repo-name-based fallback this
+  // finsnap.pixflow.one, not the old repo-name-based fallback this
   // used to have.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://finsnap-2026.vercel.app';
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://finsnap.pixflow.one';
 
   return `
   <div dir="${dir}" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff;">

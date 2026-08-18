@@ -5,7 +5,7 @@ import type { MetadataRoute } from 'next';
 // itself. Only the truly public, indexable routes belong here — the app
 // experience isn't a separate crawlable URL.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://finsnap-2026.vercel.app';
+  const baseUrl = 'https://finsnap.pixflow.one';
   const now = new Date();
 
   return [
