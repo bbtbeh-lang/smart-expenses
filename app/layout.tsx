@@ -1,5 +1,5 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 // Self-hosted fonts via @fontsource, not next/font/google + a Google
 // Fonts <link>. next/font/google still makes a build-time network
 // request to fetch the font files even though it serves them from our
@@ -19,6 +19,9 @@ import '@fontsource/vazirmatn/800.css';
 export const metadata: Metadata = {
   title: 'FinSnap — Smart Finance Management',
   description: 'AI-powered income, expense, and tax management for personal and business use.',
+};
+
+export const viewport: Viewport = {
   themeColor: '#10b981',
 };
 
