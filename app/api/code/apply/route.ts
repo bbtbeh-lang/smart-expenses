@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ success: false, message: 'missing_code' }, { status: 400 });
   const code = String(body.code || '').trim().toUpperCase();
   // The server's own "today" (Postgres current_date, Vercel process clock)
   // is UTC, not the user's local calendar day — see the migration this

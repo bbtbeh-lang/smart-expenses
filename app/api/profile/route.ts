@@ -32,7 +32,8 @@ export async function PATCH(req: NextRequest) {
   const userId = await getAuthedUserId(req);
   if (!userId) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   const hasBirthDate = Object.prototype.hasOwnProperty.call(body, 'birthDate');
   const birthDate = body.birthDate as string | null;
   const incomingCustomCategories = body.customCategories as Record<string, string> | undefined;
