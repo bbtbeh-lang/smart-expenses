@@ -26,6 +26,12 @@ const VALID_OCR_CATEGORIES = new Set([
 // check the user's entire history — just recent activity.
 const DUPLICATE_LOOKBACK_DAYS = 180;
 
+// Frontend already downsizes to max 1200px + jpeg 0.85 before upload, so a
+// well-formed image should land well under this — this just guards against
+// abuse/bad clients before we spend a scan credit or a model call on it.
+// (Mirrors the same guard in app/api/ocr/income/route.ts.)
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
+
 export async function POST(req: Request) {
   let userId: string | null = null;
   let scanConsumed = false;
@@ -47,6 +53,33 @@ export async function POST(req: Request) {
     }
     userId = userData.user.id;
 
+    // BUG FIX: image validation (missing/invalid base64/oversized) used to
+    // happen after consumeScan, relying on the catch block's refund to undo
+    // the charge. That worked (refundScan did fire), but only after already
+    // decrementing and re-incrementing the quota counter and, for an
+    // oversized payload, after fully buffering it first. Validating BEFORE
+    // consumeScan — same order as app/api/ocr/income/route.ts — means a
+    // malformed or abusive request never touches the quota counter at all.
+    const body = await req.json().catch(() => null);
+    const image: string | undefined = body?.image;
+    const mimeType: string | undefined = body?.mimeType;
+    if (!image || typeof image !== 'string') {
+      return Response.json({ error: 'missing_image' }, { status: 400 });
+    }
+
+    let imageBuffer: Buffer;
+    try {
+      imageBuffer = Buffer.from(image, 'base64');
+    } catch {
+      return Response.json({ error: 'invalid_image' }, { status: 400 });
+    }
+    if (imageBuffer.length === 0) {
+      return Response.json({ error: 'invalid_image' }, { status: 400 });
+    }
+    if (imageBuffer.length > MAX_IMAGE_BYTES) {
+      return Response.json({ error: 'image_too_large' }, { status: 413 });
+    }
+
     const consumeResult = await consumeScan(userId);
     if (!consumeResult.allowed) {
       return Response.json(
@@ -60,12 +93,10 @@ export async function POST(req: Request) {
     scanConsumed = true;
     scanResult = consumeResult;
 
-    const { image, mimeType } = await req.json();
-    const safeMimeType = getSupportedMimeType(mimeType);
+    const safeMimeType = getSupportedMimeType(mimeType || '');
 
     // Kick off the duplicate check in parallel with the OCR call — they're
     // independent, so there's no reason to wait for one before the other.
-    const imageBuffer = Buffer.from(image, 'base64');
     const duplicateCheckPromise = (async () => {
       try {
         const receiptHash = await computeReceiptHash(imageBuffer);

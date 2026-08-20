@@ -112,12 +112,16 @@ export async function POST(req: Request) {
           { type: 'image', source: { type: 'base64', media_type: safeMimeType, data: image } },
           {
             type: 'text',
-            text: `You are an expert SALES/INCOME invoice scanner (not an expense receipt). Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency. This document represents money the business RECEIVED from a client/customer.
+            text: `You are an expert SALES/INCOME invoice scanner (not an expense receipt). Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency. This document represents money the business RECEIVED from a client/customer. For reference, today's date is ${new Date().toISOString().slice(0, 10)} (YYYY-MM-DD) — invoices are essentially never dated in the future or more than a couple of years in the past, so use that as a sanity check.
 
 Extract:
 1. clientName: the customer/client/buyer name being billed (NOT the issuing business's own name)
 2. invoiceNumber: invoice/reference number if present, else ""
 3. date: invoice date in YYYY-MM-DD format
+   - If the date is written in the Persian/Jalali (Solar Hijri) calendar (e.g. "۱۴۰۴/۵/۱۴" or "14 مرداد 1404"), convert it to the Gregorian calendar for the output.
+   - If a 2-digit year is printed (e.g. "26" or "٢٦"), expand it to the correct 4-digit year (e.g. 2026), never a different century.
+   - Read each digit carefully — a smudged or low-contrast digit misread as a different one is the most common source of an impossible date (e.g. a wrong century or a future date).
+   - If the date is missing, illegible, or you cannot resolve it with reasonable confidence, return "" rather than guessing — do not output a date you are not fairly confident in.
 4. items: EVERY line item with description and price (number only)
 5. amount: final TOTAL amount received/billed (number only, no currency symbol)
 6. tax: sales tax collected on this invoice (e.g. "GST", "HST", "QST", "TPS", "TVQ", "VAT"). Sum multiple tax lines. Use "" if none shown.
@@ -140,12 +144,31 @@ Return ONLY valid JSON, no markdown:
       ? (itemNames.length > 0 ? `${parsed.clientName} — ${itemNames.join(', ')}` : parsed.clientName)
       : itemNames.join(', ');
 
+    // Defense in depth: even with explicit prompt guidance, the model can
+    // still misread a digit. An invoice dated more than 2 years ago or more
+    // than a day in the future (allowing for timezones) is almost always a
+    // misread rather than a real transaction — better to drop it and let
+    // the form fall back to today's date (which the person can fix) than
+    // silently record a wrong one. Mirrors app/api/ocr/route.ts.
+    let safeDate = '';
+    if (parsed.date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date)) {
+      const d = new Date(parsed.date + 'T00:00:00Z');
+      const now = new Date();
+      const twoYearsAgo = new Date(now);
+      twoYearsAgo.setFullYear(now.getFullYear() - 2);
+      const tomorrow = new Date(now);
+      tomorrow.setDate(now.getDate() + 1);
+      if (!isNaN(d.getTime()) && d >= twoYearsAgo && d <= tomorrow) {
+        safeDate = parsed.date;
+      }
+    }
+
     const duplicateInfo = await duplicateCheckPromise;
 
     return Response.json({
       amount: parsed.amount || '',
       description,
-      date: parsed.date || '',
+      date: safeDate,
       clientName: parsed.clientName || '',
       invoiceNumber: parsed.invoiceNumber || '',
       tax: parsed.tax || '',

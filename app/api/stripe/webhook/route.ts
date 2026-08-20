@@ -78,10 +78,25 @@ export async function POST(req: NextRequest) {
         const subscription = event.data.object as Stripe.Subscription;
         const userId = subscription.metadata?.supabase_user_id;
         if (userId) {
+          // BUG FIX: this used to filter only by user_id, which blindly
+          // cancels whatever subscription row is currently on file for
+          // this user. Stripe does not guarantee webhook delivery order —
+          // if a user cancels an old subscription and starts a new one
+          // right after (upgrade via a fresh checkout, quick resubscribe),
+          // this `deleted` event for the OLD subscription can arrive
+          // *after* the `created`/`updated` event for the NEW one already
+          // wrote the new subscription's id into this same row. Without
+          // this extra filter, that late-arriving cancellation would wipe
+          // out the user's brand-new active subscription. Filtering on
+          // stripe_subscription_id too means this update only takes effect
+          // if the row still refers to *this* subscription; if a newer one
+          // has since replaced it, the update matches zero rows and is a
+          // correct no-op.
           await supabaseAdmin
             .from('subscriptions')
             .update({ status: 'canceled', updated_at: new Date().toISOString() })
-            .eq('user_id', userId);
+            .eq('user_id', userId)
+            .eq('stripe_subscription_id', subscription.id);
         }
         break;
       }
