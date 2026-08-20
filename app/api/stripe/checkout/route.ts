@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { PLANS, PlanId, BillingPeriod } from '@/lib/plans';
+import { getSafeOrigin } from '@/lib/safeOrigin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -43,13 +44,11 @@ export async function POST(req: NextRequest) {
       customerId = customer.id;
     }
 
-    // fin.pixflow.one is the real production domain (custom domain,
-    // confirmed against the Vercel dashboard) — this hardcoded value is
-    // only a last-resort fallback for when both the Origin header AND
-    // NEXT_PUBLIC_APP_URL are missing; it previously pointed at
-    // smart-expenses-2026.vercel.app, a stale/wrong domain left over
-    // from the repo's old name.
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://fin.pixflow.one';
+    // SECURITY: only trust the Origin header if it's one of our own
+    // known domains — see lib/safeOrigin.ts. An unchecked Origin here
+    // becomes the post-payment redirect Stripe sends the user's browser
+    // to, which is an open-redirect vector for a raw (non-browser) POST.
+    const origin = getSafeOrigin(req);
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { getSafeOrigin } from '@/lib/safeOrigin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,9 +26,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 404 });
     }
 
-    // Same fix as /api/stripe/checkout — the real production domain is
-    // fin.pixflow.one, not the old repo-name-based fallback.
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'https://fin.pixflow.one';
+    // SECURITY: same open-redirect fix as /api/stripe/checkout — see
+    // lib/safeOrigin.ts.
+    const origin = getSafeOrigin(req);
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
