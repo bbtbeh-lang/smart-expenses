@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { receiptHash } = await req.json();
+  const body = await req.json().catch(() => null);
+  const receiptHash = body?.receiptHash;
   if (!receiptHash) {
     return NextResponse.json({ error: 'Missing receiptHash' }, { status: 400 });
   }
