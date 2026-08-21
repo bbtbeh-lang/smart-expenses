@@ -53,9 +53,6 @@ export default function OnboardingScreen({ tr, onSelect }: OnboardingScreenProps
               <div>
                 <div className="font-bold text-slate-900 text-base mb-1">{tr.business}</div>
                 <div className="text-sm text-slate-500 leading-relaxed">{tr.businessDesc}</div>
-                <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
-                  {tr.onboardingGstReady}
-                </div>
               </div>
             </div>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-slate-50 group-hover:bg-teal-500 flex items-center justify-center transition-all duration-200">
