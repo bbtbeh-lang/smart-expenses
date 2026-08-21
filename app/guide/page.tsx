@@ -125,7 +125,22 @@ const CONTENT: Record<GLang, Section[]> = {
       icon: FileText,
       title: 'Reports Tab',
       blocks: [
-        { type: 'p', text: 'Generate a Tax Report for an accountant-ready view of your year, in three views:' },
+        { type: 'p', text: 'A monthly view of your income, expenses, and profit, with tools to slice and export the numbers:' },
+        { type: 'ul', items: [
+          'Filter by month, or set a custom date range spanning any period.',
+          'Filter by category, and switch between Income / Expenses / All.',
+          'Top Income and Top Expense category breakdowns, with a share-of-total bar for each.',
+          'Search by Product / Order — find every income and expense tied to a specific product or order, based on the transaction description, with its own spent/received/net totals.',
+          'Export the current view, or just your search results, to CSV — requires a paid plan or an active gift code.',
+        ] },
+      ],
+    },
+    {
+      id: 'tax-report',
+      icon: ShieldAlert,
+      title: 'Tax Report',
+      blocks: [
+        { type: 'p', text: 'A separate, accountant-ready view of your year — open it from the "Generate Tax Report" quick action on the Dashboard. Three views:' },
         { type: 'ul', items: [
           'Summary — totals for the fiscal year.',
           'Ledger — every transaction, one row each.',
@@ -293,14 +308,29 @@ const CONTENT: Record<GLang, Section[]> = {
       icon: FileText,
       title: 'تب گزارش‌ها',
       blocks: [
-        { type: 'p', text: 'یه «گزارش مالیاتی» بساز تا نمای آماده‌برای‌حسابدار از سالت رو، توی سه بخش ببینی:' },
+        { type: 'p', text: 'یه نمای ماهانه از درآمد، هزینه و سودت، همراه با ابزارهایی برای فیلتر و خروجی گرفتن:' },
+        { type: 'ul', items: [
+          'فیلتر بر اساس ماه، یا یه بازه‌ی تاریخ دلخواه برای هر دوره‌ای.',
+          'فیلتر بر اساس دسته‌بندی، و جابه‌جایی بین درآمد / هزینه / همه.',
+          'دسته‌بندی‌های برتر درآمد و هزینه، با نوار سهم از کل برای هرکدوم.',
+          'جستجو بر اساس محصول / سفارش — همه‌ی درآمدها و هزینه‌های مربوط به یک محصول یا سفارش خاص رو بر اساس توضیحات تراکنش پیدا کن، با مجموع هزینه/دریافتی/سود خالص جداگانه.',
+          'خروجی گرفتن از نمای فعلی، یا فقط نتایج جستجو، به CSV — نیاز به پلن پولی یا کد فعال هدیه داره.',
+        ] },
+      ],
+    },
+    {
+      id: 'tax-report',
+      icon: ShieldAlert,
+      title: 'گزارش مالیاتی',
+      blocks: [
+        { type: 'p', text: 'یه نمای جداگانه و آماده‌برای‌حسابدار از سالت — از دکمه‌ی «تولید گزارش مالیاتی» توی داشبورد بازش کن. سه بخش:' },
         { type: 'ul', items: [
           'خلاصه — مجموع‌های سال مالی.',
           'دفتر کل — هر تراکنش، یه ردیف.',
           'خلاصه‌ی مالیات — مجموع GST/HST/QST جمع‌آوری‌شده از رسیدهای اسکن‌شده‌ت، بر اساس دسته‌بندی.',
         ] },
         { type: 'note', text: 'فاین‌اسنپ مبلغ‌های مالیاتیِ شناسایی‌شده روی رسیدهات رو جمع می‌زنه. این محاسبه‌ی چیزی که بدهکاری یا می‌تونی توی اظهارنامه‌ی GST/HST/QST مطالبه کنی نیست. برای عدد واقعیِ پرداختی، با یه حسابدار یا مستقیماً CRA مشورت کن.' },
-        { type: 'p', text: 'دانلود گزارش به‌صورت CSV یا PDF فقط برای پلن‌های پولیه.' },
+        { type: 'p', text: 'دانلود گزارش به‌صورت CSV یا PDF نیاز به پلن پولی یا کد فعال هدیه داره.' },
       ],
     },
     {
