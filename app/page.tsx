@@ -958,6 +958,7 @@ export default function Home() {
         <TaxReportModal
           tr={tr}
           tier={state.tier}
+          hasGiftAccess={state.hasManualAccess}
           lang={state.lang}
           transactions={filteredTransactions}
           onClose={() => setShowTaxReport(false)}

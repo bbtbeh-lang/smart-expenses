@@ -133,7 +133,7 @@ const CONTENT: Record<GLang, Section[]> = {
           'Tax Summary — total GST/HST/QST collected from your scanned receipts, by category.',
         ] },
         { type: 'note', text: 'FinSnap totals the tax amounts detected on your receipts. It does NOT calculate what you owe or can claim on a GST/HST/QST return. For an actual remittance figure, consult an accountant or the CRA directly.' },
-        { type: 'p', text: 'Downloading as CSV or PDF is a Premium (paid plan) feature.' },
+        { type: 'p', text: 'Downloading as CSV or PDF requires a paid plan or an active gift code.' },
       ],
     },
     {
@@ -170,7 +170,7 @@ const CONTENT: Record<GLang, Section[]> = {
       icon: CreditCard,
       title: 'Subscription Plans',
       blocks: [
-        { type: 'p', text: 'Receipt scanning (AI reading a photo/PDF automatically) is a paid feature. Manual entry is always free, and the Free tier can also unlock a day of manual entry via a daily code on FinSnap\'s YouTube channel.' },
+        { type: 'p', text: 'Receipt scanning, manual transaction entry, and the tax report\'s PDF/CSV export are all paid features. The Free tier can unlock all of them temporarily with a gift code posted on FinSnap\'s YouTube channel — nothing about your existing data changes when a code expires.' },
         { type: 'table', headers: ['Plan', 'Monthly', 'Yearly', 'Scans / month'], rows: [
           ['Basic', '$6.99', '$69 (2 months free)', '50'],
           ['Pro', '$19.99', '$199 (2 months free)', '250'],

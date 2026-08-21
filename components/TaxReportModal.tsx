@@ -10,6 +10,13 @@ import { supabase } from '@/lib/supabase';
 interface TaxReportModalProps {
   tr: Translations;
   tier: Tier;
+  // Grants temporary access to gated exports the same way an active gift
+  // code unlocks manual entry (see app/api/subscription/route.ts's
+  // hasManualAccess) — a free-tier user with a currently-redeemed code
+  // gets PDF/CSV export too, on top of manual entry, without needing to
+  // upgrade. This is purely additive to `tier === 'premium'`; it never
+  // downgrades a paying user's access.
+  hasGiftAccess: boolean;
   lang: Lang;
   transactions: Transaction[];
   onClose: () => void;
@@ -20,7 +27,15 @@ interface TaxReportModalProps {
 
 type Tab = 'summary' | 'ledger' | 'tax';
 
-export default function TaxReportModal({ tr, tier, lang, transactions: allTransactions, onClose, onOpenUpgrade, customCategories = {}, customIncomeCategories = {} }: TaxReportModalProps) {
+export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transactions: allTransactions, onClose, onOpenUpgrade, customCategories = {}, customIncomeCategories = {} }: TaxReportModalProps) {
+  // BUG FIX: exports (PDF and CSV/Excel) were meant to be a paid-plan
+  // feature per the in-app guide ("Downloading as CSV or PDF requires a
+  // paid plan or an active gift code"), but only the CSV/Excel button
+  // actually checked this — the PDF button below had no gate at all, so
+  // every free-tier user could already download the tax report as a PDF
+  // for free. `canExport` is the single source of truth both buttons
+  // should check from here on.
+  const canExport = tier === 'premium' || hasGiftAccess;
   const catLabel = (key: string) => resolveCategoryLabel(key, tr as unknown as Record<string, string>, customCategories, customIncomeCategories);
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -371,26 +386,26 @@ export default function TaxReportModal({ tr, tier, lang, transactions: allTransa
           )}
 
           <div className="mt-6 space-y-3">
-            {/* PDF — available to everyone */}
-            <button
-              onClick={handleDownloadPDF}
-              disabled={pdfLoading}
-              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
-            >
-              {pdfLoading ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-              ) : <FileDown className="w-4 h-4" />}
-              {tr.downloadPDF}
-            </button>
-
-            {tier === 'premium' ? (
-              <button onClick={handleDownloadExcel} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 flex items-center justify-center gap-2">
-                <Download className="w-4 h-4" />
-                {tr.downloadExcel}
-              </button>
+            {canExport ? (
+              <>
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={pdfLoading}
+                  className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-slate-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
+                >
+                  {pdfLoading ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : <FileDown className="w-4 h-4" />}
+                  {tr.downloadPDF}
+                </button>
+                <button onClick={handleDownloadExcel} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 flex items-center justify-center gap-2">
+                  <Download className="w-4 h-4" />
+                  {tr.downloadExcel}
+                </button>
+              </>
             ) : (
               <div className="space-y-3">
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
