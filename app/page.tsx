@@ -851,6 +851,9 @@ export default function Home() {
                 tr={tr}
                 customCategories={state.customCategories}
                 customIncomeCategories={state.customIncomeCategories}
+                tier={state.tier}
+                hasGiftAccess={state.hasManualAccess}
+                onOpenUpgrade={() => setShowUpgrade(true)}
               />
             )}
             {activeTab === 'pricing' && (

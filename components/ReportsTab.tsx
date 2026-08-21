@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package } from 'lucide-react';
-import { Transaction, Lang } from '@/lib/types';
+import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package, Lock } from 'lucide-react';
+import { Transaction, Lang, Tier } from '@/lib/types';
 import { Translations } from '@/lib/translations';
 import { parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
 
@@ -12,6 +12,13 @@ interface ReportsTabProps {
   tr: Translations;
   customCategories?: Record<string, string>;
   customIncomeCategories?: Record<string, string>;
+  // Same paid-plan-or-gift-code export gate as TaxReportModal and
+  // TransactionsTab — this file had two CSV export buttons (monthly
+  // report + product/order search) with no tier prop at all, free for
+  // everyone.
+  tier: Tier;
+  hasGiftAccess: boolean;
+  onOpenUpgrade: () => void;
 }
 
 type ViewMode = 'all' | 'income' | 'expense';
@@ -158,7 +165,8 @@ function CategoryBreakdown({ title, entries, total, color, catLabel }: { title: 
   );
 }
 
-export default function ReportsTab({ transactions, lang, tr, customCategories = {}, customIncomeCategories = {} }: ReportsTabProps) {
+export default function ReportsTab({ transactions, lang, tr, customCategories = {}, customIncomeCategories = {}, tier, hasGiftAccess, onOpenUpgrade }: ReportsTabProps) {
+  const canExport = tier === 'premium' || hasGiftAccess;
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [view, setView] = useState<ViewMode>('all');
   const [search, setSearch] = useState('');
@@ -379,10 +387,14 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
             {L.transactions} ({filtered.length})
           </h3>
           <button
-            onClick={() => exportToCSV(filtered, hasCustomRange ? `Report_${dateFrom}_to_${dateTo}_${view}` : selectedMonth === 'all' ? `All_${view}` : `Report_${selectedMonth}_${view}`, catLabel)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
+            onClick={canExport
+              ? () => exportToCSV(filtered, hasCustomRange ? `Report_${dateFrom}_to_${dateTo}_${view}` : selectedMonth === 'all' ? `All_${view}` : `Report_${selectedMonth}_${view}`, catLabel)
+              : onOpenUpgrade}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all active:scale-95 ${
+              canExport ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
+            }`}
           >
-            <Download className="w-3.5 h-3.5" />
+            {canExport ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
             {L.exportCSV}
           </button>
         </div>
@@ -449,10 +461,12 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
                 <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
                   <span className="text-xs text-slate-500">{searchResults.length} {L.matches}</span>
                   <button
-                    onClick={() => exportToCSV(searchResults, `Product_Report_${search.trim().replace(/[^a-z0-9]+/gi, '_')}`, catLabel)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-xl transition-all active:scale-95"
+                    onClick={canExport ? () => exportToCSV(searchResults, `Product_Report_${search.trim().replace(/[^a-z0-9]+/gi, '_')}`, catLabel) : onOpenUpgrade}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all active:scale-95 ${
+                      canExport ? 'bg-slate-800 hover:bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
+                    }`}
                   >
-                    <Download className="w-3.5 h-3.5" />
+                    {canExport ? <Download className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                     {L.exportMatches}
                   </button>
                 </div>
