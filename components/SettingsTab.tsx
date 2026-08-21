@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Globe, Bell, Shield, ChevronRight, Moon, Sun, Smartphone, Briefcase, Home, Calendar } from 'lucide-react';
+import { User, Globe, Shield, ChevronRight, Moon, Sun, Smartphone, Briefcase, Home, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AppState, Lang, AccountType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -24,7 +24,6 @@ const LANGS: { id: Lang; native: string; flag: string }[] = [
 ];
 
 export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpenPlanManager, onLangToggle, onDeleteAccount, onChangeAccountType }: SettingsTabProps) {
-  const [notifications, setNotifications] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -210,26 +209,11 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
       <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-50">
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-slate-400" />
+            <Smartphone className="w-4 h-4 text-slate-400" />
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{tr.settingsPreferences}</span>
           </div>
         </div>
         <div className="divide-y divide-slate-50">
-          <div className="px-5 py-3.5 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-slate-800">{tr.settingsNotifications}</div>
-              <div className="text-xs text-slate-400">{tr.settingsNotificationsDesc}</div>
-            </div>
-            <button
-              onClick={() => setNotifications(n => !n)}
-              role="switch"
-              aria-checked={notifications}
-              aria-label={tr.settingsNotifications}
-              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${notifications ? 'bg-emerald-500' : 'bg-slate-200'}`}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${notifications ? 'left-5' : 'left-0.5'}`} />
-            </button>
-          </div>
           <div className="px-5 py-3.5 flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-slate-800">{tr.settingsCurrency}</div>
