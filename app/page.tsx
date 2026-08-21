@@ -839,6 +839,9 @@ export default function Home() {
                 onEdit={tx => setEditingTransaction(tx)}
                 customCategories={state.customCategories}
                 customIncomeCategories={state.customIncomeCategories}
+                tier={state.tier}
+                hasGiftAccess={state.hasManualAccess}
+                onOpenUpgrade={() => setShowUpgrade(true)}
               />
             )}
             {activeTab === 'reports' && (

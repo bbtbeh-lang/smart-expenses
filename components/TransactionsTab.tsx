@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Search, X, Download, Pencil } from 'lucide-react';
+import { TrendingUp, TrendingDown, Search, X, Download, Pencil, Lock } from 'lucide-react';
 import { Translations } from '@/lib/translations';
-import { Transaction, TransactionType, Lang } from '@/lib/types';
+import { Transaction, TransactionType, Lang, Tier } from '@/lib/types';
 import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
 
 interface TransactionsTabProps {
@@ -13,6 +13,14 @@ interface TransactionsTabProps {
   onEdit: (tx: Transaction) => void;
   customCategories?: Record<string, string>;
   customIncomeCategories?: Record<string, string>;
+  // BUG FIX: this export was completely ungated for every user — no tier
+  // prop existed on this component at all — while the Reports tab's Tax
+  // Report export (same category of action: download your financial
+  // data) is a paid/gift-code feature. Same access rule as
+  // TaxReportModal's `canExport`: a paid plan or an active gift code.
+  tier: Tier;
+  hasGiftAccess: boolean;
+  onOpenUpgrade: () => void;
 }
 
 type FilterType = 'all' | 'income' | 'expense';
@@ -55,7 +63,8 @@ function exportToCsv(
   URL.revokeObjectURL(url);
 }
 
-export default function TransactionsTab({ transactions, tr, lang, onEdit, customCategories = {}, customIncomeCategories = {} }: TransactionsTabProps) {
+export default function TransactionsTab({ transactions, tr, lang, onEdit, customCategories = {}, customIncomeCategories = {}, tier, hasGiftAccess, onOpenUpgrade }: TransactionsTabProps) {
+  const canExport = tier === 'premium' || hasGiftAccess;
   const catLabel = (key: string) => resolveCategoryLabel(key, tr as unknown as Record<string, string>, customCategories, customIncomeCategories);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
@@ -104,13 +113,23 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
       {/* Export button */}
       {transactions.length > 0 && (
         <div className="flex justify-end">
-          <button
-            onClick={() => exportToCsv(transactions, catLabel)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all duration-150 shadow-sm shadow-emerald-200"
-          >
-            <Download className="w-3.5 h-3.5" />
-            {tr.exportExcel}
-          </button>
+          {canExport ? (
+            <button
+              onClick={() => exportToCsv(transactions, catLabel)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-semibold rounded-xl transition-all duration-150 shadow-sm shadow-emerald-200"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {tr.exportExcel}
+            </button>
+          ) : (
+            <button
+              onClick={onOpenUpgrade}
+              className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-500 text-xs font-semibold rounded-xl transition-all duration-150"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              {tr.exportExcel}
+            </button>
+          )}
         </div>
       )}
 

@@ -82,7 +82,7 @@ const CONTENT: Record<GLang, Section[]> = {
           'Search by merchant or description.',
           'Filter by category.',
           'Edit or delete any transaction.',
-          'Export everything to Excel/CSV.',
+          'Export everything to Excel/CSV — requires a paid plan or an active gift code.',
         ] },
       ],
     },
@@ -251,7 +251,7 @@ const CONTENT: Record<GLang, Section[]> = {
           'بر اساس اسم فروشگاه یا توضیحات جست‌وجو کنی.',
           'بر اساس دسته‌بندی فیلتر کنی.',
           'هر تراکنشی رو ویرایش یا حذف کنی.',
-          'همه رو به Excel/CSV خروجی بگیری.',
+          'همه رو به Excel/CSV خروجی بگیری — نیاز به پلن پولی یا کد فعال هدیه داره.',
         ] },
       ],
     },
@@ -339,7 +339,7 @@ const CONTENT: Record<GLang, Section[]> = {
       icon: CreditCard,
       title: 'پلن‌های اشتراک',
       blocks: [
-        { type: 'p', text: 'اسکن رسید (خوندن خودکار عکس/PDF توسط هوش مصنوعی) یه امکان پولیه. ورود دستی همیشه رایگانه، و توی پلن رایگان هم می‌تونی با کد روزانه‌ی کانال یوتیوب فاین‌اسنپ، یه روز ورود دستی رو باز کنی.' },
+        { type: 'p', text: 'اسکن رسید، ورود دستی تراکنش، و خروجی PDF/CSV گزارش مالیاتی همه امکانات پولی هستن. توی پلن رایگان هم می‌تونی با کد هدیه‌ی کانال یوتیوب فاین‌اسنپ، به‌طور موقت به همه‌شون دسترسی پیدا کنی — با تموم شدن اعتبار کد، هیچ‌چیزی از اطلاعات قبلیت پاک نمی‌شه.' },
         { type: 'table', headers: ['پلن', 'ماهانه', 'سالانه', 'اسکن در ماه'], rows: [
           ['Basic', '$۶.۹۹', '$۶۹ (۲ ماه رایگان)', '۵۰'],
           ['Pro', '$۱۹.۹۹', '$۱۹۹ (۲ ماه رایگان)', '۲۵۰'],
