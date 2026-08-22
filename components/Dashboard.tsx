@@ -124,7 +124,7 @@ export default function Dashboard({
       catMap[t.category].value += t.amount;
     });
     return Object.values(catMap).filter(x => x.value > 0).sort((a, b) => b.value - a.value);
-  }, [filteredTxs, tr, state.customCategories]);
+  }, [filteredTxs, tr, state.customCategories, state.customIncomeCategories]);
 
   // Category spending vs budget
   const currentYm = currentLocalYearMonth();

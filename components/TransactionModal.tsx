@@ -233,7 +233,7 @@ export default function TransactionModal({
       setOcrBanner(tr.ocrFailed);
       setTimeout(() => setStep('manual'), 1200);
     }
-  }, [txType, tr.ocrScanning, tr.ocrReady, onScanBlocked, onScanConsumed, expenseCats]);
+  }, [txType, tr.ocrScanning, tr.ocrReady, tr.ocrFailed, onScanBlocked, onScanConsumed, expenseCats]);
 
   const handleFileChange = (file: File | null) => {
     if (!file) return;
