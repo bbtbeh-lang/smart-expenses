@@ -86,6 +86,17 @@ export async function POST(req: NextRequest) {
       // the next invoice instead of charging/refunding immediately.
       proration_behavior: isUpgrade ? 'always_invoice' : 'create_prorations',
       payment_behavior: 'error_if_incomplete',
+      // BUG FIX: without this, a subscription that was previously set to
+      // cancel at period end (see the Customer Portal's "cancel at period
+      // end" setting, tracked via subscriptions.cancel_at_period_end)
+      // stays flagged to cancel even after the user picks a new plan here
+      // — Stripe does not clear cancel_at_period_end just because the
+      // price/items changed. Someone landing on this endpoint has, by
+      // definition, chosen to keep paying (there's no path here except
+      // "select a plan"), so any pending cancellation must be explicitly
+      // undone or they'd still lose access at the old period end despite
+      // believing they'd just resubscribed/changed plans.
+      cancel_at_period_end: false,
       metadata: {
         supabase_user_id: user.id,
         plan,

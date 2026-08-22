@@ -11,13 +11,20 @@ interface PlanModalProps {
   plan: PlanId;
   billingPeriod: BillingPeriod;
   currentPeriodEnd: string | null;
+  // BUG FIX: this modal used to show "Renews on: [date]" purely from
+  // currentPeriodEnd, with no way to know a subscription is actually set
+  // to cancel (Stripe Customer Portal is configured for "cancel at period
+  // end," not immediate) — same class of gap Dashboard.tsx had before its
+  // own cancelAtPeriodEnd fix. A canceling subscription was showing the
+  // exact wrong message: "renews on X" when it was actually about to end.
+  cancelAtPeriodEnd: boolean;
   hasStripeSubscription: boolean;
   onClose: () => void;
   onManageSubscription: () => Promise<void> | void;
   onOpenUpgrade: () => void;
 }
 
-export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, hasStripeSubscription, onClose, onManageSubscription, onOpenUpgrade }: PlanModalProps) {
+export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, cancelAtPeriodEnd, hasStripeSubscription, onClose, onManageSubscription, onOpenUpgrade }: PlanModalProps) {
   const [loading, setLoading] = useState(false);
 
   const handleManage = async () => {
@@ -77,9 +84,9 @@ export default function PlanModal({ tr, plan, billingPeriod, currentPeriodEnd, h
               <span className="ml-auto text-xs font-bold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full">{tr.planActive}</span>
             </div>
             {renewalDate && (
-              <div className={`text-xs mt-3 border-t border-amber-200 pt-3 ${renewalSoon ? 'text-rose-600 font-semibold' : 'text-amber-700'}`}>
-                {tr.renewsOn}: {renewalDate}
-                {renewalSoon && (
+              <div className={`text-xs mt-3 border-t border-amber-200 pt-3 ${cancelAtPeriodEnd ? 'text-amber-700 font-semibold' : renewalSoon ? 'text-rose-600 font-semibold' : 'text-amber-700'}`}>
+                {cancelAtPeriodEnd ? `${tr.endsOn}: ${renewalDate}` : `${tr.renewsOn}: ${renewalDate}`}
+                {!cancelAtPeriodEnd && renewalSoon && (
                   <span className="block mt-1 text-rose-600">
                     {tr.renewalReminderSoon.replace('{days}', String(daysUntilRenewal))}
                   </span>

@@ -991,6 +991,7 @@ export default function Home() {
           plan={state.plan}
           billingPeriod={state.billingPeriod}
           currentPeriodEnd={state.currentPeriodEnd}
+          cancelAtPeriodEnd={state.cancelAtPeriodEnd}
           hasStripeSubscription={state.hasStripeSubscription}
           onClose={() => setShowPlanManager(false)}
           onManageSubscription={handleManageSubscription}
