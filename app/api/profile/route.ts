@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const { data } = await supabaseAdmin
     .from('user_profiles')
-    .select('birth_date, custom_categories, custom_income_categories, budget_data')
+    .select('birth_date, custom_categories, custom_income_categories, budget_data, saved_pricing_products')
     .eq('user_id', userId)
     .maybeSingle();
 
@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     customCategories: data?.custom_categories ?? {},
     customIncomeCategories: data?.custom_income_categories ?? {},
     budgetData: data?.budget_data ?? {},
+    savedPricingProducts: data?.saved_pricing_products ?? [],
   });
 }
 
@@ -39,6 +40,7 @@ export async function PATCH(req: NextRequest) {
   const incomingCustomCategories = body.customCategories as Record<string, string> | undefined;
   const incomingCustomIncomeCategories = body.customIncomeCategories as Record<string, string> | undefined;
   const incomingBudgetData = body.budgetData as Record<string, unknown> | undefined;
+  const incomingSavedPricingProducts = body.savedPricingProducts as unknown[] | undefined;
 
   // Basic sanity checks: valid YYYY-MM-DD, not in the future, not
   // implausibly old (guards against fat-finger typos like a 1901 year).
@@ -74,6 +76,12 @@ export async function PATCH(req: NextRequest) {
   if (incomingBudgetData) {
     updates.budget_data = incomingBudgetData;
   }
+  // Same authoritative-replace reasoning again — PricingTab always sends
+  // its full, current Saved Items list (it's a single localStorage array
+  // being mirrored, not a partial delta).
+  if (incomingSavedPricingProducts) {
+    updates.saved_pricing_products = incomingSavedPricingProducts;
+  }
 
   const { error } = await supabaseAdmin
     .from('user_profiles')
@@ -89,5 +97,6 @@ export async function PATCH(req: NextRequest) {
     customCategories: updates.custom_categories,
     customIncomeCategories: updates.custom_income_categories,
     budgetData: updates.budget_data,
+    savedPricingProducts: updates.saved_pricing_products,
   });
 }

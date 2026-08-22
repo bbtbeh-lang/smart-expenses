@@ -8,6 +8,7 @@ import {
 import { Lang, AccountType } from '@/lib/types';
 import { BUSINESS_TEMPLATES, BusinessTemplate } from '@/lib/businessTemplates';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { supabase } from '@/lib/supabase';
 
 interface PricingTabProps {
   lang: Lang;
@@ -350,6 +351,31 @@ function persistSaved(products: SavedProduct[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
   } catch {}
+}
+
+// BUG FIX: Saved Items used to live in localStorage only — same gap
+// custom_categories and budget_data had before their own migrations to
+// user_profiles (device-specific, wiped by clearing browser data or
+// simply lost switching devices). This pushes the full list to Supabase
+// on every save/delete, same authoritative-replace pattern as those two
+// fields on the same PATCH /api/profile endpoint. Fire-and-forget: the
+// localStorage write above already gives the user an instant, working
+// local copy, and a failed network call here shouldn't block their flow
+// — the next successful sync (their next save, or next sign-in's
+// reconciliation) catches it back up.
+async function syncSavedToServer(products: SavedProduct[]) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ savedPricingProducts: products }),
+    });
+  } catch {
+    // Offline or request failed — localStorage already has the latest
+    // copy; the next save/delete (or next sign-in reconciliation) retries.
+  }
 }
 
 function generateId() {
@@ -776,10 +802,39 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // handleApplyTemplate, handleSave, ...) keeps reading/writing "the
   // current fields" completely unchanged. Switching drafts just snapshots
   useEffect(() => {
-    setSaved(loadSaved());
+    const localData = loadSaved();
+    setSaved(localData);
     // Keep the accordion open by default for whatever categories exist
     // right after mount (covers the two starter categories created above).
     setOpenCategoryIds(prev => (prev.length === 0 ? categories.map(c => c.id) : prev));
+
+    // Reconcile with the server as the source of truth going forward.
+    // Two cases: the server already has this user's saved items (a
+    // returning user, or one who saved from a different device) — use
+    // that, since it's the freshest cross-device copy. Or the server is
+    // empty but this browser's localStorage has items — a one-time
+    // migration for existing users who saved things before this sync
+    // existed: push the local copy up once so it isn't stranded on this
+    // device forever.
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/profile', { headers: { Authorization: `Bearer ${session.access_token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverProducts = (data.savedPricingProducts ?? []) as SavedProduct[];
+        if (serverProducts.length > 0) {
+          setSaved(serverProducts);
+          persistSaved(serverProducts);
+        } else if (localData.length > 0) {
+          syncSavedToServer(localData);
+        }
+      } catch {
+        // Offline or request failed — the localStorage copy loaded above
+        // already gives the user a working list; nothing more to do here.
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1097,6 +1152,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             : p
         );
         persistSaved(next);
+        syncSavedToServer(next);
         return next;
       });
       return;
@@ -1119,6 +1175,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setSaved(prev => {
       const next = [entry, ...prev];
       persistSaved(next);
+      syncSavedToServer(next);
       return next;
     });
     resetForm();
@@ -1147,6 +1204,7 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
     setSaved(prev => {
       const next = prev.filter(p => p.id !== id);
       persistSaved(next);
+      syncSavedToServer(next);
       return next;
     });
     if (editingId === id) resetForm();
