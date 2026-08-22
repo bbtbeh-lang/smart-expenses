@@ -99,7 +99,7 @@ const CONTENT: Record<GLang, Section[]> = {
           'Packaging & Direct Consumables — disposable per-unit items (containers, bags, one-time-use supplies).',
           'Hidden & Overhead Costs — indirect costs that are easy to forget: electricity, equipment wear, unbillable admin time, rent share, insurance.',
         ] },
-        { type: 'note', text: 'Hidden & Overhead is NOT itemized. Instead of guessing dollar figures one by one, you get a single automatic percentage (based on business type — e.g. ~15% food, ~10% real estate, ~8% retail) applied on top of your direct costs. Adjust that one number if your real overhead differs — never itemize it.' },
+        { type: 'note', text: 'Hidden & Overhead is NOT itemized. Instead of guessing dollar figures one by one, you get a single automatic percentage (based on business type — e.g. ~19% food, ~10% real estate, ~12% retail) applied on top of your direct costs. Adjust that one number if your real overhead differs — never itemize it.' },
         { type: 'h3', text: 'Step 3 — Choose your pricing basis' },
         { type: 'ul', items: [
           'By quantity — a fixed number of units/clients/jobs.',
@@ -282,7 +282,7 @@ const CONTENT: Record<GLang, Section[]> = {
           'بسته‌بندی و ملزومات مصرفی مستقیم — اقلام یک‌بارمصرفِ هر واحد (ظرف، کیسه، لوازم یک‌بارمصرف).',
           'هزینه‌های پنهان و سربار — هزینه‌ی غیرمستقیمی که راحت یادت می‌ره: برق، استهلاک تجهیزات، زمان اداریِ بدون‌فاکتور، سهم اجاره، بیمه.',
         ] },
-        { type: 'note', text: '«هزینه‌های پنهان و سربار» آیتم به آیتم نیست. به‌جای حدس‌زدن عدد برای برق یا استهلاک تجهیزات یکی‌یکی، یه درصد خودکار (بر اساس نوع کسب‌وکار — مثلاً حدود ۱۵٪ غذایی، ۱۰٪ املاک، ۸٪ خرده‌فروشی) روی هزینه‌های مستقیمت اعمال می‌شه. اگه سربار واقعیت فرق داره، همون یه عدد رو تغییر بده — هیچ‌وقت آیتم به آیتم واردش نکن.' },
+        { type: 'note', text: '«هزینه‌های پنهان و سربار» آیتم به آیتم نیست. به‌جای حدس‌زدن عدد برای برق یا استهلاک تجهیزات یکی‌یکی، یه درصد خودکار (بر اساس نوع کسب‌وکار — مثلاً حدود ۱۹٪ غذایی، ۱۰٪ املاک، ۱۲٪ خرده‌فروشی) روی هزینه‌های مستقیمت اعمال می‌شه. اگه سربار واقعیت فرق داره، همون یه عدد رو تغییر بده — هیچ‌وقت آیتم به آیتم واردش نکن.' },
         { type: 'h3', text: 'مرحله ۳ — مبنای قیمت‌گذاریت رو انتخاب کن' },
         { type: 'ul', items: [
           'بر اساس تعداد — یه عدد ثابت از واحد/مشتری/کار.',
