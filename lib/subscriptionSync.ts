@@ -31,6 +31,14 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
     (subscription as unknown as { current_period_end?: number }).current_period_end;
   const currentPeriodEndIso = periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null;
   const plan = planInfo?.plan || 'free';
+  // The Stripe Customer Portal is configured for "cancel at period end"
+  // (not immediate) — this is Stripe's own flag for that pending state.
+  // While true, `status` still reports 'active' (correctly, since the
+  // user paid for and should keep access through the current period);
+  // this is what lets the UI show a "your plan ends on [date]" notice
+  // instead of access just vanishing with no warning once the period
+  // actually ends and Stripe fires customer.subscription.deleted.
+  const cancelAtPeriodEnd = subscription.cancel_at_period_end === true;
 
   // BUG FIX: this used to reset scans_used_this_period unconditionally on
   // every call — including customer.subscription.updated events fired for
@@ -63,6 +71,7 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
         stripe_customer_id: subscription.customer as string,
         stripe_subscription_id: subscription.id,
         current_period_end: currentPeriodEndIso,
+        cancel_at_period_end: cancelAtPeriodEnd,
         updated_at: new Date().toISOString(),
         // Only included (and thus only written) when it's a genuine new
         // period/plan — omitting these keys on a no-op update leaves the

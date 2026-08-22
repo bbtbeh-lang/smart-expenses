@@ -177,14 +177,26 @@ export default function Dashboard({
     else onOpenUpgrade();
   };
 
-  // In-app renewal reminder: only for active paid plans, shown within the
+  // In-app renewal reminder: only for active paid plans that are actually
+  // going to renew — not ones set to cancel (see cancelAtPeriodEnd below,
+  // which gets its own, differently-worded banner). Shown within the
   // final 3 days of the current billing period (mirrors the Stripe
   // `invoice.upcoming` email reminder sent server-side).
   const daysUntilRenewal = state.currentPeriodEnd
     ? Math.ceil((new Date(state.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
-  const showRenewalBanner = state.tier === 'premium' && daysUntilRenewal !== null && daysUntilRenewal <= 3 && daysUntilRenewal >= 0;
+  const showRenewalBanner = state.tier === 'premium' && !state.cancelAtPeriodEnd && daysUntilRenewal !== null && daysUntilRenewal <= 3 && daysUntilRenewal >= 0;
   const renewalDateLabel = state.currentPeriodEnd ? new Date(state.currentPeriodEnd).toLocaleDateString('en-CA') : '';
+
+  // Pending-cancellation notice: the Stripe Customer Portal is configured
+  // for "cancel at period end" rather than immediate cancellation, so a
+  // user who cancels keeps full access (status stays 'active') right up
+  // until the period actually ends. Without this, there was no way for
+  // the app to tell them that was coming — access would just disappear
+  // one day with zero warning. Shown for the whole remaining period, not
+  // just the final 3 days, since "you're about to lose paid features" is
+  // worth surfacing earlier than a routine renewal reminder.
+  const showCancelBanner = state.tier === 'premium' && state.cancelAtPeriodEnd && !!state.currentPeriodEnd;
 
   // Bill/installment due-date reminders: for each budget item with a due
   // date + reminder enabled, resolve the next occurrence (recurrence-aware)
@@ -281,6 +293,25 @@ export default function Dashboard({
             </div>
           </div>
           <span className="text-xs font-bold text-rose-700 whitespace-nowrap self-center">{tr.renewalBannerCta} →</span>
+        </button>
+      )}
+
+      {/* Pending cancellation notice — plan set to cancel at period end */}
+      {showCancelBanner && (
+        <button
+          onClick={onOpenPlanManager}
+          className="w-full text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 hover:bg-amber-100 transition-colors"
+        >
+          <span className="text-lg leading-none mt-0.5">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-bold text-amber-700">{tr.cancelBannerTitle}</div>
+            <div className="text-xs text-amber-600 mt-0.5">
+              {tr.cancelBannerBody
+                .replace('{plan}', state.plan !== 'free' ? PLANS[state.plan].name : state.plan)
+                .replace('{date}', renewalDateLabel)}
+            </div>
+          </div>
+          <span className="text-xs font-bold text-amber-700 whitespace-nowrap self-center">{tr.cancelBannerCta} →</span>
         </button>
       )}
 

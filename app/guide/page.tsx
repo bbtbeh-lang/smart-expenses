@@ -190,7 +190,7 @@ const CONTENT: Record<GLang, Section[]> = {
           ['Pro', '$19.99', '$199 (2 months free)', '250'],
           ['Business', '$39.99', '$399 (2 months free)', '600'],
         ] },
-        { type: 'p', text: 'All plans are billed securely through Stripe. Change plans, update payment, or cancel anytime from Settings → Manage your plan. Downgrading to Free takes effect immediately and removes access to premium features.' },
+        { type: 'p', text: 'All plans are billed securely through Stripe. Change plans, update payment, or cancel anytime from Settings → Manage your plan. Canceling keeps your paid features until the end of your current billing period, then switches you to Free — you won\'t be charged again.' },
       ],
     },
     {
@@ -373,7 +373,7 @@ const CONTENT: Record<GLang, Section[]> = {
           ['Pro', '$۱۹.۹۹', '$۱۹۹ (۲ ماه رایگان)', '۲۵۰'],
           ['Business', '$۳۹.۹۹', '$۳۹۹ (۲ ماه رایگان)', '۶۰۰'],
         ] },
-        { type: 'p', text: 'همه‌ی پلن‌ها با امنیت کامل از طریق Stripe صورت‌حساب می‌شن. هر وقت خواستی از تنظیمات ← مدیریت پلن، پلن رو عوض کن، روش پرداخت رو آپدیت کن، یا لغو کن. برگشتن به پلن رایگان فوری اعمال می‌شه و دسترسی به امکانات پولی رو قطع می‌کنه.' },
+        { type: 'p', text: 'همه‌ی پلن‌ها با امنیت کامل از طریق Stripe صورت‌حساب می‌شن. هر وقت خواستی از تنظیمات ← مدیریت پلن، پلن رو عوض کن، روش پرداخت رو آپدیت کن، یا لغو کن. با لغو کردن، امکانات پولیت تا پایان همون دوره‌ی صورت‌حساب فعلی فعال می‌مونه، بعدش به پلن رایگان تبدیل می‌شی — دیگه هزینه‌ای ازت کسر نمی‌شه.' },
       ],
     },
     {

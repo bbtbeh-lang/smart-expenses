@@ -39,6 +39,7 @@ export interface AppState {
   scansUsedThisPeriod: number;
   scanLimit: number;
   currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
   subscriptionLoaded: boolean;
   hasManualAccess: boolean;
   hasScanAccess: boolean;
