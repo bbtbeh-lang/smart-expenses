@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   const { data: subs } = await supabaseAdmin
     .from('subscriptions')
-    .select('user_id, plan, billing_period, status, scans_used_this_period, current_period_end, stripe_customer_id, granted_by_admin');
+    .select('user_id, plan, billing_period, status, scans_used_this_period, current_period_end, cancel_at_period_end, stripe_customer_id, granted_by_admin');
 
   const { data: profiles } = await supabaseAdmin
     .from('user_profiles')
@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
         status: sub?.status ?? 'inactive',
         scansUsed: sub?.scans_used_this_period ?? 0,
         currentPeriodEnd: sub?.current_period_end ?? null,
+        cancelAtPeriodEnd: sub?.cancel_at_period_end === true,
         stripeCustomerId: sub?.stripe_customer_id ?? null,
         grantedByAdmin: sub?.granted_by_admin ?? false,
       };

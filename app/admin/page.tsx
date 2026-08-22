@@ -23,6 +23,7 @@ interface Customer {
   status: 'inactive' | 'active' | 'past_due' | 'canceled';
   scansUsed: number;
   currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
   stripeCustomerId: string | null;
   grantedByAdmin: boolean;
 }
@@ -468,10 +469,15 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="py-2.5 pr-3 text-slate-500" dir="ltr">{c.scansUsed}</td>
-                        <td className="py-2.5 pr-3 text-slate-400 text-xs" dir="ltr">
-                          {c.currentPeriodEnd
-                            ? new Date(c.currentPeriodEnd).toLocaleDateString()
-                            : new Date(c.createdAt).toLocaleDateString()}
+                        <td className="py-2.5 pr-3 text-xs" dir="ltr">
+                          {c.currentPeriodEnd ? (
+                            <span className={c.cancelAtPeriodEnd ? 'text-amber-600 font-semibold' : 'text-slate-400'}>
+                              {new Date(c.currentPeriodEnd).toLocaleDateString()}
+                              {c.cancelAtPeriodEnd && ' (canceling)'}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">{new Date(c.createdAt).toLocaleDateString()}</span>
+                          )}
                         </td>
                         <td className="py-2.5">
                           {c.grantedByAdmin && c.status === 'active' && c.email && (
