@@ -5,7 +5,10 @@ const OLD_HOST = "finpix.netlify.app";
 const NEW_HOST = "fin.pixflow.one";
 
 export function middleware(request: NextRequest) {
-  const host = request.headers.get("host");
+  const host =
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    request.nextUrl.hostname;
 
   if (host === OLD_HOST) {
     const url = request.nextUrl.clone();
@@ -15,7 +18,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 301);
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  res.headers.set("x-debug-detected-host", host || "unknown");
+  return res;
 }
 
 export const config = {
