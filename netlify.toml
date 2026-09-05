@@ -4,3 +4,9 @@ publish = ".next"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+  from = "https://finpix.netlify.app/*"
+  to = "https://fin.pixflow.one/:splat"
+  status = 301
+  force = true
