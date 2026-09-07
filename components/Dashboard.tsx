@@ -91,6 +91,11 @@ export default function Dashboard({
 
   // Metrics for filtered period
   const periodIncome = useMemo(() => filteredTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0), [filteredTxs]);
+  const recentTxs = useMemo(
+    () => [...filteredTxs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5),
+    [filteredTxs]
+  );
+
   const periodExpenses = useMemo(() => filteredTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0), [filteredTxs]);
   const netProfit = periodIncome - periodExpenses;
   const profitMargin = periodIncome > 0 ? Math.round((netProfit / periodIncome) * 100) : 0;
@@ -566,7 +571,7 @@ export default function Dashboard({
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredTxs.slice(-5).reverse().map(tx => (
+            {recentTxs.map(tx => (
               <div key={tx.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-emerald-100' : 'bg-rose-100'}`}>
                   <span className="text-lg">{tx.type === 'income' ? '💰' : '💸'}</span>

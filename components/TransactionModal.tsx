@@ -643,7 +643,8 @@ export default function TransactionModal({
                       onClick={() => {
                         setTxType(t);
                         const defaultCat = t === 'income' ? 'catSalesRevenue' : (txAccountType === 'business' ? 'catBusinessMaterials' : 'catGroceries');
-                        if (!cats.includes(category)) setCategory(defaultCat);
+                        const targetCats = t === 'income' ? [...INCOME_OCR_CATEGORIES] : [...expenseCats, ...customExpenseCatKeys];
+                        if (!targetCats.includes(category)) setCategory(defaultCat);
                       }}
                       className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${txType === t ? (t === 'income' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                     >
