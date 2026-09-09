@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, List, Settings, BarChart2, Calculator, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, Settings, BarChart2, Calculator } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 
 export type NavTab = 'dashboard' | 'transactions' | 'reports' | 'pricing' | 'settings';
@@ -9,14 +9,9 @@ interface NavBarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   tr: Translations;
-  // Desktop-only: logout rendered at the bottom of the sidebar instead
-  // of the top header once there's room for it here. Optional so
-  // NavBar still works if a caller doesn't need this (e.g. tests).
-  onLogout?: () => void;
-  isLoggedIn?: boolean;
 }
 
-export default function NavBar({ activeTab, onTabChange, tr, onLogout, isLoggedIn }: NavBarProps) {
+export default function NavBar({ activeTab, onTabChange, tr }: NavBarProps) {
   const tabs: { id: NavTab; icon: React.ReactNode; label: string }[] = [
     { id: 'dashboard', icon: <LayoutDashboard className="w-5 h-5" />, label: tr.navDashboard },
     { id: 'transactions', icon: <List className="w-5 h-5" />, label: tr.navTransactions },
@@ -51,21 +46,6 @@ export default function NavBar({ activeTab, onTabChange, tr, onLogout, isLoggedI
           </button>
         ))}
       </div>
-
-      {/* Desktop-only: logout, moved out of the top header where it used
-          to compete for space with the app name and the
-          Personal/Business switch. */}
-      {onLogout && isLoggedIn && (
-        <div className="hidden lg:block border-t border-slate-100 px-3 py-3">
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-rose-500 bg-slate-100 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all duration-150"
-          >
-            <LogOut className="w-3.5 h-3.5 shrink-0" />
-            {tr.logout}
-          </button>
-        </div>
-      )}
     </nav>
   );
 }
