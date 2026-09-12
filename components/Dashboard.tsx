@@ -257,7 +257,9 @@ export default function Dashboard({
             <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${state.tier === 'premium' ? 'bg-emerald-50' : 'bg-blue-50'}`}>
               <span className="text-sm">⚡</span>
               <span className={`text-xs font-semibold ${state.tier === 'premium' ? 'text-emerald-600' : 'text-blue-600'}`} dir="ltr">
-                {tr.scansRemaining}: {scansLeft}/{state.scanLimit}
+                {state.unlimitedScans
+                  ? `${tr.scansRemaining}: ${tr.unlimited}`
+                  : `${tr.scansRemaining}: ${scansLeft}/${state.scanLimit}`}
               </span>
             </div>
           ) : (

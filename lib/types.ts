@@ -38,6 +38,7 @@ export interface AppState {
   billingPeriod: BillingPeriod;
   scansUsedThisPeriod: number;
   scanLimit: number;
+  unlimitedScans: boolean;
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   subscriptionLoaded: boolean;

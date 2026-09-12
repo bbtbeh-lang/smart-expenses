@@ -54,6 +54,7 @@ export const t = {
     free: 'Free (YouTube Promo)',
     premium: 'Premium',
     scansRemaining: 'Scans Remaining This Month',
+    unlimited: 'Unlimited',
     scansUnlimited: 'Scans Remaining: Unlimited',
     // YouTube Code Widget
     youtubeWidgetTitle: "Got today's YouTube Secret Code?",
@@ -372,6 +373,7 @@ export const t = {
     free: 'Gratuit (Promo YouTube)',
     premium: 'Premium',
     scansRemaining: 'Scans Restants ce Mois',
+    unlimited: 'Illimité',
     scansUnlimited: 'Scans Restants : Illimités',
     youtubeWidgetTitle: "Vous avez le code secret YouTube d'aujourd'hui?",
     youtubeWidgetSub: "Entrez-le pour débloquer la saisie manuelle aujourd'hui (ne débloque pas le scan)",
@@ -679,6 +681,7 @@ export const t = {
     free: 'رایگان (پرومو یوتیوب)',
     premium: 'پریمیوم',
     scansRemaining: 'اسکن‌های باقی‌مانده این ماه',
+    unlimited: 'نامحدود',
     scansUnlimited: 'اسکن‌های باقی‌مانده: نامحدود',
     youtubeWidgetTitle: 'کد مخفی یوتیوب امروز را دارید؟',
     youtubeWidgetSub: 'آن را وارد کنید تا ورود دستی امروز باز شود (اسکن را باز نمی‌کند)',

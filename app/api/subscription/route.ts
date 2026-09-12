@@ -61,6 +61,7 @@ export async function GET(req: NextRequest) {
       status: 'inactive',
       scansUsed: 0,
       scanLimit: scanLimitForPlan('free'),
+      unlimitedScans: false,
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       hasManualAccess,
@@ -84,6 +85,10 @@ export async function GET(req: NextRequest) {
     status: sub.status,
     scansUsed: sub.scans_used_this_period,
     scanLimit: scanLimitForPlan(sub.plan),
+    // Admin-granted (comp) subscriptions get unlimited OCR scanning —
+    // see the granted_by_admin bypass in consume_scan() — so the UI
+    // shouldn't show a numeric cap that doesn't actually apply.
+    unlimitedScans: sub.granted_by_admin === true,
     currentPeriodEnd: sub.current_period_end,
     cancelAtPeriodEnd: sub.cancel_at_period_end === true,
     hasManualAccess,
