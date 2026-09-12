@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdminEmail } from '@/lib/adminAuth';
+import { sendGrantAccessEmail } from '@/lib/email';
 
 type GrantPlan = 'starter' | 'basic' | 'pro' | 'business';
 const VALID_PLANS: GrantPlan[] = ['starter', 'basic', 'pro', 'business'];
+const PLAN_DISPLAY_NAMES: Record<GrantPlan, string> = {
+  starter: 'Starter',
+  basic: 'Basic',
+  pro: 'Pro',
+  business: 'Business',
+};
 
 // Duration presets. 'lifetime' just means "far enough in the future that
 // it never practically expires" — current_period_end is only used for
@@ -95,7 +102,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to grant access' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, email: targetUser.email, plan, periodEnd: periodEndFor(duration) });
+  const periodEndIso = periodEndFor(duration);
+  // Notify the user by email. This is the whole point of the grant from
+  // their side — without it they have no idea their account just got
+  // premium access — but a failed/misconfigured Resend key must never
+  // turn a successful grant into an error response, since the DB write
+  // above already succeeded.
+  const emailSent = await sendGrantAccessEmail({
+    to: targetUser.email!,
+    planName: PLAN_DISPLAY_NAMES[plan as GrantPlan],
+    periodEndLabel: duration === 'lifetime' ? '' : new Date(periodEndIso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    lang: 'EN',
+  });
+
+  return NextResponse.json({ success: true, email: targetUser.email, plan, periodEnd: periodEndIso, emailSent });
 }
 
 // Revokes a previously admin-granted subscription (sets status to

@@ -6,6 +6,14 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+  /* The UI is always light-themed (no dark-mode toggle exists), but
+     without an explicit color-scheme, mobile browsers still render
+     native form controls (e.g. the <input type="date"> calendar icon
+     and mm/dd/yyyy placeholder) using the OS/browser dark-mode palette
+     when the device is in dark mode. That renders them near-white on
+     our white input background, making the Reports date-range fields
+     look empty. Forcing light here keeps native controls legible. */
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {

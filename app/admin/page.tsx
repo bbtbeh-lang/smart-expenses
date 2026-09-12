@@ -153,7 +153,12 @@ export default function AdminPage() {
         setGrantMessage({ text: data.error || 'Failed to grant access', ok: false });
         return;
       }
-      setGrantMessage({ text: `Granted ${grantPlan} access to ${data.email}.`, ok: true });
+      setGrantMessage({
+        text: data.emailSent
+          ? `Granted ${grantPlan} access to ${data.email}. Notification email sent.`
+          : `Granted ${grantPlan} access to ${data.email}. Access is active, but the notification email failed to send — let them know manually.`,
+        ok: true,
+      });
       setGrantEmail('');
       loadCustomers();
     } catch {
