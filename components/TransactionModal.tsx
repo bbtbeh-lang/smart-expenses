@@ -269,7 +269,7 @@ export default function TransactionModal({
       date,
       hasReceipt: editTransaction?.hasReceipt ?? (step === 'manual' && ocrStatus !== 'idle'),
       items: receiptItems.length > 0 ? receiptItems : undefined,
-      taxAmount,
+      taxAmount: txType === 'expense' ? taxAmount : undefined,
       receiptHash: receiptHash || undefined,
     };
     if (isEditMode && onUpdate) {
@@ -686,6 +686,26 @@ export default function TransactionModal({
                   />
                 </div>
               </div>
+
+              {txType === 'expense' && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.taxAmount}</label>
+                  <div className="relative" dir="ltr">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">$</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={taxAmount ?? ''}
+                      onChange={e => setTaxAmount(e.target.value === '' ? undefined : parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-slate-400 leading-snug">{tr.taxAmountHint}</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">{tr.description}</label>
