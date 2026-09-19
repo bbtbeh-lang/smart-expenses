@@ -357,8 +357,13 @@ export default function Dashboard({
         </button>
       )}
 
-      {/* YouTube Code Widget — unlocks Manual Entry ONLY, never OCR scanning */}
-      {!state.hasManualAccess && (
+      {/* YouTube Code Widget — unlocks Manual Entry ONLY, never OCR
+          scanning. Hidden per Behnaz's request (Sep 2026): confusing
+          next to the trial-scan widget below and no code was even being
+          generated for it day-to-day. Backend (/api/code/apply,
+          daily_codes, handleApplyCode) is untouched — just re-enable
+          this block to bring it back for a future campaign. */}
+      {false && !state.hasManualAccess && (
         <div className="bg-gradient-to-br from-rose-50 to-orange-50 border border-rose-200 rounded-2xl p-4">
           <div className="flex items-start gap-3 mb-3">
             <div className="w-8 h-8 rounded-xl bg-rose-500 flex items-center justify-center shrink-0">
