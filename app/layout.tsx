@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: 'FinSnap — Smart Finance Management',
   description: 'AI-powered income, expense, and tax management for personal and business use.',
   verification: {
-    google: 'SWkzIC5jtZitwyPw3e5aMyueJ4i9hhSoAHsIihX5jmY',
+    google: 'xgx3gz3-cwAJOAef4oEX7obRi0KU0MeaCurrZvYTlwE',
   },
 };
 
