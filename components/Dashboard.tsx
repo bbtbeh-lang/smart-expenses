@@ -393,9 +393,9 @@ export default function Dashboard({
               {tr.applyCode}
             </button>
           </div>
-          {codeMsg && (
-            <div className={`mt-2.5 text-xs font-medium rounded-xl px-3 py-2 ${codeMsg.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-              {codeMsg.ok ? '🎉 ' : '❌ '}{codeMsg.text}
+          {codeMsg !== null && (
+            <div className={`mt-2.5 text-xs font-medium rounded-xl px-3 py-2 ${codeMsg!.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              {codeMsg!.ok ? '🎉 ' : '❌ '}{codeMsg!.text}
             </div>
           )}
         </div>
