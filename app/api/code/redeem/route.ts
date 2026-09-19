@@ -4,19 +4,19 @@ export async function POST(req: Request) {
   const authHeader = req.headers.get('authorization') || '';
   const token = authHeader.replace('Bearer ', '');
   if (!token) {
-    return Response.json({ error: 'not_authenticated' }, { status: 401 });
+    return Response.json({ success: false, message: 'not_authenticated' }, { status: 401 });
   }
 
   const { data: userData, error: authError } = await supabaseAdmin.auth.getUser(token);
   if (authError || !userData?.user) {
-    return Response.json({ error: 'not_authenticated' }, { status: 401 });
+    return Response.json({ success: false, message: 'not_authenticated' }, { status: 401 });
   }
   const userId = userData.user.id;
 
   const body = await req.json().catch(() => null);
   const code: string | undefined = body?.code;
   if (!code || typeof code !== 'string' || code.trim().length === 0) {
-    return Response.json({ error: 'invalid_code' }, { status: 400 });
+    return Response.json({ success: false, message: 'invalid_code' }, { status: 400 });
   }
 
   const { data, error } = await supabaseAdmin.rpc('redeem_trial_code', {
@@ -26,16 +26,16 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error('redeem_trial_code RPC error:', error);
-    return Response.json({ error: 'server_error' }, { status: 500 });
+    return Response.json({ success: false, message: 'server_error' }, { status: 500 });
   }
 
   if (!data?.ok) {
-    const status = data?.error === 'invalid_code' ? 404 : 400;
-    return Response.json({ error: data?.error ?? 'unknown_error' }, { status });
+    return Response.json({ success: false, message: data?.error ?? 'invalid_code' });
   }
 
   return Response.json({
-    ok: true,
+    success: true,
+    message: 'ok',
     expiresAt: data.expires_at,
     scanLimit: data.scan_limit,
   });

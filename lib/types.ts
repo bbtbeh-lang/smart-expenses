@@ -45,6 +45,10 @@ export interface AppState {
   hasManualAccess: boolean;
   hasScanAccess: boolean;
   hasStripeSubscription: boolean;
+  // Set when hasScanAccess is true via an active trial-code redemption
+  // (see /api/code/redeem) rather than a paid plan; null otherwise,
+  // including when a paid plan is what's granting access.
+  trialExpiresAt: string | null;
   codeActivated: boolean;
   scansUsedToday: number;
   maxDailyScans: number;

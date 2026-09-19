@@ -57,6 +57,7 @@ function freshState(lang: Lang = 'EN'): AppState {
     hasManualAccess: false,
     hasScanAccess: false,
     hasStripeSubscription: false,
+    trialExpiresAt: null,
     codeActivated: false,
     scansUsedToday: 0,
     maxDailyScans: 10,
@@ -145,6 +146,7 @@ export default function Home() {
         hasManualAccess: !!sub.hasManualAccess,
         hasScanAccess: !!sub.hasScanAccess,
         hasStripeSubscription: !!sub.hasStripeSubscription,
+        trialExpiresAt: sub.trialExpiresAt ?? null,
       }));
     } catch {
       // Network error — leave existing state as-is, will retry on next auth event.
@@ -589,6 +591,29 @@ export default function Home() {
     }
   };
 
+  // Same server-only-decides pattern as handleApplyCode above, but hits
+  // /api/code/redeem (trial_redemptions / consume_trial_scan) — this is
+  // the one deliberate exception where a code grants real OCR scan
+  // access, not just manual entry.
+  const handleApplyTrialCode = async (code: string): Promise<{ success: boolean; message: string }> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return { success: false, message: 'not_authenticated' };
+    try {
+      const res = await fetch('/api/code/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await refreshSubscription();
+      }
+      return { success: !!data.success, message: data.message || 'server_error' };
+    } catch {
+      return { success: false, message: 'server_error' };
+    }
+  };
+
   const handleSaveManual = (tx: Transaction) => {
     setState(prev => ({
       ...prev,
@@ -830,6 +855,7 @@ export default function Home() {
                 onOpenUpgrade={() => setShowUpgrade(true)}
                 onOpenTaxReport={() => setShowTaxReport(true)}
                 onApplyCode={handleApplyCode}
+                onApplyTrialCode={handleApplyTrialCode}
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
                 onQuickScan={handleQuickScanClick}

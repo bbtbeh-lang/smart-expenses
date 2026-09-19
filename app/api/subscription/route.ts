@@ -22,11 +22,23 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   // --- checkAccess: the two access rules are deliberately independent ---
-  // hasScanAccess: ONLY an active paid plan grants this. The daily code
-  // must never appear in this check — that's the whole point of keeping
-  // OCR exclusive to paying customers.
+  // hasScanAccess: an active paid plan grants this, OR an active,
+  // unexpired trial-code redemption (see trial_redemptions /
+  // consume_trial_scan — a deliberate, intentional exception carved out
+  // for the FINSNAP7-style trial campaign; the daily_codes/code_usages
+  // system below is untouched and still never grants scan access).
   const isPlanActive = !!sub && sub.status === 'active';
-  const hasScanAccess = isPlanActive;
+
+  const { data: trial } = await supabaseAdmin
+    .from('trial_redemptions')
+    .select('scans_used, scan_limit, expires_at')
+    .eq('user_id', userId)
+    .gt('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const hasScanAccess = isPlanActive || !!trial;
 
   // hasManualAccess: a paid plan grants it too, OR the user redeemed
   // today's code (checked via code_usages, written only by the atomic
@@ -59,14 +71,15 @@ export async function GET(req: NextRequest) {
       plan: 'free',
       billingPeriod: null,
       status: 'inactive',
-      scansUsed: 0,
-      scanLimit: scanLimitForPlan('free'),
+      scansUsed: trial ? trial.scans_used : 0,
+      scanLimit: trial ? trial.scan_limit : scanLimitForPlan('free'),
       unlimitedScans: false,
       currentPeriodEnd: null,
       cancelAtPeriodEnd: false,
       hasManualAccess,
       hasScanAccess,
       hasStripeSubscription: false,
+      trialExpiresAt: trial?.expires_at ?? null,
     });
   }
 
@@ -94,5 +107,6 @@ export async function GET(req: NextRequest) {
     hasManualAccess,
     hasScanAccess,
     hasStripeSubscription: !!sub.stripe_subscription_id,
+    trialExpiresAt: null,
   });
 }

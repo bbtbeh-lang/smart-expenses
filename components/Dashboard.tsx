@@ -17,6 +17,7 @@ interface DashboardProps {
   onOpenUpgrade: () => void;
   onOpenTaxReport: () => void;
   onApplyCode: (code: string) => Promise<{ success: boolean; message: string }>;
+  onApplyTrialCode: (code: string) => Promise<{ success: boolean; message: string }>;
   onOpenPlanManager: () => void;
   onOpenBudget: () => void;
   onQuickScan: () => void;
@@ -70,10 +71,12 @@ function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
 }
 
 export default function Dashboard({
-  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onOpenPlanManager, onOpenBudget, onQuickScan,
+  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onApplyTrialCode, onOpenPlanManager, onOpenBudget, onQuickScan,
 }: DashboardProps) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [trialCode, setTrialCode] = useState('');
+  const [trialCodeMsg, setTrialCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [dateFilter, setDateFilter] = useState<DateFilter>('this_month');
 
   const scansLeft = Math.max(0, state.scanLimit - state.scansUsedThisPeriod);
@@ -175,6 +178,17 @@ export default function Dashboard({
     setCodeMsg({ text: success ? tr.codeSuccess : errorText, ok: success });
     if (success) setCode('');
     setTimeout(() => setCodeMsg(null), 4000);
+  };
+
+  const handleApplyTrialCode = async () => {
+    if (!trialCode.trim()) return;
+    const { success, message } = await onApplyTrialCode(trialCode.trim().toUpperCase());
+    const errorText = message === 'daily_cap_reached' ? tr.trialCodeDailyCapReached
+      : message === 'already_redeemed' ? tr.trialCodeAlreadyUsed
+      : tr.trialCodeInvalid;
+    setTrialCodeMsg({ text: success ? tr.trialCodeSuccess : errorText, ok: success });
+    if (success) setTrialCode('');
+    setTimeout(() => setTrialCodeMsg(null), 5000);
   };
 
   const handleTierBadgeClick = () => {
@@ -377,6 +391,48 @@ export default function Dashboard({
           {codeMsg && (
             <div className={`mt-2.5 text-xs font-medium rounded-xl px-3 py-2 ${codeMsg.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
               {codeMsg.ok ? '🎉 ' : '❌ '}{codeMsg.text}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Trial Code Widget — unlocks real OCR scanning for a limited
+          window (e.g. 7 days / 7 scans), unlike the YouTube widget above
+          which only ever grants Manual Entry. Deliberate, intentional
+          exception — see trial_redemptions / consume_trial_scan. */}
+      {!state.hasScanAccess && (
+        <div className="bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-slate-800">{tr.trialCodeWidgetTitle}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{tr.trialCodeWidgetSub}</div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={trialCode}
+              onChange={e => setTrialCode(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleApplyTrialCode(); } }}
+              placeholder={tr.enterCode}
+              className="flex-1 px-3 py-2.5 bg-white border border-blue-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+              dir="ltr"
+            />
+            <button
+              type="button"
+              onClick={handleApplyTrialCode}
+              disabled={!trialCode.trim()}
+              className="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-xl text-sm transition-all active:scale-[0.97] whitespace-nowrap disabled:opacity-40"
+            >
+              {tr.applyCode}
+            </button>
+          </div>
+          {trialCodeMsg && (
+            <div className={`mt-2.5 text-xs font-medium rounded-xl px-3 py-2 ${trialCodeMsg.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+              {trialCodeMsg.ok ? '🎉 ' : '❌ '}{trialCodeMsg.text}
             </div>
           )}
         </div>
