@@ -19,6 +19,9 @@ import '@fontsource/vazirmatn/800.css';
 export const metadata: Metadata = {
   title: 'FinSnap — Smart Finance Management',
   description: 'AI-powered income, expense, and tax management for personal and business use.',
+  verification: {
+    google: 'SWkzIC5jtZitwyPw3e5aMyueJ4i9hhSoAHsIihX5jmY',
+  },
 };
 
 export const viewport: Viewport = {
