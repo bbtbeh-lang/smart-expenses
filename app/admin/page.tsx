@@ -13,6 +13,25 @@ interface CodeStatus {
   validDate: string;
 }
 
+interface TrialCode {
+  id: string;
+  code: string;
+  scanLimit: number;
+  validDays: number;
+  dailyCap: number | null;
+  active: boolean;
+  createdAt: string;
+  activationsToday: number;
+}
+
+interface TrialCodeDraft {
+  code: string;
+  scanLimit: string;
+  validDays: string;
+  dailyCap: string; // '' means unlimited
+  active: boolean;
+}
+
 interface Customer {
   userId: string;
   email: string | null;
@@ -61,6 +80,19 @@ export default function AdminPage() {
   const [grantMessage, setGrantMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [revokingEmail, setRevokingEmail] = useState<string | null>(null);
 
+  // Trial-code campaign management (e.g. FINSNAP7) — separate from the
+  // daily manual-entry code above; these grant real OCR scan access.
+  const [trialCodes, setTrialCodes] = useState<TrialCode[] | null>(null);
+  const [trialCodesLoading, setTrialCodesLoading] = useState(false);
+  const [trialCodesError, setTrialCodesError] = useState('');
+  const [trialCodeDrafts, setTrialCodeDrafts] = useState<Record<string, TrialCodeDraft>>({});
+  const [trialCodeSaving, setTrialCodeSaving] = useState<string | null>(null);
+  const [newTrialCode, setNewTrialCode] = useState<TrialCodeDraft>({
+    code: '', scanLimit: '7', validDays: '7', dailyCap: '20', active: true,
+  });
+  const [newTrialCodeSaving, setNewTrialCodeSaving] = useState(false);
+  const [newTrialCodeMessage, setNewTrialCodeMessage] = useState<{ text: string; ok: boolean } | null>(null);
+
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token || null;
@@ -108,6 +140,99 @@ export default function AdminPage() {
   useEffect(() => {
     if (authChecked && !forbidden) loadCustomers();
   }, [authChecked, forbidden, loadCustomers]);
+
+  const loadTrialCodes = useCallback(async () => {
+    setTrialCodesLoading(true);
+    setTrialCodesError('');
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/trial-codes', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setTrialCodesError(data.error || 'Failed to load trial codes');
+        return;
+      }
+      const data = await res.json();
+      setTrialCodes(data.codes);
+      setTrialCodeDrafts(Object.fromEntries(
+        (data.codes as TrialCode[]).map(c => [c.id, {
+          code: c.code,
+          scanLimit: String(c.scanLimit),
+          validDays: String(c.validDays),
+          dailyCap: c.dailyCap === null ? '' : String(c.dailyCap),
+          active: c.active,
+        }])
+      ));
+    } catch {
+      setTrialCodesError('Failed to load trial codes');
+    } finally {
+      setTrialCodesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authChecked && !forbidden) loadTrialCodes();
+  }, [authChecked, forbidden, loadTrialCodes]);
+
+  const saveTrialCode = async (id: string) => {
+    const draft = trialCodeDrafts[id];
+    if (!draft) return;
+    setTrialCodeSaving(id);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/trial-codes', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          code: draft.code,
+          scanLimit: Number(draft.scanLimit),
+          validDays: Number(draft.validDays),
+          dailyCap: draft.dailyCap === '' ? null : Number(draft.dailyCap),
+          active: draft.active,
+        }),
+      });
+      if (res.ok) loadTrialCodes();
+    } finally {
+      setTrialCodeSaving(null);
+    }
+  };
+
+  const createTrialCode = async () => {
+    if (!newTrialCode.code.trim()) return;
+    setNewTrialCodeSaving(true);
+    setNewTrialCodeMessage(null);
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/trial-codes', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newTrialCode.code,
+          scanLimit: Number(newTrialCode.scanLimit),
+          validDays: Number(newTrialCode.validDays),
+          dailyCap: newTrialCode.dailyCap === '' ? null : Number(newTrialCode.dailyCap),
+          active: newTrialCode.active,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const text = data.error === 'code_already_exists' ? 'That code already exists.' : 'Failed to create code.';
+        setNewTrialCodeMessage({ text, ok: false });
+        return;
+      }
+      setNewTrialCodeMessage({ text: `Created ${newTrialCode.code.toUpperCase()}.`, ok: true });
+      setNewTrialCode({ code: '', scanLimit: '7', validDays: '7', dailyCap: '20', active: true });
+      loadTrialCodes();
+    } catch {
+      setNewTrialCodeMessage({ text: 'Failed to create code.', ok: false });
+    } finally {
+      setNewTrialCodeSaving(false);
+    }
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -312,6 +437,161 @@ export default function AdminPage() {
             </div>
           </a>
         </div>
+        </div>
+
+        {/* Trial code campaigns — these grant real OCR scan access,
+            unlike the daily manual-entry code above. Fully admin-editable
+            so a campaign can be tuned or a new one launched without a
+            deploy. */}
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-6 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-sm font-bold text-slate-800">Trial code campaigns</h2>
+            <button
+              onClick={loadTrialCodes}
+              disabled={trialCodesLoading}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${trialCodesLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mb-4">
+            Each code grants real receipt-scanning access for a limited trial window (e.g. 7 scans
+            over 7 days), with an optional cap on how many people can activate it per calendar day.
+          </p>
+
+          {trialCodesError && (
+            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-3 py-2 mb-3">{trialCodesError}</div>
+          )}
+
+          {trialCodes && trialCodes.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {trialCodes.map(c => {
+                const draft = trialCodeDrafts[c.id] || {
+                  code: c.code, scanLimit: String(c.scanLimit), validDays: String(c.validDays),
+                  dailyCap: c.dailyCap === null ? '' : String(c.dailyCap), active: c.active,
+                };
+                const setDraft = (patch: Partial<TrialCodeDraft>) =>
+                  setTrialCodeDrafts(prev => ({ ...prev, [c.id]: { ...draft, ...patch } }));
+                return (
+                  <div key={c.id} className="border border-slate-200 rounded-xl p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={draft.code}
+                        onChange={e => setDraft({ code: e.target.value.toUpperCase() })}
+                        className="w-32 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-mono font-bold text-center focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        dir="ltr"
+                      />
+                      <label className="flex items-center gap-1 text-xs text-slate-500">
+                        Scans
+                        <input
+                          type="number" min={1} value={draft.scanLimit}
+                          onChange={e => setDraft({ scanLimit: e.target.value })}
+                          className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          dir="ltr"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-xs text-slate-500">
+                        Days
+                        <input
+                          type="number" min={1} value={draft.validDays}
+                          onChange={e => setDraft({ validDays: e.target.value })}
+                          className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          dir="ltr"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-xs text-slate-500">
+                        Daily cap
+                        <input
+                          type="number" min={1} value={draft.dailyCap} placeholder="∞"
+                          onChange={e => setDraft({ dailyCap: e.target.value })}
+                          className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                          dir="ltr"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                        <input
+                          type="checkbox" checked={draft.active}
+                          onChange={e => setDraft({ active: e.target.checked })}
+                          className="w-3.5 h-3.5"
+                        />
+                        Active
+                      </label>
+                      <button
+                        onClick={() => saveTrialCode(c.id)}
+                        disabled={trialCodeSaving === c.id}
+                        className="ml-auto px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg text-xs transition-all active:scale-[0.97] disabled:opacity-50"
+                      >
+                        {trialCodeSaving === c.id ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-2" dir="ltr">
+                      {c.activationsToday} activation{c.activationsToday === 1 ? '' : 's'} today
+                      {c.dailyCap !== null && ` / ${c.dailyCap} cap`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {trialCodesLoading && !trialCodes && (
+            <p className="text-sm text-slate-400 py-4 text-center">Loading…</p>
+          )}
+          {trialCodes && trialCodes.length === 0 && (
+            <p className="text-sm text-slate-400 py-2 text-center mb-3">No trial codes yet.</p>
+          )}
+
+          <div className="border-t border-slate-100 pt-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">New code</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={newTrialCode.code}
+                onChange={e => setNewTrialCode(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+                placeholder="e.g. FINSNAP7"
+                className="w-36 px-2.5 py-1.5 border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                dir="ltr"
+              />
+              <label className="flex items-center gap-1 text-xs text-slate-500">
+                Scans
+                <input
+                  type="number" min={1} value={newTrialCode.scanLimit}
+                  onChange={e => setNewTrialCode(p => ({ ...p, scanLimit: e.target.value }))}
+                  className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  dir="ltr"
+                />
+              </label>
+              <label className="flex items-center gap-1 text-xs text-slate-500">
+                Days
+                <input
+                  type="number" min={1} value={newTrialCode.validDays}
+                  onChange={e => setNewTrialCode(p => ({ ...p, validDays: e.target.value }))}
+                  className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  dir="ltr"
+                />
+              </label>
+              <label className="flex items-center gap-1 text-xs text-slate-500">
+                Daily cap
+                <input
+                  type="number" min={1} value={newTrialCode.dailyCap} placeholder="∞"
+                  onChange={e => setNewTrialCode(p => ({ ...p, dailyCap: e.target.value }))}
+                  className="w-16 px-2 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  dir="ltr"
+                />
+              </label>
+              <button
+                onClick={createTrialCode}
+                disabled={newTrialCodeSaving || !newTrialCode.code.trim()}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-all active:scale-[0.97] disabled:opacity-50"
+              >
+                {newTrialCodeSaving ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+            {newTrialCodeMessage && (
+              <div className={`text-xs rounded-xl px-3 py-2 mt-2 ${newTrialCodeMessage.ok ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' : 'bg-rose-50 border border-rose-200 text-rose-700'}`}>
+                {newTrialCodeMessage.text}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Grant free access */}
