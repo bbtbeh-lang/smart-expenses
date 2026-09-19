@@ -29,6 +29,7 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
 export async function POST(req: Request) {
   let userId: string | null = null;
   let scanConsumed = false;
+  let scanSource: 'paid' | 'trial' = 'paid';
   let scanResult: { scansUsed: number; scanLimit: number } = { scansUsed: 0, scanLimit: 0 };
 
   try {
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
       );
     }
     scanConsumed = true;
+    scanSource = consumeResult.source ?? 'paid';
     scanResult = consumeResult;
 
     const safeMimeType = getSupportedMimeType(mimeType || '');
@@ -188,7 +190,7 @@ Return ONLY valid JSON, no markdown:
     });
   } catch (error) {
     console.error('Income OCR error:', error);
-    if (scanConsumed && userId) await refundScan(userId);
+    if (scanConsumed && userId) await refundScan(userId, scanSource);
     return Response.json(
       { amount: '', description: '', date: '', clientName: '', invoiceNumber: '', tax: '', category: '', items: [], duplicate: { isDuplicate: false }, invoiceHash: null },
       { status: 500 }
