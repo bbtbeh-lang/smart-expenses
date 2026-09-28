@@ -180,6 +180,13 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
             );
           })()}
         </p>
+
+        {/* Public, crawlable link to the guide. /guide was previously only
+            reachable from Settings (behind login), so Google had no page
+            linking to it. */}
+        <p className="text-xs text-slate-400 mt-2">
+          <a href="/guide" className="underline hover:text-slate-600">{tr.settingsGuide}</a>
+        </p>
       </div>
     </div>
   );
