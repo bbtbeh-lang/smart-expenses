@@ -186,6 +186,7 @@ const CONTENT: Record<GLang, Section[]> = {
       blocks: [
         { type: 'p', text: 'Receipt scanning, manual transaction entry, and the tax report\'s PDF/CSV export are all paid features. The Free tier can unlock all of them temporarily with a gift code posted on FinSnap\'s YouTube channel — nothing about your existing data changes when a code expires.' },
         { type: 'table', headers: ['Plan', 'Monthly', 'Yearly', 'Scans / month'], rows: [
+          ['Starter', '$1.99', '$16.99', '0 (manual entry only)'],
           ['Basic', '$6.99', '$69 (2 months free)', '50'],
           ['Pro', '$19.99', '$199 (2 months free)', '250'],
           ['Business', '$39.99', '$399 (2 months free)', '600'],
@@ -369,6 +370,7 @@ const CONTENT: Record<GLang, Section[]> = {
       blocks: [
         { type: 'p', text: 'اسکن رسید، ورود دستی تراکنش، و خروجی PDF/CSV گزارش مالیاتی همه امکانات پولی هستن. توی پلن رایگان هم می‌تونی با کد هدیه‌ی کانال یوتیوب فاین‌اسنپ، به‌طور موقت به همه‌شون دسترسی پیدا کنی — با تموم شدن اعتبار کد، هیچ‌چیزی از اطلاعات قبلیت پاک نمی‌شه.' },
         { type: 'table', headers: ['پلن', 'ماهانه', 'سالانه', 'اسکن در ماه'], rows: [
+          ['Starter', '$۱.۹۹', '$۱۶.۹۹', '۰ (فقط ورود دستی)'],
           ['Basic', '$۶.۹۹', '$۶۹ (۲ ماه رایگان)', '۵۰'],
           ['Pro', '$۱۹.۹۹', '$۱۹۹ (۲ ماه رایگان)', '۲۵۰'],
           ['Business', '$۳۹.۹۹', '$۳۹۹ (۲ ماه رایگان)', '۶۰۰'],
