@@ -111,7 +111,13 @@ export default function Dashboard({
       d.setDate(1);
       d.setMonth(d.getMonth() - i);
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = tr.monthsShort[d.getMonth()];
+      // The last point (i === 0) is always the current, still-in-progress
+      // month — its total only covers the days elapsed so far, which made
+      // it read as a sudden crash next to full prior months. Marking the
+      // label (e.g. "Oct*") plus a note below the chart makes that an
+      // expected partial total instead of a drop the person has to puzzle
+      // over.
+      const label = tr.monthsShort[d.getMonth()] + (i === 0 ? '*' : '');
       const txs = state.transactions.filter((t: Transaction) => t.date.startsWith(ym));
       result.push({
         month: label,
@@ -497,7 +503,8 @@ export default function Dashboard({
       {/* Monthly Trend Chart */}
       <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{tr.monthlyTrend}</div>
-        <div className="text-[11px] text-slate-400 mb-3">{tr.monthlyTrendSubtitle}</div>
+        <div className="text-[11px] text-slate-400 mb-1">{tr.monthlyTrendSubtitle}</div>
+        <div className="text-[10px] text-slate-400 mb-2 italic">{tr.monthlyTrendCurrentMonthNote}</div>
         <ResponsiveContainer width="100%" height={160}>
           <LineChart data={monthlyData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
             <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />

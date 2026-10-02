@@ -142,9 +142,10 @@ Return ONLY valid JSON, no markdown:
 
     const parsed = JSON.parse(jsonMatch[0]);
     const itemNames = (parsed.items || []).map((i: { name: string }) => i.name).filter(Boolean);
-    const description = parsed.clientName
-      ? (itemNames.length > 0 ? `${parsed.clientName} — ${itemNames.join(', ')}` : parsed.clientName)
-      : itemNames.join(', ');
+    // Same fix as the expense OCR route: description is just the client
+    // name now, not every line item jammed in. Items are still returned
+    // separately and saved on the transaction for the detail view/reports.
+    const description = parsed.clientName || itemNames.join(', ');
 
     // Defense in depth: even with explicit prompt guidance, the model can
     // still misread a digit. An invoice dated more than 2 years ago or more

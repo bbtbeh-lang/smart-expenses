@@ -168,9 +168,13 @@ Return ONLY valid JSON, no markdown:
 
     const parsed = JSON.parse(jsonMatch[0]);
     const itemNames = (parsed.items || []).map((i: {name: string}) => i.name).filter(Boolean);
-    const description = parsed.merchant
-      ? (itemNames.length > 0 ? `${parsed.merchant} — ${itemNames.join(', ')}` : parsed.merchant)
-      : itemNames.join(', ');
+    // The description is just the merchant name now — a grocery receipt
+    // with 10+ items used to jam every item name into this one line
+    // ("IKEA — Strawberry Waffle Co, Kids Strawberry Tree, ..."), which
+    // became unreadable and got truncated in the transaction list. The
+    // full item list isn't lost: it's still returned separately as
+    // `items` and saved on the transaction for the detail view/reports.
+    const description = parsed.merchant || itemNames.join(', ');
 
     // Defense in depth: even with explicit prompt guidance, the model can
     // still misread a digit. A receipt dated more than 2 years ago or more
