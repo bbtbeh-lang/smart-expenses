@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2, Lock } from 'lucide-react';
+import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriangle, Trash2, Lock, ImageIcon, Loader2 } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { TransactionType, AccountType, Tier, Transaction, ReceiptItem, INCOME_OCR_CATEGORIES } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -79,6 +79,11 @@ export default function TransactionModal({
   const [ocrBanner, setOcrBanner] = useState('');
   const [dragging, setDragging] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // View-receipt-photo: fetches a short-lived signed URL for the archived
+  // scan on demand rather than loading it eagerly, since most edits never
+  // need it and the URL would expire before being used anyway.
+  const [viewingReceipt, setViewingReceipt] = useState(false);
+  const [receiptPhotoError, setReceiptPhotoError] = useState(false);
   const [showNewCatInput, setShowNewCatInput] = useState(false);
   const [newCatLabel, setNewCatLabel] = useState('');
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
@@ -131,7 +136,10 @@ export default function TransactionModal({
         const url = URL.createObjectURL(file);
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX = 1200;
+          // 1568px is the longest edge the model reads natively (larger images
+          // are downscaled server-side anyway). 1200 made long/crumpled receipts
+          // illegible, which caused misread digits in dates and totals.
+          const MAX = 1568;
           let w = img.width, h = img.height;
           if (w > MAX || h > MAX) {
             if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -142,7 +150,7 @@ export default function TransactionModal({
           const ctx = canvas.getContext('2d')!;
           ctx.drawImage(img, 0, 0, w, h);
           URL.revokeObjectURL(url);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
           resolve(dataUrl.split(',')[1]);
         };
         img.onerror = () => reject(new Error('Failed to load image'));
@@ -314,6 +322,31 @@ export default function TransactionModal({
           }).catch(() => {});
         }
       });
+    }
+  };
+
+  const handleViewReceiptPhoto = async () => {
+    if (!editTransaction?.receiptHash || viewingReceipt) return;
+    setViewingReceipt(true);
+    setReceiptPhotoError(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('not_authenticated');
+      const res = await fetch('/api/receipts/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ receiptHash: editTransaction.receiptHash }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.url) throw new Error('no_url');
+      // Opened in a new tab rather than an in-app lightbox: the URL is a
+      // plain signed image link, so the browser's own viewer (pinch-zoom,
+      // save, print) is strictly more capable than anything built here.
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch {
+      setReceiptPhotoError(true);
+    } finally {
+      setViewingReceipt(false);
     }
   };
 
@@ -652,6 +685,21 @@ export default function TransactionModal({
                     </button>
                   ))}
                 </div>
+              )}
+
+              {isEditMode && editTransaction?.receiptHash && (
+                <button
+                  type="button"
+                  onClick={handleViewReceiptPhoto}
+                  disabled={viewingReceipt}
+                  className="w-full flex items-center justify-center gap-2 py-2 mb-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-60"
+                >
+                  {viewingReceipt ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}
+                  {tr.viewReceiptPhoto}
+                </button>
+              )}
+              {receiptPhotoError && (
+                <p className="text-xs text-rose-500 mb-2 text-center">{tr.viewReceiptPhotoError}</p>
               )}
 
               {receiptItems.length > 0 && (
