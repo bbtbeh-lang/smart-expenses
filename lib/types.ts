@@ -27,6 +27,7 @@ export interface Transaction {
   originalAmount?: number;
   items?: ReceiptItem[];
   receiptHash?: string;
+  invoiceHash?: string;
 }
 
 export interface AppState {

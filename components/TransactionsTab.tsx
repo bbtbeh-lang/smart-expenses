@@ -78,7 +78,15 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
   const [photoErrorId, setPhotoErrorId] = useState<string | null>(null);
 
   const handleViewReceiptPhoto = async (tx: Transaction) => {
-    if (!tx.receiptHash || loadingPhotoId) return;
+    // Expense transactions carry receiptHash, income transactions carry
+    // invoiceHash — signed-url accepts either and looks up the matching
+    // table/bucket, so this just forwards whichever one the tx has.
+    const hashBody = tx.receiptHash
+      ? { receiptHash: tx.receiptHash }
+      : tx.invoiceHash
+      ? { invoiceHash: tx.invoiceHash }
+      : null;
+    if (!hashBody || loadingPhotoId) return;
     setLoadingPhotoId(tx.id);
     setPhotoErrorId(null);
     try {
@@ -87,7 +95,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
       const res = await fetch('/api/receipts/signed-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ receiptHash: tx.receiptHash }),
+        body: JSON.stringify(hashBody),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.url) throw new Error('no_url');
@@ -248,7 +256,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
                       <div className="text-xs text-slate-400 mt-0.5" dir="ltr">{tr.taxInlineLabel} {formatCurrency(tx.taxAmount, lang, 2)}</div>
                     )}
                   </div>
-                  {tx.receiptHash && (
+                  {(tx.receiptHash || tx.invoiceHash) && (
                     <button
                       onClick={() => handleViewReceiptPhoto(tx)}
                       disabled={loadingPhotoId === tx.id}

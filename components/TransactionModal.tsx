@@ -274,6 +274,7 @@ export default function TransactionModal({
       items: receiptItems.length > 0 ? receiptItems : undefined,
       taxAmount: txType === 'expense' ? taxAmount : undefined,
       receiptHash: receiptHash || undefined,
+      invoiceHash: invoiceHash || undefined,
     };
     if (isEditMode && onUpdate) {
       onUpdate(tx);

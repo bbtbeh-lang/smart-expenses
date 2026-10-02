@@ -18,6 +18,7 @@ function toRow(tx: Transaction, userId: string) {
     original_amount: tx.originalAmount ?? null,
     items: tx.items || null,
     receipt_hash: tx.receiptHash || null,
+    invoice_hash: tx.invoiceHash || null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -38,6 +39,7 @@ function fromRow(row: Record<string, unknown>): Transaction {
     originalAmount: row.original_amount != null ? Number(row.original_amount) : undefined,
     items: (row.items as Transaction['items']) || undefined,
     receiptHash: (row.receipt_hash as string) || undefined,
+    invoiceHash: (row.invoice_hash as string) || undefined,
   };
 }
 
