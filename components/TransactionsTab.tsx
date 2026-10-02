@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Search, X, Download, Pencil, Lock } from 'lucide-react';
+import { TrendingUp, TrendingDown, Search, X, Download, Pencil, Lock, ImageIcon, Loader2 } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang, Tier } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
 import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
 
 interface TransactionsTabProps {
@@ -69,6 +70,34 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
+
+  // View-receipt-photo: which row's photo is currently being fetched (by
+  // transaction id), so only that row's button shows a spinner — fetched
+  // on demand rather than preloaded, since most rows are never opened.
+  const [loadingPhotoId, setLoadingPhotoId] = useState<string | null>(null);
+  const [photoErrorId, setPhotoErrorId] = useState<string | null>(null);
+
+  const handleViewReceiptPhoto = async (tx: Transaction) => {
+    if (!tx.receiptHash || loadingPhotoId) return;
+    setLoadingPhotoId(tx.id);
+    setPhotoErrorId(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('not_authenticated');
+      const res = await fetch('/api/receipts/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ receiptHash: tx.receiptHash }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.url) throw new Error('no_url');
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch {
+      setPhotoErrorId(tx.id);
+    } finally {
+      setLoadingPhotoId(null);
+    }
+  };
 
   // Unique months present in the data, newest first — same derivation as
   // the Reports tab's month selector, so both tabs group months the same way.
@@ -219,6 +248,19 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
                       <div className="text-xs text-slate-400 mt-0.5" dir="ltr">{tr.taxInlineLabel} {formatCurrency(tx.taxAmount, lang, 2)}</div>
                     )}
                   </div>
+                  {tx.receiptHash && (
+                    <button
+                      onClick={() => handleViewReceiptPhoto(tx)}
+                      disabled={loadingPhotoId === tx.id}
+                      title={tr.viewReceiptPhoto}
+                      aria-label={tr.viewReceiptPhoto}
+                      className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all active:scale-95 disabled:opacity-60"
+                    >
+                      {loadingPhotoId === tx.id
+                        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        : <ImageIcon className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
                   <button
                     onClick={() => onEdit(tx)}
                     title={tr.editTransaction}
@@ -229,6 +271,9 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
                   </button>
                 </div>
               </div>
+              {photoErrorId === tx.id && (
+                <p className="text-xs text-rose-500 mt-1 text-right">{tr.viewReceiptPhotoError}</p>
+              )}
             </div>
           ))}
         </div>
