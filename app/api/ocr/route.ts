@@ -140,7 +140,7 @@ export async function POST(req: Request) {
           },
           {
             type: 'text',
-            text: `You are an expert receipt/invoice scanner. Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency. For reference, today's date is ${new Date().toISOString().slice(0, 10)} (YYYY-MM-DD) — receipts are essentially never dated in the future or more than a couple of years in the past, so use that as a sanity check.
+            text: `You are an expert receipt/invoice scanner. Read this image in ANY language and ANY currency — not limited to Persian/Farsi, English, French, or Arabic; this app isn't limited to one country, so read German, Spanish, Italian, or any other language just as confidently. For reference, today's date is ${new Date().toISOString().slice(0, 10)} (YYYY-MM-DD) — receipts are essentially never dated in the future or more than a couple of years in the past, so use that as a sanity check.
 
 Extract:
 1. merchant: store/restaurant/business name
@@ -152,11 +152,12 @@ Extract:
    - If the date is missing, illegible, or you cannot resolve the ambiguity with reasonable confidence, return "" rather than guessing — do not output a date you are not fairly confident in.
 3. items: EVERY line item with name and price (number only)
 4. amount: final TOTAL (number only, no currency symbol)
-5. tax: the sales tax amount shown on the receipt. Look carefully near the bottom of the receipt, just above or below the final total — tax lines are often printed in smaller text than the total and are easy to miss. Look for any of these labels (in any language): "GST", "HST", "QST", "PST", "TPS", "TVQ", "TVP", "VAT", "Tax", "Sales Tax", "مالیات". If there are multiple separate tax lines (e.g. GST and QST shown separately), sum them into one number. Do not confuse a tip/gratuity line with tax. If a subtotal line is also visible, sanity-check that subtotal + tax ≈ the final total; if your tax reading doesn't reconcile with subtotal and total, re-examine the receipt for a tax line you may have missed before giving up. Only use "" if you are confident, after this check, that no tax line is shown at all (e.g. a tax-exempt purchase or a merchant that doesn't itemize tax) — do not use "" just because the line was hard to read; give your best-effort number in that case.
+5. tax: the sales tax amount shown on the receipt. Look carefully near the bottom of the receipt, just above or below the final total — tax lines are often printed in smaller text than the total and are easy to miss. This isn't limited to Canadian tax names — look for the local sales-tax/VAT label in whatever language and country the receipt is from, for example: "GST", "HST", "QST", "PST", "TPS", "TVQ", "TVP", "VAT", "MwSt" (Germany), "IVA" (Spain/Italy), "BTW" (Netherlands), "Tax", "Sales Tax", "مالیات" — or any other local term for sales tax/VAT not listed here. If there are multiple separate tax lines (e.g. GST and QST shown separately), sum them into one number. Do not confuse a tip/gratuity line with tax. If a subtotal line is also visible, sanity-check that subtotal + tax ≈ the final total; if your tax reading doesn't reconcile with subtotal and total, re-examine the receipt for a tax line you may have missed before giving up. Only use "" if you are confident, after this check, that no tax line is shown at all (e.g. a tax-exempt purchase or a merchant that doesn't itemize tax) — do not use "" just because the line was hard to read; give your best-effort number in that case.
+5b. taxLabel: the exact label printed on the receipt for that tax line (e.g. "GST", "HST", "MwSt", "VAT", "IVA") — whatever text is actually printed, in its original language/abbreviation, not translated or renamed. If you summed multiple separate tax lines for #5, join their labels with " + " (e.g. "GST + QST"). Use "" if tax is "" too.
 6. category: your single best guess at an expense category for this receipt, based on the merchant name and items. Pick EXACTLY ONE of: "catGroceries", "catRestaurant", "catTransport", "catUtilities", "catHealth", "catEntertainment", "catBusinessMaterials", "catOffice", "catMarketing", "catSoftware", "catTravel", "catOther". If you are not reasonably confident, use "catOther".
 
 Return ONLY valid JSON, no markdown:
-{"merchant":"","date":"YYYY-MM-DD","amount":"","tax":"","category":"","items":[{"name":"","price":""}]}`
+{"merchant":"","date":"YYYY-MM-DD","amount":"","tax":"","taxLabel":"","category":"","items":[{"name":"","price":""}]}`
           }
         ]
       }]
@@ -203,6 +204,7 @@ Return ONLY valid JSON, no markdown:
       date: safeDate,
       merchant: parsed.merchant || '',
       tax: parsed.tax || '',
+      taxLabel: parsed.taxLabel || '',
       // Best-effort suggestion only — the user can always change it. Falls
       // back to '' (meaning "no suggestion") if the model returned
       // something outside our known category set, so the UI's existing
@@ -226,6 +228,6 @@ Return ONLY valid JSON, no markdown:
     if (scanConsumed && userId) {
       await refundScan(userId, scanSource);
     }
-    return Response.json({ amount: '', description: '', date: '', merchant: '', tax: '', category: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
+    return Response.json({ amount: '', description: '', date: '', merchant: '', tax: '', taxLabel: '', category: '', items: [], duplicate: { isDuplicate: false }, receiptHash: null }, { status: 500 });
   }
 }

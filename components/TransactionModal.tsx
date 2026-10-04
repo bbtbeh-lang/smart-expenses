@@ -83,6 +83,7 @@ export default function TransactionModal({
   const [newCatLabel, setNewCatLabel] = useState('');
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
   const [taxAmount, setTaxAmount] = useState<number | undefined>(editTransaction?.taxAmount);
+  const [taxLabel, setTaxLabel] = useState<string | undefined>(editTransaction?.taxLabel);
   const [receiptHash, setReceiptHash] = useState<string | null>(null);
   const [receiptImageBase64, setReceiptImageBase64] = useState<string | null>(null);
   const [invoiceHash, setInvoiceHash] = useState<string | null>(null);
@@ -195,6 +196,7 @@ export default function TransactionModal({
       if (parsed.date) setDate(parsed.date);
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
+      if (parsed.taxLabel) setTaxLabel(parsed.taxLabel);
       if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
 
       if (isIncome) {
@@ -275,6 +277,7 @@ export default function TransactionModal({
       taxAmount: txType === 'expense' ? taxAmount : undefined,
       receiptHash: receiptHash || undefined,
       invoiceHash: invoiceHash || undefined,
+      taxLabel: taxLabel || undefined,
     };
     if (isEditMode && onUpdate) {
       onUpdate(tx);

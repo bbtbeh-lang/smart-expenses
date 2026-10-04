@@ -114,7 +114,7 @@ export async function POST(req: Request) {
           { type: 'image', source: { type: 'base64', media_type: safeMimeType, data: image } },
           {
             type: 'text',
-            text: `You are an expert SALES/INCOME invoice scanner (not an expense receipt). Read this image in ANY language (Persian/Farsi, English, French, Arabic) and ANY currency. This document represents money the business RECEIVED from a client/customer. For reference, today's date is ${new Date().toISOString().slice(0, 10)} (YYYY-MM-DD) — invoices are essentially never dated in the future or more than a couple of years in the past, so use that as a sanity check.
+            text: `You are an expert SALES/INCOME invoice scanner (not an expense receipt). Read this image in ANY language and ANY currency — not limited to Persian/Farsi, English, French, or Arabic; this app isn't limited to one country, so read German, Spanish, Italian, or any other language just as confidently. This document represents money the business RECEIVED from a client/customer. For reference, today's date is ${new Date().toISOString().slice(0, 10)} (YYYY-MM-DD) — invoices are essentially never dated in the future or more than a couple of years in the past, so use that as a sanity check.
 
 Extract:
 1. clientName: the customer/client/buyer name being billed (NOT the issuing business's own name)
@@ -126,11 +126,12 @@ Extract:
    - If the date is missing, illegible, or you cannot resolve it with reasonable confidence, return "" rather than guessing — do not output a date you are not fairly confident in.
 4. items: EVERY line item with description and price (number only)
 5. amount: final TOTAL amount received/billed (number only, no currency symbol)
-6. tax: sales tax collected on this invoice (e.g. "GST", "HST", "QST", "TPS", "TVQ", "VAT"). Sum multiple tax lines. Use "" if none shown.
+6. tax: sales tax collected on this invoice — not limited to Canadian tax names, look for the local label in whatever language/country the invoice is from (e.g. "GST", "HST", "QST", "TPS", "TVQ", "VAT", "MwSt", "IVA", "BTW", or any other local term). Sum multiple tax lines. Use "" if none shown.
+6b. taxLabel: the exact label printed on the invoice for that tax line (e.g. "GST", "VAT", "MwSt"), in its original wording — not translated. Join multiple labels with " + ". Use "" if tax is "" too.
 7. category: your best guess at an income category. Pick EXACTLY ONE of: "catSalesRevenue", "catServiceRevenue", "catConsulting", "catCommission", "catRental", "catOtherIncome". If unsure, use "catOtherIncome".
 
 Return ONLY valid JSON, no markdown:
-{"clientName":"","invoiceNumber":"","date":"YYYY-MM-DD","amount":"","tax":"","category":"","items":[{"name":"","price":""}]}`
+{"clientName":"","invoiceNumber":"","date":"YYYY-MM-DD","amount":"","tax":"","taxLabel":"","category":"","items":[{"name":"","price":""}]}`
           }
         ]
       }]
@@ -175,6 +176,7 @@ Return ONLY valid JSON, no markdown:
       clientName: parsed.clientName || '',
       invoiceNumber: parsed.invoiceNumber || '',
       tax: parsed.tax || '',
+      taxLabel: parsed.taxLabel || '',
       category: VALID_INCOME_CATEGORIES.has(parsed.category) ? parsed.category : '',
       items: (parsed.items || []).map((i: { name: string; price: string }) => ({
         name: i.name,
@@ -193,7 +195,7 @@ Return ONLY valid JSON, no markdown:
     console.error('Income OCR error:', error);
     if (scanConsumed && userId) await refundScan(userId, scanSource);
     return Response.json(
-      { amount: '', description: '', date: '', clientName: '', invoiceNumber: '', tax: '', category: '', items: [], duplicate: { isDuplicate: false }, invoiceHash: null },
+      { amount: '', description: '', date: '', clientName: '', invoiceNumber: '', tax: '', taxLabel: '', category: '', items: [], duplicate: { isDuplicate: false }, invoiceHash: null },
       { status: 500 }
     );
   }

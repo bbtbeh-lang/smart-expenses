@@ -118,7 +118,12 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       const monthLabel = monthNames[parseInt(monthKey.slice(5, 7), 10) - 1];
 
       rows.push([`Month ${monthLabel}`]);
-      rows.push(['#', 'Description', 'Date', 'Store', 'Amount', 'Tax', 'Total', 'Document']);
+      // "Tax Type" holds the label as printed on the source document
+      // ("GST", "MwSt", "VAT"...) rather than a fixed Canadian header,
+      // since one report can mix receipts from different countries —
+      // left blank when the receipt didn't have one recognized (older
+      // scans, or a tax-exempt purchase).
+      rows.push(['#', 'Description', 'Date', 'Store', 'Amount', 'Tax', 'Tax Type', 'Total', 'Document']);
 
       let mPretax = 0, mTax = 0, mTotal = 0;
       monthTx.forEach((tx, i) => {
@@ -133,17 +138,18 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           neutralizeCsvFormula(tx.merchant || ''),
           pretax.toFixed(2),
           tax.toFixed(2),
+          neutralizeCsvFormula(tx.taxLabel || ''),
           tx.amount.toFixed(2),
           tx.receiptHash ? 'Yes' : '',
         ]);
       });
 
-      rows.push(['', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), mTotal.toFixed(2), '']);
+      rows.push(['', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), '', mTotal.toFixed(2), '']);
       rows.push([]);
       grandPretax += mPretax; grandTax += mTax; grandTotal += mTotal;
     });
 
-    rows.push(['', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), grandTotal.toFixed(2), '']);
+    rows.push(['', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), '', grandTotal.toFixed(2), '']);
 
     // Summary rows
     rows.push([]);
@@ -315,6 +321,11 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                         {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount, lang, 2)}
                       </div>
                     </div>
+                    {!!tx.taxAmount && (
+                      <div className="ml-5 mt-0.5 text-xs text-slate-400" dir="ltr">
+                        {tr.taxInlineLabel} {formatCurrency(tx.taxAmount, lang, 2)}{tx.taxLabel ? ` (${tx.taxLabel})` : ''}
+                      </div>
+                    )}
                     {tx.items && tx.items.length > 0 && (
                       <div className="mt-2 ml-5 space-y-0.5 border-t border-slate-200 pt-2">
                         {tx.items.map((item, i) => (

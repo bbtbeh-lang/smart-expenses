@@ -28,6 +28,10 @@ export interface Transaction {
   items?: ReceiptItem[];
   receiptHash?: string;
   invoiceHash?: string;
+  // Exact tax label as printed on the source receipt/invoice ("GST",
+  // "MwSt", "VAT"...), kept as-is rather than normalized, so exports can
+  // show what the document actually said instead of a generic "Tax".
+  taxLabel?: string;
 }
 
 export interface AppState {

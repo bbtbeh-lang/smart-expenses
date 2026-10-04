@@ -19,6 +19,7 @@ function toRow(tx: Transaction, userId: string) {
     items: tx.items || null,
     receipt_hash: tx.receiptHash || null,
     invoice_hash: tx.invoiceHash || null,
+    tax_label: tx.taxLabel || null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -40,6 +41,7 @@ function fromRow(row: Record<string, unknown>): Transaction {
     items: (row.items as Transaction['items']) || undefined,
     receiptHash: (row.receipt_hash as string) || undefined,
     invoiceHash: (row.invoice_hash as string) || undefined,
+    taxLabel: (row.tax_label as string) || undefined,
   };
 }
 
