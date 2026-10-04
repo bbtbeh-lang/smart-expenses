@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell, Zap, Receipt } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
@@ -297,7 +297,10 @@ export default function Dashboard({
             title={tr.quickScanFabLabel}
             className="flex items-center gap-1 rounded-full pl-2 pr-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white active:scale-95 transition-transform"
           >
-            <Zap className="w-3 h-3" fill="currentColor" />
+            {/* Receipt icon (not the generic lightning bolt) so the button
+                itself signals "scan an expense receipt" at a glance, on top
+                of the "(expense)" text in quickScanFabLabel. */}
+            <Receipt className="w-3 h-3" />
             <span className="text-xs font-bold">{tr.quickScanFabLabel}</span>
           </button>
         </div>

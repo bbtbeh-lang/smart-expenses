@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Zap } from 'lucide-react';
+import { Receipt } from 'lucide-react';
 import { AppState, AppScreen, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
@@ -929,7 +929,7 @@ export default function Home() {
           title={tr.quickScanFabLabel}
           className="fixed z-40 top-32 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pl-3 pr-3.5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold shadow-lg shadow-orange-300/50 active:scale-95 transition-transform"
         >
-          <Zap className="w-3.5 h-3.5" fill="currentColor" />
+          <Receipt className="w-3.5 h-3.5" />
           {tr.quickScanFabLabel}
         </button>
       )}
