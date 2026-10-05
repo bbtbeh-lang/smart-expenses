@@ -5,10 +5,17 @@ export interface PlanConfig {
   id: PlanId;
   name: string;
   scanLimit: number;
-  monthlyPriceId: string;
+  monthlyPriceId?: string;
   yearlyPriceId: string;
-  monthlyPriceCAD: number;
+  monthlyPriceCAD?: number;
   yearlyPriceCAD: number;
+  // Basic is deliberately yearly-only: it's a low-commitment "everyday use"
+  // tier (50 scans for the whole year, ~1/week) rather than a scaled-down
+  // version of Pro/Business's monthly allowance — a monthly price at the
+  // same per-scan economics wouldn't make sense at this volume. The UI
+  // hides this plan under the Monthly tab and checkout rejects a monthly
+  // request for it (see UpgradeModal.tsx / stripe/checkout route).
+  yearlyOnly?: boolean;
 }
 
 // Price IDs come from the Stripe Dashboard (Product catalog).
@@ -27,10 +34,12 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     id: 'basic',
     name: 'Basic',
     scanLimit: 50,
-    monthlyPriceId: 'price_1Twk1jJdj7e5h39ZoMGojgJD',
-    yearlyPriceId: 'price_1TwkBEJdj7e5h39ZO2kmZnf0',
-    monthlyPriceCAD: 6.99,
-    yearlyPriceCAD: 69,
+    // TODO: replace with the real yearly Price ID once created in Stripe
+    // (Basic product → new $19.99 CAD/year price). Placeholder below is
+    // the OLD $69/year price and must not ship as-is.
+    yearlyPriceId: 'REPLACE_WITH_NEW_BASIC_YEARLY_PRICE_ID',
+    yearlyPriceCAD: 19.99,
+    yearlyOnly: true,
   },
   pro: {
     id: 'pro',

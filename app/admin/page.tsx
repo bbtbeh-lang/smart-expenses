@@ -325,7 +325,11 @@ export default function AdminPage() {
     const total = paying.reduce((sum, c) => {
       const plan = PLANS[c.plan as PlanId];
       if (!plan) return sum;
-      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : plan.monthlyPriceCAD);
+      // Yearly-only plans (e.g. Basic) have no monthlyPriceCAD — their
+      // billingPeriod should always be 'yearly' in practice, but fall back
+      // to yearlyPriceCAD/12 rather than NaN if that's ever not the case.
+      const monthlyEquivalent = plan.monthlyPriceCAD ?? plan.yearlyPriceCAD / 12;
+      return sum + (c.billingPeriod === 'yearly' ? plan.yearlyPriceCAD / 12 : monthlyEquivalent);
     }, 0);
     return { mrr: total, activeSubscribers: paying.length };
   }, [customers]);

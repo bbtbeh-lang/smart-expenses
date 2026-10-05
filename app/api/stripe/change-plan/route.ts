@@ -56,7 +56,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You are already on this plan.' }, { status: 400 });
     }
 
+    // Basic is yearly-only (see lib/plans.ts) — reject switching to it on
+    // a monthly cadence rather than falling through to an undefined price.
+    if (billingPeriod === 'monthly' && PLANS[plan].yearlyOnly) {
+      return NextResponse.json({ error: 'This plan is yearly-only' }, { status: 400 });
+    }
+
     const newPriceId = billingPeriod === 'yearly' ? PLANS[plan].yearlyPriceId : PLANS[plan].monthlyPriceId;
+    if (!newPriceId) {
+      return NextResponse.json({ error: 'No price configured for this plan/period' }, { status: 400 });
+    }
 
     const stripeSub = await stripe.subscriptions.retrieve(sub.stripe_subscription_id);
     const itemId = stripeSub.items.data[0]?.id;
@@ -71,7 +80,7 @@ export async function POST(req: NextRequest) {
     // $39.99/12 = $3.33, which made almost any other plan look like an
     // "upgrade" even when it was strictly cheaper.
     const monthlyEquivalent = (p: PlanId, period: BillingPeriod) =>
-      period === 'yearly' ? PLANS[p].yearlyPriceCAD / 12 : PLANS[p].monthlyPriceCAD;
+      period === 'yearly' ? PLANS[p].yearlyPriceCAD / 12 : PLANS[p].monthlyPriceCAD ?? PLANS[p].yearlyPriceCAD / 12;
 
     const isUpgrade =
       monthlyEquivalent(plan, billingPeriod) >

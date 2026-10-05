@@ -14,7 +14,12 @@ interface UpgradeModalProps {
 }
 
 export default function UpgradeModal({ tr, currentPlan, onClose, onSelectPlan }: UpgradeModalProps) {
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
+  // Basic is yearly-only, so if that's already the user's plan, open on
+  // the Yearly tab — otherwise Basic would be filtered out of the list
+  // (see planCards below) and their current plan wouldn't even show.
+  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>(
+    currentPlan === 'basic' ? 'yearly' : 'monthly'
+  );
   const [selectedPlan, setSelectedPlan] = useState<'starter' | 'basic' | 'pro' | 'business'>(
     currentPlan === 'free' ? 'pro' : (currentPlan as 'starter' | 'basic' | 'pro' | 'business')
   );
@@ -30,10 +35,14 @@ export default function UpgradeModal({ tr, currentPlan, onClose, onSelectPlan }:
   };
 
   // Starter listed first — cheapest tier, 0 scans, manual tracking only.
-  const planCards = (['starter', 'basic', 'pro', 'business'] as const).map(id => ({
-    ...PLANS[id],
-    price: billingPeriod === 'yearly' ? PLANS[id].yearlyPriceCAD : PLANS[id].monthlyPriceCAD,
-  }));
+  // Yearly-only plans (Basic) are hidden under the Monthly tab since they
+  // have no monthly price to show.
+  const planCards = (['starter', 'basic', 'pro', 'business'] as const)
+    .filter(id => billingPeriod === 'yearly' || !PLANS[id].yearlyOnly)
+    .map(id => ({
+      ...PLANS[id],
+      price: billingPeriod === 'yearly' ? PLANS[id].yearlyPriceCAD : PLANS[id].monthlyPriceCAD,
+    }));
 
   return (
     <div
@@ -102,6 +111,14 @@ export default function UpgradeModal({ tr, currentPlan, onClose, onSelectPlan }:
                     {tr.mostPopular}
                   </span>
                 )}
+                {/* Distinct color from "Most Popular" (Pro) so the two
+                    badges don't read as competing claims on the same
+                    list. */}
+                {plan.yearlyOnly && (
+                  <span className="absolute -top-2.5 right-4 text-[10px] font-bold text-white bg-sky-500 px-2.5 py-0.5 rounded-full">
+                    {tr.everydayPlanBadge}
+                  </span>
+                )}
                 {selectedPlan === plan.id && (
                   <div className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow">
                     <Check className="w-3 h-3 text-white" />
@@ -117,7 +134,11 @@ export default function UpgradeModal({ tr, currentPlan, onClose, onSelectPlan }:
                       <span className="text-xs font-normal text-slate-400"> /{billingPeriod === 'yearly' ? tr.perYear : tr.perMonth}</span>
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">
-                      {plan.scanLimit > 0 ? tr.scansPerMonth.replace('{count}', String(plan.scanLimit)) : tr.manualEntryOnly}
+                      {plan.scanLimit === 0
+                        ? tr.manualEntryOnly
+                        : plan.yearlyOnly
+                        ? tr.scansPerYearPractical.replace('{count}', String(plan.scanLimit))
+                        : tr.scansPerMonth.replace('{count}', String(plan.scanLimit))}
                     </div>
                   </div>
                   {currentPlan === plan.id && (

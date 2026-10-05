@@ -26,7 +26,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
+    // Basic is yearly-only (see lib/plans.ts) — the UI already hides it
+    // under the Monthly tab, but a direct/forged request could still try
+    // this combination, so reject it explicitly rather than falling
+    // through to an undefined monthlyPriceId.
+    if (billingPeriod === 'monthly' && PLANS[plan].yearlyOnly) {
+      return NextResponse.json({ error: 'This plan is yearly-only' }, { status: 400 });
+    }
+
     const priceId = billingPeriod === 'yearly' ? PLANS[plan].yearlyPriceId : PLANS[plan].monthlyPriceId;
+    if (!priceId) {
+      return NextResponse.json({ error: 'No price configured for this plan/period' }, { status: 400 });
+    }
 
     // Reuse an existing Stripe customer for this user if we have one on file.
     const { data: existingSub } = await supabaseAdmin
