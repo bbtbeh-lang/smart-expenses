@@ -624,7 +624,7 @@ export default function AdminPage() {
               className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
             >
               <option value="starter">Starter</option>
-              <option value="basic">Basic</option>
+              <option value="basic">Light</option>
               <option value="pro">Pro</option>
               <option value="business">Business</option>
             </select>

@@ -32,7 +32,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
   },
   basic: {
     id: 'basic',
-    name: 'Basic',
+    name: 'Light',
     scanLimit: 50,
     // TODO: replace with the real yearly Price ID once created in Stripe
     // (Basic product → new $19.99 CAD/year price). Placeholder below is
