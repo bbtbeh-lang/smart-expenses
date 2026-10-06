@@ -1,4 +1,4 @@
-export type PlanId = 'starter' | 'basic' | 'pro' | 'business';
+export type PlanId = 'basic' | 'pro' | 'business';
 export type BillingPeriod = 'monthly' | 'yearly';
 
 export interface PlanConfig {
@@ -21,15 +21,6 @@ export interface PlanConfig {
 // Price IDs come from the Stripe Dashboard (Product catalog).
 // These are safe to expose on the client — they are not secret.
 export const PLANS: Record<PlanId, PlanConfig> = {
-  starter: {
-    id: 'starter',
-    name: 'Starter',
-    scanLimit: 0,
-    monthlyPriceId: 'price_1U4iAcJdj7e5h39Ze9OFVCPa',
-    yearlyPriceId: 'price_1U4iCAJdj7e5h39Z5qPFTiBN',
-    monthlyPriceCAD: 1.99,
-    yearlyPriceCAD: 16.99,
-  },
   basic: {
     id: 'basic',
     name: 'Light',

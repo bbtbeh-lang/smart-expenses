@@ -183,9 +183,8 @@ async function handleUpcomingInvoice(invoice: Stripe.Invoice) {
   }
 }
 
-const PLAN_DISPLAY_NAME: Record<'starter' | 'basic' | 'pro' | 'business', string> = {
-  starter: 'Starter',
-  basic: 'Basic',
+const PLAN_DISPLAY_NAME: Record<'basic' | 'pro' | 'business', string> = {
+  basic: 'Light',
   pro: 'Pro',
   business: 'Business',
 };

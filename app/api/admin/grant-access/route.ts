@@ -3,11 +3,10 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdminEmail } from '@/lib/adminAuth';
 import { sendGrantAccessEmail } from '@/lib/email';
 
-type GrantPlan = 'starter' | 'basic' | 'pro' | 'business';
-const VALID_PLANS: GrantPlan[] = ['starter', 'basic', 'pro', 'business'];
+type GrantPlan = 'basic' | 'pro' | 'business';
+const VALID_PLANS: GrantPlan[] = ['basic', 'pro', 'business'];
 const PLAN_DISPLAY_NAMES: Record<GrantPlan, string> = {
-  starter: 'Starter',
-  basic: 'Basic',
+  basic: 'Light',
   pro: 'Pro',
   business: 'Business',
 };

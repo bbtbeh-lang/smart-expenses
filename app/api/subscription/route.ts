@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
   // /api/stripe/change-plan (which requires an existing Stripe subscription
   // to modify) or /api/stripe/checkout (which starts a new one) — and
   // whether the Stripe customer portal is even reachable. Plan !== 'free'
-  // alone isn't enough: an admin-granted 'starter' plan is active but has
+  // alone isn't enough: an admin-granted 'basic' plan is active but has
   // nothing in Stripe to change or manage.
   return NextResponse.json({
     plan: sub.plan,
