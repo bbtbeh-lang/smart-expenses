@@ -25,10 +25,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     id: 'basic',
     name: 'Light',
     scanLimit: 50,
-    // TODO: replace with the real yearly Price ID once created in Stripe
-    // (Basic product → new $19.99 CAD/year price). Placeholder below is
-    // the OLD $69/year price and must not ship as-is.
-    yearlyPriceId: 'REPLACE_WITH_NEW_BASIC_YEARLY_PRICE_ID',
+    yearlyPriceId: 'price_1TwkBEJdj7e5h39ZO2kmZnf0',
     yearlyPriceCAD: 19.99,
     yearlyOnly: true,
   },
