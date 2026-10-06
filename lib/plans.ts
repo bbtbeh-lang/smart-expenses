@@ -25,7 +25,7 @@ export const PLANS: Record<PlanId, PlanConfig> = {
     id: 'basic',
     name: 'Light',
     scanLimit: 50,
-    yearlyPriceId: 'price_1TwkBEJdj7e5h39ZO2kmZnf0',
+    yearlyPriceId: 'price_1UNeqQJdj7e5h39ZRjKF0BA9',
     yearlyPriceCAD: 19.99,
     yearlyOnly: true,
   },
