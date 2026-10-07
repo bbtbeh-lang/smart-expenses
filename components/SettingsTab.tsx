@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Globe, Shield, ChevronRight, Moon, Sun, Smartphone, Briefcase, Home, Calendar } from 'lucide-react';
+import { User, Globe, Shield, ChevronRight, Moon, Sun, Briefcase, Home, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { AppState, Lang, AccountType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
@@ -202,25 +202,6 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
               )}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Preferences */}
-      <div className="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-50">
-          <div className="flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{tr.settingsPreferences}</span>
-          </div>
-        </div>
-        <div className="divide-y divide-slate-50">
-          <div className="px-5 py-3.5 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-slate-800">{tr.settingsCurrency}</div>
-              <div className="text-xs text-slate-400">{tr.canadianDollarLabel}</div>
-            </div>
-            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full" dir="ltr">CAD $</span>
-          </div>
         </div>
       </div>
 

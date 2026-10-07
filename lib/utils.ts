@@ -103,26 +103,22 @@ export function parseLocalDate(dateStr: string): Date {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
-// FinSnap is a Canadian-dollar product for the Canadian market — the
-// currency never changes with the UI language. Only the surrounding text
-// (labels, categories, etc.) is translated; showing amounts in Iranian
-// Toman for Persian-speaking users would be financially misleading, since
-// they're actually paying and being billed in CAD.
-export function getCurrencySymbol(_lang: Lang): string {
-  return '$';
-}
-
-// Returns e.g. "$1,234.00" — always CAD, with thousands separators.
+// FinSnap doesn't assume a single currency: a receipt scanned abroad is
+// read in whatever currency it was printed in (see the OCR prompt), so a
+// fixed "$"/"CAD" symbol here would misrepresent amounts that aren't
+// actually Canadian dollars. Showing the bare number, with no currency
+// symbol, makes no claim either way — the person already knows what they
+// entered or scanned.
 export function formatCurrency(amount: number, _lang: Lang, decimals = 2): string {
-  // BUG FIX: toLocaleString() puts the minus sign first, so a negative
-  // amount used to render as "$-730.80" (sign after the currency
-  // symbol) instead of the standard "-$730.80".
+  // BUG FIX (kept): toLocaleString() puts the minus sign first, so a
+  // negative amount used to render oddly with the old currency-symbol
+  // version. Sign is still placed before the number for consistency.
   const isNegative = amount < 0;
   const formatted = Math.abs(amount).toLocaleString('en-CA', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-  return `${isNegative ? '-' : ''}$${formatted}`;
+  return `${isNegative ? '-' : ''}${formatted}`;
 }
 
 // Given an anchor due date (YYYY-MM-DD) and a recurrence rule, returns the

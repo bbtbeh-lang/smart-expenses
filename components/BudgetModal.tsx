@@ -264,14 +264,13 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                 <div className="flex items-center gap-3">
                   <div className="flex-1 text-sm font-medium text-slate-700">{(tr as any)[cat]}</div>
                   <div className="relative w-36" dir="ltr">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">$</span>
                     <input
                       type="number"
                       inputMode="decimal"
                       value={values[cat] ?? ''}
                       onChange={e => setValues(prev => ({ ...prev, [cat]: e.target.value }))}
                       placeholder={tr.noBudget}
-                      className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                      className="w-full pl-3 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                     />
                   </div>
                 </div>
@@ -356,14 +355,13 @@ export default function BudgetModal({ tr, accountType, budgets, customCategories
                       />
                     </div>
                     <div className="relative w-28" dir="ltr">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-semibold">$</span>
                       <input
                         type="number"
                         inputMode="decimal"
                         value={item.amount}
                         onChange={e => setCustomItems(prev => prev.map(i => i.key === item.key ? { ...i, amount: e.target.value } : i))}
                         placeholder={tr.noBudget}
-                        className="w-full pl-7 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                        className="w-full pl-3 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
                       />
                     </div>
                     <button
