@@ -127,7 +127,16 @@ export default function TransactionModal({
     setOcrProgress(30);
     setOcrBanner(tr.ocrScanning);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
+      // Two encodings of the same resized canvas: a high-quality one for
+      // OCR (digits/dates need to stay crisp for the model to read them
+      // reliably) and a lighter one for the archived copy that gets stored
+      // in Supabase Storage. By the time the archive is saved, the OCR has
+      // already read what it needs — the stored copy only has to stay
+      // legible to a person (and to CRA as proof), so it can be compressed
+      // harder without hurting accuracy. Dedup/hash and the storage path
+      // come from the OCR response, not from this image, so they're
+      // unaffected.
+      const { ocr: base64, archive: archiveBase64 } = await new Promise<{ ocr: string; archive: string }>((resolve, reject) => {
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = () => {
@@ -146,8 +155,10 @@ export default function TransactionModal({
           const ctx = canvas.getContext('2d')!;
           ctx.drawImage(img, 0, 0, w, h);
           URL.revokeObjectURL(url);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-          resolve(dataUrl.split(',')[1]);
+          resolve({
+            ocr: canvas.toDataURL('image/jpeg', 0.9).split(',')[1],
+            archive: canvas.toDataURL('image/jpeg', 0.7).split(',')[1],
+          });
         };
         img.onerror = () => reject(new Error('Failed to load image'));
         img.src = url;
@@ -157,9 +168,9 @@ export default function TransactionModal({
       // ذخیره تصویر در state مناسب بسته به نوع تراکنش
       const isIncome = txType === 'income';
       if (isIncome) {
-        setInvoiceImageBase64(base64);
+        setInvoiceImageBase64(archiveBase64);
       } else {
-        setReceiptImageBase64(base64);
+        setReceiptImageBase64(archiveBase64);
       }
 
       const { data: { session } } = await supabase.auth.getSession();
