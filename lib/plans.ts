@@ -63,3 +63,18 @@ export function scanLimitForPlan(plan: PlanId | 'free'): number {
   if (plan === 'free') return 0; // OCR/scanning is exclusive to paying plans — see checkAccess in /api/subscription.
   return PLANS[plan].scanLimit;
 }
+
+// One-time "extra scans" pack, bought on top of a plan when its own scans
+// run out. The Price is a ONE-TIME price (not recurring) created in the
+// Stripe Dashboard ("FinSnap — 50 extra scans"). Credited by the webhook
+// (see add_extra_scans in the DB), spent only after the plan's own
+// allowance is used up, and never expires or resets with the plan period.
+export const SCAN_PACK = {
+  scans: 50,
+  priceCAD: 9.99,
+  priceId: 'price_1UPu0aJdj7e5h39Zn91VlUmI',
+};
+
+// Kill switch: if the Price ID is ever blanked/placeholdered again, the UI
+// hides the buy button and the API refuses, so nothing ships half-working.
+export const SCAN_PACK_ENABLED = !!SCAN_PACK.priceId && !SCAN_PACK.priceId.startsWith('REPLACE_');

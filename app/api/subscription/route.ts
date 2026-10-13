@@ -97,7 +97,9 @@ export async function GET(req: NextRequest) {
     billingPeriod: sub.billing_period,
     status: sub.status,
     scansUsed: sub.scans_used_this_period,
-    scanLimit: scanLimitForPlan(sub.plan),
+    // Plan allowance + purchased extra scans (see consume_scan), so the
+    // client's "limit - used" is the total number of scans left.
+    scanLimit: scanLimitForPlan(sub.plan) + (sub.extra_scans ?? 0),
     // Admin-granted (comp) subscriptions get unlimited OCR scanning —
     // see the granted_by_admin bypass in consume_scan() — so the UI
     // shouldn't show a numeric cap that doesn't actually apply.

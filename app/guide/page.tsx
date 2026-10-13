@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { SCAN_PACK, SCAN_PACK_ENABLED } from '@/lib/plans';
 import {
   Zap, Home, PlusCircle, List, Calculator, FileText, Wallet,
   Settings as SettingsIcon, CreditCard, Info, ChevronRight, ShieldAlert,
@@ -191,6 +192,7 @@ const CONTENT: Record<GLang, Section[]> = {
           ['Business', '$39.99', '$399 (2 months free)', '600'],
         ] },
         { type: 'p', text: 'Light is for occasional use — around one receipt a week — at a fraction of the cost of a monthly plan. If you scan more than that most months, Pro or Business work out cheaper per scan.' },
+        ...(SCAN_PACK_ENABLED ? [{ type: 'p' as const, text: `Running low on scans? You can buy a pack of ${SCAN_PACK.scans} extra scans (CA$${SCAN_PACK.priceCAD}, one-time) from the scan screen or the Dashboard. They\'re used after your plan\'s own scans and never expire.` }] : []),
         { type: 'p', text: 'All plans are billed securely through Stripe. Change plans, update payment, or cancel anytime from Settings → Manage your plan. Canceling keeps your paid features until the end of your current billing period, then switches you to Free — you won\'t be charged again.' },
       ],
     },
@@ -375,6 +377,7 @@ const CONTENT: Record<GLang, Section[]> = {
           ['Business', '$۳۹.۹۹', '$۳۹۹ (۲ ماه رایگان)', '۶۰۰'],
         ] },
         { type: 'p', text: 'پلن Light برای استفاده‌ی گاه‌به‌گاهه — حدود یه رسید در هفته — با قیمتی خیلی کمتر از یه پلن ماهانه. اگه بیشتر ماه‌ها بیشتر از این اسکن می‌کنی، Pro یا Business به‌ازای هر اسکن ارزون‌تر تموم می‌شن.' },
+        ...(SCAN_PACK_ENABLED ? [{ type: 'p' as const, text: `اسکن‌هات داره تموم می‌شه؟ می‌تونی از صفحه‌ی اسکن یا داشبورد یه بسته‌ی ${SCAN_PACK.scans} اسکنی (CA$${SCAN_PACK.priceCAD}، پرداخت یک‌باره) بخری. این اسکن‌ها بعد از اسکن‌های خود پلنت مصرف می‌شن و منقضی نمی‌شن.` }] : []),
         { type: 'p', text: 'همه‌ی پلن‌ها با امنیت کامل از طریق Stripe صورت‌حساب می‌شن. هر وقت خواستی از تنظیمات ← مدیریت پلن، پلن رو عوض کن، روش پرداخت رو آپدیت کن، یا لغو کن. با لغو کردن، امکانات پولیت تا پایان همون دوره‌ی صورت‌حساب فعلی فعال می‌مونه، بعدش به پلن رایگان تبدیل می‌شی — دیگه هزینه‌ای ازت کسر نمی‌شه.' },
       ],
     },

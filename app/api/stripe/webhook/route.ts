@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { upsertSubscriptionFromStripe } from '@/lib/subscriptionSync';
-import { planFromPriceId } from '@/lib/plans';
+import { planFromPriceId, SCAN_PACK } from '@/lib/plans';
 import { sendRenewalReminderEmail } from '@/lib/email';
 import Stripe from 'stripe';
 
@@ -60,6 +60,23 @@ export async function POST(req: NextRequest) {
         if (userId && session.subscription) {
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
           await upsertSubscriptionFromStripe(userId, subscription);
+        } else if (
+          userId &&
+          session.mode === 'payment' &&
+          session.metadata?.type === 'scan_pack' &&
+          session.payment_status === 'paid'
+        ) {
+          // Extra-scans pack. The amount comes from our own SCAN_PACK
+          // constant, never from request/metadata data. add_extra_scans
+          // is keyed on the Checkout session id, so a redelivered webhook
+          // can't credit the same purchase twice; throwing on error makes
+          // Stripe retry (500 below), which is safe for the same reason.
+          const { error: creditError } = await supabaseAdmin.rpc('add_extra_scans', {
+            p_user_id: userId,
+            p_amount: SCAN_PACK.scans,
+            p_session_id: session.id,
+          });
+          if (creditError) throw creditError;
         }
         break;
       }

@@ -21,6 +21,8 @@ interface DashboardProps {
   onOpenPlanManager: () => void;
   onOpenBudget: () => void;
   onQuickScan: () => void;
+  // Set only when buying a scan pack is possible for this user.
+  onBuyScanPack?: () => void;
 }
 
 const EXPENSE_CATS_PERSONAL = [
@@ -71,7 +73,7 @@ function filterTxByDate(txs: Transaction[], filter: DateFilter): Transaction[] {
 }
 
 export default function Dashboard({
-  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onApplyTrialCode, onOpenPlanManager, onOpenBudget, onQuickScan,
+  state, tr, onAddTransaction, onOpenUpgrade, onOpenTaxReport, onApplyCode, onApplyTrialCode, onOpenPlanManager, onOpenBudget, onQuickScan, onBuyScanPack,
 }: DashboardProps) {
   const [code, setCode] = useState('');
   const [codeMsg, setCodeMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -279,8 +281,16 @@ export default function Dashboard({
               <span className={`text-xs font-semibold ${state.tier === 'premium' ? 'text-emerald-600' : 'text-blue-600'}`} dir="ltr">
                 {state.unlimitedScans
                   ? `${tr.scansRemaining}: ${tr.unlimited}`
-                  : `${tr.scansRemaining}: ${scansLeft}/${state.scanLimit}`}
+                  : `${state.plan === 'basic' ? tr.scansRemainingYear : tr.scansRemaining}: ${scansLeft}/${state.scanLimit}`}
               </span>
+              {onBuyScanPack && !state.unlimitedScans && scansLeft <= 10 && (
+                <button
+                  onClick={onBuyScanPack}
+                  className="text-xs font-bold text-emerald-700 underline hover:text-emerald-900"
+                >
+                  {tr.buyMoreScans}
+                </button>
+              )}
             </div>
           ) : (
             <button

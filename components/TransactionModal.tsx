@@ -5,6 +5,7 @@ import { X, ChevronLeft, Upload, ScanLine, CheckCircle, AlertCircle, AlertTriang
 import { Translations } from '@/lib/translations';
 import { TransactionType, AccountType, Tier, Transaction, ReceiptItem, INCOME_OCR_CATEGORIES } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
+import { SCAN_PACK } from '@/lib/plans';
 import { getOrCreateCategoryKey, todayLocalDate } from '@/lib/utils';
 
 type ModalStep = 'type' | 'receipt' | 'manual' | 'ocr';
@@ -25,7 +26,14 @@ interface TransactionModalProps {
   onSaveManual: (tx: Transaction) => void;
   onUpdate?: (tx: Transaction) => void;
   onDelete?: (id: string) => void;
-  onScanConsumed: (scansUsed: number) => void;
+  // scanLimit is passed along too: spending a purchased extra scan leaves
+  // scansUsed unchanged but lowers the total limit, so both must update.
+  onScanConsumed: (scansUsed: number, scanLimit?: number) => void;
+  // Set only when buying a scan pack is possible for this user.
+  onBuyScanPack?: () => void;
+  // Light's allowance is per year, every other plan's is per month — only
+  // used to pick the right wording.
+  scanPeriodYearly?: boolean;
   onOpenUpgrade: () => void;
   onScanBlocked: () => void;
   // Quick Scan fast-path (tax-prep shortcut): skips straight to the camera/
@@ -53,7 +61,7 @@ export default function TransactionModal({
   tr, accountType, tier, hasManualAccess, hasScanAccess, scansUsedToday, maxDailyScans,
   editTransaction, customCategories = {}, onAddCustomCategory,
   onClose, onSaveManual, onUpdate, onDelete,
-  onScanConsumed, onOpenUpgrade, onScanBlocked, quickScan,
+  onScanConsumed, onOpenUpgrade, onScanBlocked, quickScan, onBuyScanPack, scanPeriodYearly,
 }: TransactionModalProps) {
   const isEditMode = !!editTransaction;
 
@@ -208,7 +216,9 @@ export default function TransactionModal({
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
       if (parsed.taxLabel) setTaxLabel(parsed.taxLabel);
-      if (typeof parsed.scansUsed === 'number') onScanConsumed(parsed.scansUsed);
+      if (typeof parsed.scansUsed === 'number') {
+        onScanConsumed(parsed.scansUsed, typeof parsed.scanLimit === 'number' ? parsed.scanLimit : undefined);
+      }
 
       if (isIncome) {
         // پر کردن invoiceHash و پردازش داده‌های فاکتور درآمد
@@ -449,6 +459,7 @@ export default function TransactionModal({
               <p className="text-base font-semibold text-slate-800">{tr.receiptQuestion}</p>
 
               {hasScanAccess ? (
+                <>
                 <button
                   onClick={handleReceiptYes}
                   className={`w-full flex items-center gap-4 p-5 border-2 rounded-2xl text-left transition-all duration-150 active:scale-[0.98] group ${scanExhausted ? 'border-slate-200 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-teal-400 hover:bg-teal-50'}`}
@@ -458,8 +469,8 @@ export default function TransactionModal({
                     <div className="font-bold text-slate-900">{tr.yesUpload}</div>
                     <div className="text-xs text-slate-500 mt-0.5">
                       {scansLeft > 0
-                        ? tr.scansLeftThisMonth.replace('{count}', String(scansLeft)).replace(/\{plural\}/g, scansLeft !== 1 ? 's' : '')
-                        : tr.scanLimitReached}
+                        ? (scanPeriodYearly ? tr.scansLeftThisYear : tr.scansLeftThisMonth).replace('{count}', String(scansLeft)).replace(/\{plural\}/g, scansLeft !== 1 ? 's' : '')
+                        : (scanPeriodYearly ? tr.scanLimitReachedYear : tr.scanLimitReached)}
                     </div>
                   </div>
                   <div className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full">
@@ -467,6 +478,27 @@ export default function TransactionModal({
                     OCR
                   </div>
                 </button>
+                {/* Offered once 10 or fewer scans remain (including zero), so
+                    the person can top up before hitting the wall. */}
+                {onBuyScanPack && scansLeft <= 10 && (
+                  <div className="flex flex-col items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={onBuyScanPack}
+                      className="w-full py-2.5 rounded-xl text-sm font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                    >
+                      {tr.buyScanPack.replace('{count}', String(SCAN_PACK.scans)).replace('{price}', `CA$${SCAN_PACK.priceCAD}`)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenUpgrade}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 underline"
+                    >
+                      {tr.orUpgradePlan}
+                    </button>
+                  </div>
+                )}
+                </>
               ) : (
                 <button
                   onClick={onOpenUpgrade}

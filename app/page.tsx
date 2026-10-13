@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Receipt } from 'lucide-react';
+import { SCAN_PACK, SCAN_PACK_ENABLED } from '@/lib/plans';
 import { AppState, AppScreen, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
@@ -344,6 +345,28 @@ export default function Home() {
 
     if (checkout === 'success') {
       addToast(tr.upgradeSuccess, 'success');
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts += 1;
+        await refreshSubscription();
+        if (attempts >= 5) clearInterval(interval);
+      }, 1500);
+      return () => clearInterval(interval);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Back from a scan-pack Checkout. The webhook credits the pack, which
+  // usually lands before this redirect, but poll briefly in case it hasn't.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const scanPack = params.get('scan_pack');
+    if (!scanPack) return;
+
+    window.history.replaceState({}, '', window.location.pathname);
+
+    if (scanPack === 'success') {
+      addToast(tr.scanPackSuccess.replace('{count}', String(SCAN_PACK.scans)), 'success');
       let attempts = 0;
       const interval = setInterval(async () => {
         attempts += 1;
@@ -798,6 +821,34 @@ export default function Home() {
     }
   };
 
+  const handleBuyScanPack = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      addToast(tr.sessionExpiredError, 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/stripe/scan-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        addToast(data.error || tr.checkoutFailedError, 'error');
+      }
+    } catch {
+      addToast(tr.checkoutFailedError, 'error');
+    }
+  };
+
+  // Packs are offered only to a person paying through Stripe with a
+  // capped plan — admin-granted accounts already scan without a limit.
+  const canBuyScanPack = SCAN_PACK_ENABLED && state.hasStripeSubscription && !state.unlimitedScans;
+  // Light's allowance is per year, every other plan's per month.
+  const scanPeriodYearly = state.plan === 'basic' && !state.unlimitedScans;
+
   const transactionModalProps = {
     tr,
     accountType: state.accountType || 'personal' as const,
@@ -808,9 +859,16 @@ export default function Home() {
     maxDailyScans: state.scanLimit,
     customCategories: state.customCategories,
     onAddCustomCategory: handleAddCustomCategory,
-    onScanConsumed: (scansUsed: number) => setState(prev => ({ ...prev, scansUsedThisPeriod: scansUsed })),
+    onScanConsumed: (scansUsed: number, scanLimit?: number) => setState(prev => ({
+      ...prev,
+      scansUsedThisPeriod: scansUsed,
+      // Only trust a real cap (-1 means unlimited, handled via unlimitedScans).
+      scanLimit: typeof scanLimit === 'number' && scanLimit >= 0 ? scanLimit : prev.scanLimit,
+    })),
+    onBuyScanPack: canBuyScanPack ? handleBuyScanPack : undefined,
+    scanPeriodYearly,
     onOpenUpgrade: () => { setShowTransactionModal(false); setEditingTransaction(null); setShowUpgrade(true); },
-    onScanBlocked: () => addToast(tr.scanLimitReached || 'You have reached your monthly scan limit for this plan.', 'error'),
+    onScanBlocked: () => addToast((scanPeriodYearly ? tr.scanLimitReachedYear : tr.scanLimitReached) || 'You have reached your scan limit for this plan.', 'error'),
   };
 
   return (
@@ -859,6 +917,7 @@ export default function Home() {
                 onOpenPlanManager={() => setShowPlanManager(true)}
                 onOpenBudget={() => setShowBudget(true)}
                 onQuickScan={handleQuickScanClick}
+                onBuyScanPack={canBuyScanPack ? handleBuyScanPack : undefined}
               />
             )}
             {activeTab === 'transactions' && (
