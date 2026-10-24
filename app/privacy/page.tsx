@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from '@/lib/support';
+
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4">
@@ -65,7 +67,14 @@ export default function PrivacyPolicyPage() {
         <p>We may update this policy from time to time. Material changes will be reflected by the "Last updated" date above.</p>
 
         <h2>7. Contact</h2>
-        <p>Questions about this policy? Contact us through the support link in the app.</p>
+        <p>
+          Questions about this policy?{' '}
+          {SUPPORT_EMAIL ? (
+            <>Contact us at <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</>
+          ) : (
+            <>Contact us through the support link in the app.</>
+          )}
+        </p>
 
         <p className="text-xs text-slate-400 mt-8 border-t border-slate-100 pt-4">
           This document is a plain-language summary provided for transparency and does not

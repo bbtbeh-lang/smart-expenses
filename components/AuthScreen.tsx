@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Translations } from '@/lib/translations';
 import { supabase } from '@/lib/supabase';
+import { SUPPORT_EMAIL } from '@/lib/support';
 
 interface AuthScreenProps {
   tr: Translations;
@@ -186,6 +187,12 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
             linking to it. */}
         <p className="text-xs text-slate-400 mt-2">
           <a href="/guide" className="underline hover:text-slate-600">{tr.settingsGuide}</a>
+          {SUPPORT_EMAIL && (
+            <>
+              {' · '}
+              <a href={`mailto:${SUPPORT_EMAIL}`} className="underline hover:text-slate-600">{tr.contactSupport}</a>
+            </>
+          )}
         </p>
       </div>
     </div>

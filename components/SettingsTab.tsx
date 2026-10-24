@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { User, Globe, Shield, ChevronRight, Moon, Sun, Briefcase, Home, Calendar } from 'lucide-react';
 import { Translations } from '@/lib/translations';
+import { SUPPORT_EMAIL } from '@/lib/support';
 import { AppState, Lang, AccountType } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 
@@ -219,6 +220,7 @@ export default function SettingsTab({ state, tr, onLogout, onOpenUpgrade, onOpen
             { label: tr.settingsGuide, value: '→', href: `/guide?lang=${state.lang === 'FA' ? 'FA' : 'EN'}` },
             { label: tr.settingsPrivacy, value: '→', href: '/privacy' },
             { label: tr.settingsTerms, value: '→', href: '/terms' },
+            ...(SUPPORT_EMAIL ? [{ label: tr.contactSupport, value: '→', href: `mailto:${SUPPORT_EMAIL}` }] : []),
           ].map(({ label, value, href }) => (
             href ? (
               <a
