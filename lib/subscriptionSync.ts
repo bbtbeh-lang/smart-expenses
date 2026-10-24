@@ -30,7 +30,6 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
     subscription.items.data[0]?.current_period_end ??
     (subscription as unknown as { current_period_end?: number }).current_period_end;
   const currentPeriodEndIso = periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null;
-  const plan = planInfo?.plan || 'free';
   // The Stripe Customer Portal is configured for "cancel at period end"
   // (not immediate) — this is Stripe's own flag for that pending state.
   // While true, `status` still reports 'active' (correctly, since the
@@ -55,6 +54,28 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
     .eq('user_id', userId)
     .maybeSingle();
 
+  // A price we don't recognise (a plan removed from lib/plans.ts, or a
+  // price created in Stripe but never added to the code) used to be
+  // mapped to 'free' — silently turning someone who is still being
+  // charged into a free user on their next renewal webhook. Keep whatever
+  // plan they already have and log loudly instead, so it shows up in the
+  // logs rather than as a customer complaint. (A brand-new subscriber with
+  // an unknown price has no existing plan to keep, so they do land on
+  // 'free' — the log line is how that gets noticed.)
+  let plan: string;
+  let billingPeriod: 'monthly' | 'yearly' | null;
+  if (planInfo) {
+    plan = planInfo.plan;
+    billingPeriod = planInfo.billingPeriod;
+  } else {
+    console.error('[subscriptionSync] UNKNOWN PRICE ID — keeping the existing plan, not downgrading', {
+      priceId, userId, subscriptionId: subscription.id, existingPlan: existing?.plan ?? null,
+    });
+    plan = existing?.plan || 'free';
+    const interval = subscription.items.data[0]?.price.recurring?.interval;
+    billingPeriod = interval === 'year' ? 'yearly' : interval === 'month' ? 'monthly' : null;
+  }
+
   const isNewPeriod =
     !existing ||
     existing.plan !== plan ||
@@ -66,7 +87,7 @@ export async function upsertSubscriptionFromStripe(userId: string, subscription:
       {
         user_id: userId,
         plan,
-        billing_period: planInfo?.billingPeriod || null,
+        billing_period: billingPeriod,
         status,
         stripe_customer_id: subscription.customer as string,
         stripe_subscription_id: subscription.id,
