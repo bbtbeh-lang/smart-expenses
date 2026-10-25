@@ -5,4 +5,4 @@
 // Leave it as '' until that address exists: every place that shows a
 // support link checks SUPPORT_EMAIL first and renders nothing when it's
 // empty, so there's never a dead "contact us" link.
-export const SUPPORT_EMAIL: string = '';
+export const SUPPORT_EMAIL: string = 'support@pixflow.one';
