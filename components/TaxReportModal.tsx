@@ -52,6 +52,13 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const totalTax = transactions.filter(t => t.taxAmount).reduce((s, t) => s + (t.taxAmount || 0), 0);
+  // A scanned expense receipt with no tax amount: the receipt simply didn't
+  // print a separate tax line (fuel receipts typically don't — the tax is
+  // inside the pump price). That is NOT the same as zero tax, so the report
+  // says so instead of showing a bare 0.00 / blank. Manual entries are
+  // excluded: with no receipt there's nothing to say was "not itemized".
+  const isUnitemized = (t: Transaction) => t.type === 'expense' && t.hasReceipt && !t.taxAmount;
+  const unitemizedCount = transactions.filter(isUnitemized).length;
   const netProfit = totalIncome - totalExpenses;
 
   // Per-category breakdown for the Tax tab — purely a re-grouping of data
@@ -138,7 +145,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           neutralizeCsvFormula(tx.merchant || ''),
           pretax.toFixed(2),
           tax.toFixed(2),
-          neutralizeCsvFormula(tx.taxLabel || ''),
+          neutralizeCsvFormula(tx.taxLabel || (isUnitemized(tx) ? 'Not itemized on receipt' : '')),
           tx.amount.toFixed(2),
           tx.receiptHash ? 'Yes' : '',
         ]);
@@ -326,6 +333,11 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                         {tr.taxInlineLabel} {formatCurrency(tx.taxAmount, lang, 2)}{tx.taxLabel ? ` (${tx.taxLabel})` : ''}
                       </div>
                     )}
+                    {isUnitemized(tx) && (
+                      <div className="ml-5 mt-0.5 text-xs italic text-slate-400">
+                        {tr.taxNotItemized}
+                      </div>
+                    )}
                     {tx.items && tx.items.length > 0 && (
                       <div className="mt-2 ml-5 space-y-0.5 border-t border-slate-200 pt-2">
                         {tx.items.map((item, i) => (
@@ -365,6 +377,13 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                   <span className="text-sm text-slate-600">{tr.totalTaxPaid}</span>
                   <span className="text-sm font-bold text-slate-800" dir="ltr">{formatCurrency(totalTax, lang, 2)}</span>
                 </div>
+                {unitemizedCount > 0 && (
+                  <p className="text-xs text-amber-600 leading-relaxed">
+                    {tr.taxUnitemizedNote
+                      .replace('{count}', String(unitemizedCount))
+                      .replace(/\{plural\}/g, unitemizedCount !== 1 ? 's' : '')}
+                  </p>
+                )}
                 <div className="h-px bg-slate-200" />
                 <p className="text-xs text-slate-400 leading-relaxed">{tr.taxLineExplainer}</p>
               </div>
