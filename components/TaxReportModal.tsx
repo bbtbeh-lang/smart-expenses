@@ -25,6 +25,20 @@ interface TaxReportModalProps {
   customIncomeCategories?: Record<string, string>;
 }
 
+// Load html2pdf.js via script tag so it never enters the webpack bundle.
+async function ensureHtml2Pdf(): Promise<any> {
+  if (!(window as any).html2pdf) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load html2pdf.js'));
+      document.head.appendChild(script);
+    });
+  }
+  return (window as any).html2pdf;
+}
+
 type Tab = 'summary' | 'ledger' | 'tax';
 
 export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transactions: allTransactions, onClose, onOpenUpgrade, customCategories = {}, customIncomeCategories = {} }: TaxReportModalProps) {
@@ -39,6 +53,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   const catLabel = (key: string) => resolveCategoryLabel(key, tr as unknown as Record<string, string>, customCategories, customIncomeCategories);
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [categoryPdfLoading, setCategoryPdfLoading] = useState(false);
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
 
   const currentYear = new Date().getFullYear();
@@ -202,17 +217,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   const handleDownloadPDF = async () => {
     setPdfLoading(true);
     try {
-      // Load html2pdf.js via script tag so it never enters the webpack bundle
-      if (!(window as any).html2pdf) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error('Failed to load html2pdf.js'));
-          document.head.appendChild(script);
-        });
-      }
-      const html2pdfFn = (window as any).html2pdf;
+      const html2pdfFn = await ensureHtml2Pdf();
       const element = document.getElementById('tax-report-pdf-content');
       if (!element || !html2pdfFn) return;
       await html2pdfFn()
@@ -228,6 +233,102 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       // silently fall back
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  // One-tap accountant package: every expense of the year, grouped by
+  // category, with per-category subtotals and a grand total. Built as a
+  // detached DOM tree with textContent (never innerHTML) because merchant
+  // names come from OCR/user input and must not be interpreted as markup.
+  const handleDownloadCategoryPDF = async () => {
+    setCategoryPdfLoading(true);
+    let host: HTMLDivElement | null = null;
+    try {
+      const html2pdfFn = await ensureHtml2Pdf();
+      if (!html2pdfFn) return;
+
+      const rtl = lang === 'FA';
+      const expenses = transactions.filter(t => t.type === 'expense');
+      const byCat = new Map<string, Transaction[]>();
+      expenses.forEach(t => {
+        if (!byCat.has(t.category)) byCat.set(t.category, []);
+        byCat.get(t.category)!.push(t);
+      });
+      const groups = Array.from(byCat.entries())
+        .map(([cat, txs]) => ({
+          cat,
+          txs: txs.slice().sort((a, b) => a.date.localeCompare(b.date)),
+          amount: txs.reduce((s, t) => s + t.amount, 0),
+          tax: txs.reduce((s, t) => s + (t.taxAmount || 0), 0),
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, css?: string) => {
+        const e = document.createElement(tag);
+        if (text !== undefined) e.textContent = text;
+        if (css) e.style.cssText = css;
+        return e;
+      };
+      const row = (cells: string[], css: string) => {
+        const r = el('div', undefined, `display:flex;gap:8px;padding:4px 0;page-break-inside:avoid;${css}`);
+        const widths = ['16%', '44%', '18%', '22%'];
+        cells.forEach((c, i) => {
+          const isNum = i >= 2;
+          r.appendChild(el('div', c, `width:${widths[i]};${isNum ? `text-align:${rtl ? 'left' : 'right'};direction:ltr;` : ''}overflow-wrap:anywhere;`));
+        });
+        return r;
+      };
+
+      host = el('div', undefined, 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;');
+      const root = el('div', undefined, `padding:24px;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;font-size:12px;color:#0f172a;direction:${rtl ? 'rtl' : 'ltr'};`);
+      host.appendChild(root);
+
+      root.appendChild(el('div', `FinSnap — ${tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
+      root.appendChild(el('div', `${tr.fiscalYear} ${currentYear}`, 'color:#64748b;margin-bottom:16px;'));
+
+      if (groups.length === 0) {
+        root.appendChild(el('div', tr.categoryPdfNoExpenses, 'color:#64748b;'));
+      }
+
+      groups.forEach(g => {
+        const block = el('div', undefined, 'margin-bottom:16px;');
+        block.appendChild(el('div', catLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;'));
+        block.appendChild(row([tr.pdfColDate, tr.pdfColMerchant, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
+        g.txs.forEach(t => {
+          block.appendChild(row([
+            t.date,
+            t.merchant || t.description,
+            t.taxAmount ? formatCurrency(t.taxAmount, lang, 2) : '—',
+            formatCurrency(t.amount, lang, 2),
+          ], 'border-bottom:1px solid #f1f5f9;'));
+        });
+        block.appendChild(row(['', tr.categoryPdfSubtotal, formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'font-weight:700;padding-top:6px;'));
+        root.appendChild(block);
+      });
+
+      if (groups.length > 0) {
+        const grandAmount = groups.reduce((s, g) => s + g.amount, 0);
+        const grandTax = groups.reduce((s, g) => s + g.tax, 0);
+        root.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;margin-top:8px;padding-top:8px;'));
+        root.appendChild(el('p', tr.taxDisclaimer, 'margin-top:16px;font-size:10px;color:#94a3b8;line-height:1.5;'));
+      }
+
+      document.body.appendChild(host);
+      await html2pdfFn()
+        .set({
+          margin: 8,
+          filename: `finsnap-expenses-by-category-${currentYear}.pdf`,
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(root)
+        .save();
+    } catch {
+      // silently fall back, same as the other PDF button
+    } finally {
+      if (host && host.parentNode) host.parentNode.removeChild(host);
+      setCategoryPdfLoading(false);
     }
   };
 
@@ -430,6 +531,19 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                     </svg>
                   ) : <FileDown className="w-4 h-4" />}
                   {tr.downloadPDF}
+                </button>
+                <button
+                  onClick={handleDownloadCategoryPDF}
+                  disabled={categoryPdfLoading}
+                  className="w-full py-3.5 bg-white border-2 border-slate-800 text-slate-800 font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
+                >
+                  {categoryPdfLoading ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : <FileDown className="w-4 h-4" />}
+                  {tr.downloadCategoryPDF}
                 </button>
                 <button onClick={handleDownloadExcel} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 flex items-center justify-center gap-2">
                   <Download className="w-4 h-4" />

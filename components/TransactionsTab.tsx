@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Search, X, Download, Pencil, Lock, ImageIcon,
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang, Tier } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
+import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField, matchesTransactionSearch } from '@/lib/utils';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -119,7 +119,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
     .reverse()
     .filter(tx => {
       const matchesType = filter === 'all' || tx.type === filter;
-      const matchesSearch = !search || tx.description.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = matchesTransactionSearch(tx, search, catLabel);
       const matchesMonth = selectedMonth === 'all' || tx.date.startsWith(selectedMonth);
       return matchesType && matchesSearch && matchesMonth;
     });
@@ -244,6 +244,12 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
                     <span className="text-xs text-slate-500">{tx.date}</span>
                     <span className="w-1 h-1 rounded-full bg-slate-300" />
                     <span className="text-xs text-slate-500 truncate">{catLabel(tx.category)}</span>
+                    {tx.merchant && tx.merchant !== tx.description && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-slate-300" />
+                        <span className="text-xs text-slate-500 truncate">{tx.merchant}</span>
+                      </>
+                    )}
                     {tx.hasReceipt && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded-md font-medium">AI</span>}
                   </div>
                 </div>
