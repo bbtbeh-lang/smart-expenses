@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package, Lock } from 'lucide-react';
 import { Transaction, Lang, Tier } from '@/lib/types';
 import { Translations } from '@/lib/translations';
-import { parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
+import { parseLocalDate, resolveCategoryLabel, csvField, csvTextField, formatCurrency } from '@/lib/utils';
 
 interface ReportsTabProps {
   transactions: Transaction[];
@@ -149,7 +149,7 @@ function CategoryBreakdown({ title, entries, total, color, catLabel }: { title: 
             <div className="flex justify-between text-xs mb-1">
               <span className="text-slate-600">{catLabel(cat)}</span>
               <span className="font-semibold text-slate-800" dir="ltr">
-                {amount.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' })}
+                {formatCurrency(amount, 'EN', 2)}
               </span>
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -176,7 +176,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
   const isRtl = lang === 'FA';
   const L = LABELS[lang] ?? LABELS.EN;
 
-  const fmt = (n: number) => n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
+  const fmt = (n: number) => formatCurrency(n, lang, 2);
   // BUG FIX: this used to only check `tr`, so any user-minted custom
   // category (see getOrCreateCategoryKey in lib/utils.ts) showed its raw
   // internal key ("custom_suger_1784775632372") everywhere in this tab —
