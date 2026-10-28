@@ -248,3 +248,35 @@ export function resolveCategoryLabel(
 ): string {
   return tr[key] || customCategories[key] || customIncomeCategories[key] || key;
 }
+
+
+// Search across everything a person would plausibly type to find a receipt:
+// the description/merchant name, the category label as they see it, the
+// amount, the date, and the scanned line-item names. Every whitespace-
+// separated word must match somewhere, so "home depot 2026-09" narrows
+// down instead of failing because no single field contains the whole
+// phrase.
+export function matchesTransactionSearch(
+  tx: {
+    description: string;
+    merchant?: string;
+    category: string;
+    amount: number;
+    date: string;
+    items?: { name: string }[];
+  },
+  query: string,
+  catLabel: (key: string) => string
+): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const haystack = [
+    tx.description,
+    tx.merchant || '',
+    catLabel(tx.category),
+    tx.amount.toFixed(2),
+    tx.date,
+    ...(tx.items || []).map(i => i.name),
+  ].join(' \n ').toLowerCase();
+  return words.every(w => haystack.includes(w));
+}

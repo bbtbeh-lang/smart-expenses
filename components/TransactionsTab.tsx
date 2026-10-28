@@ -5,7 +5,7 @@ import { TrendingUp, TrendingDown, Search, X, Download, Pencil, Lock, ImageIcon,
 import { Translations } from '@/lib/translations';
 import { Transaction, TransactionType, Lang, Tier } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField } from '@/lib/utils';
+import { formatCurrency, parseLocalDate, resolveCategoryLabel, csvField, csvTextField, matchesTransactionSearch } from '@/lib/utils';
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -119,7 +119,7 @@ export default function TransactionsTab({ transactions, tr, lang, onEdit, custom
     .reverse()
     .filter(tx => {
       const matchesType = filter === 'all' || tx.type === filter;
-      const matchesSearch = !search || tx.description.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = matchesTransactionSearch(tx, search, catLabel);
       const matchesMonth = selectedMonth === 'all' || tx.date.startsWith(selectedMonth);
       return matchesType && matchesSearch && matchesMonth;
     });
