@@ -268,7 +268,15 @@ export function matchesTransactionSearch(
   query: string,
   catLabel: (key: string) => string
 ): boolean {
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  // People type Persian/Arabic-Indic digits and thousands separators;
+  // normalise so "۳۰" and "1,234.50" still find the stored amount/date.
+  const digits = (t: string) =>
+    t.replace(/[۰-۹]/g, c => String(c.charCodeAt(0) - 0x06f0))
+     .replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x0660));
+  const words = digits(query.toLowerCase())
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(w => (/^[\d.,]+$/.test(w) ? w.replace(/,/g, '') : w));
   if (words.length === 0) return true;
   const haystack = [
     tx.description,
