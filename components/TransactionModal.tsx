@@ -92,6 +92,7 @@ export default function TransactionModal({
   const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>(editTransaction?.items || []);
   const [taxAmount, setTaxAmount] = useState<number | undefined>(editTransaction?.taxAmount);
   const [taxLabel, setTaxLabel] = useState<string | undefined>(editTransaction?.taxLabel);
+  const [taxRate, setTaxRate] = useState<number | undefined>(editTransaction?.taxRate);
   const [receiptHash, setReceiptHash] = useState<string | null>(null);
   const [receiptImageBase64, setReceiptImageBase64] = useState<string | null>(null);
   const [invoiceHash, setInvoiceHash] = useState<string | null>(null);
@@ -216,6 +217,7 @@ export default function TransactionModal({
       if (parsed.items && parsed.items.length > 0) setReceiptItems(parsed.items);
       if (parsed.tax) setTaxAmount(parseFloat(parsed.tax) || undefined);
       if (parsed.taxLabel) setTaxLabel(parsed.taxLabel);
+      if (parsed.taxRate) setTaxRate(parseFloat(parsed.taxRate) || undefined);
       if (typeof parsed.scansUsed === 'number') {
         onScanConsumed(parsed.scansUsed, typeof parsed.scanLimit === 'number' ? parsed.scanLimit : undefined);
       }
@@ -296,6 +298,7 @@ export default function TransactionModal({
       hasReceipt: editTransaction?.hasReceipt ?? (step === 'manual' && ocrStatus !== 'idle'),
       items: receiptItems.length > 0 ? receiptItems : undefined,
       taxAmount: txType === 'expense' ? taxAmount : undefined,
+      taxRate: txType === 'expense' && !taxAmount ? taxRate : undefined,
       receiptHash: receiptHash || undefined,
       invoiceHash: invoiceHash || undefined,
       taxLabel: taxLabel || undefined,
@@ -752,6 +755,27 @@ export default function TransactionModal({
                     />
                   </div>
                   <p className="mt-1 text-[11px] text-slate-400 leading-snug">{tr.taxAmountHint}</p>
+                  {!taxAmount && (editTransaction?.hasReceipt || ocrStatus !== 'idle') && (
+                    <div className="mt-2 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-2">
+                      <p className="text-[11px] text-amber-800 leading-snug">{tr.taxNotFoundHint}</p>
+                      <label className="block text-[11px] font-semibold text-slate-600">{tr.taxRateReceiptLabel}</label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        max="30"
+                        step="0.1"
+                        value={taxRate ?? ''}
+                        onChange={e => {
+                          const v = parseFloat(e.target.value);
+                          setTaxRate(e.target.value === '' || !isFinite(v) ? undefined : Math.min(30, Math.max(0, v)));
+                        }}
+                        placeholder="13"
+                        dir="ltr"
+                        className="w-28 px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-900"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
