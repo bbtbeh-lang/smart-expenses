@@ -5,7 +5,7 @@ import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react'
 import { Translations } from '@/lib/translations';
 import { Tier, Transaction, Lang } from '@/lib/types';
 import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula, estimateTax } from '@/lib/utils';
-import { fetchServerTransactionsForYear } from '@/lib/transactionSync';
+import { fetchServerTransactionsInRange } from '@/lib/transactionSync';
 import { supabase } from '@/lib/supabase';
 
 interface TaxReportModalProps {
@@ -78,7 +78,29 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // new Date("2026-07-27") UTC-midnight parsing bug — so we compare
   // the year as a string slice here too, instead of re-parsing with
   // `new Date(t.date)`, to stay consistent with that fix.
-  const transactions = allTransactions.filter(t => t.date.slice(0, 4) === String(currentYear));
+  // Report period: defaults to the current calendar year (the old fixed
+  // behaviour), but the person can narrow it to a quarter, a month or any
+  // custom range. Dates are plain 'YYYY-MM-DD' strings, so string
+  // comparison is correct and timezone-safe. Every tab, both PDFs and the
+  // CSV all read from this one filtered list.
+  const [fromDate, setFromDate] = useState(`${currentYear}-01-01`);
+  const [toDate, setToDate] = useState(`${currentYear}-12-31`);
+  const periodStart = fromDate || '0000-01-01';
+  const periodEnd = toDate || '9999-12-31';
+  const periodLabel = `${fromDate || '…'} → ${toDate || '…'}`;
+  const inPeriod = (d: string) => d >= periodStart && d <= periodEnd;
+  const transactions = allTransactions.filter(t => inPeriod(t.date));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate(); // m is 1-based
+  const setRange = (f: string, t: string) => { setFromDate(f); setToDate(t); };
+  const setQuarter = (q: number) => {
+    const m1 = (q - 1) * 3 + 1, m3 = m1 + 2;
+    setRange(`${currentYear}-${pad(m1)}-01`, `${currentYear}-${pad(m3)}-${pad(lastDay(currentYear, m3))}`);
+  };
+  const setThisMonth = () => {
+    const m = new Date().getMonth() + 1;
+    setRange(`${currentYear}-${pad(m)}-01`, `${currentYear}-${pad(m)}-${pad(lastDay(currentYear, m))}`);
+  };
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -230,7 +252,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'finsnap-tax-report.csv';
+    a.download = `finsnap-tax-report-${fromDate || 'start'}_${toDate || 'end'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -261,7 +283,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // category, with per-category subtotals and a grand total. Built as a
   // detached DOM tree with textContent (never innerHTML) because merchant
   // names come from OCR/user input and must not be interpreted as markup.
-  const handleDownloadCategoryPDF = async () => {
+  const handleDownloadAccountantPDF = async (groupBy: 'category' | 'month') => {
     setCategoryPdfLoading(true);
     let host: HTMLDivElement | null = null;
     try {
@@ -272,15 +294,23 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       // Build from what the SERVER holds, not from whatever this tab has in
       // memory (which can be stale or contain unsynced rows). Fall back to
       // local data only if the server can't be reached, and say so in the file.
-      const serverTx = await fetchServerTransactionsForYear(currentYear, accountType);
+      const serverTx = await fetchServerTransactionsInRange(periodStart, periodEnd, accountType);
       const source = serverTx ?? transactions;
-      const expenses = source.filter(t => t.type === 'expense' && t.date.slice(0, 4) === String(currentYear));
-      const byCat = new Map<string, Transaction[]>();
+      const expenses = source.filter(t => t.type === 'expense' && inPeriod(t.date));
+      // Group by category (biggest first) or by calendar month (chronological).
+      const monthLabel = (ym: string) => {
+        const [y, m] = ym.split('-').map(Number);
+        const loc = lang === 'FA' ? 'fa-IR-u-ca-gregory' : lang === 'FR' ? 'fr-CA' : 'en-CA';
+        return `${new Date(y, m - 1, 1).toLocaleDateString(loc, { month: 'long' })} ${y}`;
+      };
+      const groupLabel = (key: string) => (groupBy === 'month' ? monthLabel(key) : catLabel(key));
+      const byKey = new Map<string, Transaction[]>();
       expenses.forEach(t => {
-        if (!byCat.has(t.category)) byCat.set(t.category, []);
-        byCat.get(t.category)!.push(t);
+        const k = groupBy === 'month' ? t.date.slice(0, 7) : t.category;
+        if (!byKey.has(k)) byKey.set(k, []);
+        byKey.get(k)!.push(t);
       });
-      const groups = Array.from(byCat.entries())
+      const groups = Array.from(byKey.entries())
         .map(([cat, txs]) => ({
           cat,
           txs: txs.slice().sort((a, b) => a.date.localeCompare(b.date)),
@@ -288,7 +318,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           tax: txs.reduce((s, t) => s + (t.taxAmount || 0), 0),
           est: txs.reduce((s, t) => s + estTaxFor(t), 0),
         }))
-        .sort((a, b) => b.amount - a.amount);
+        .sort((a, b) => (groupBy === 'month' ? a.cat.localeCompare(b.cat) : b.amount - a.amount));
 
       const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, css?: string) => {
         const e = document.createElement(tag);
@@ -311,8 +341,8 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       const root = el('div', undefined, `padding:24px;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;font-size:12px;color:#0f172a;direction:${rtl ? 'rtl' : 'ltr'};`);
       host.appendChild(root);
 
-      root.appendChild(el('div', `FinSnap — ${tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
-      root.appendChild(el('div', `${tr.fiscalYear} ${currentYear}`, 'color:#64748b;margin-bottom:4px;'));
+      root.appendChild(el('div', `FinSnap — ${groupBy === 'month' ? tr.monthPdfTitle : tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
+      root.appendChild(el('div', periodLabel, 'color:#64748b;margin-bottom:4px;'));
       root.appendChild(el('div',
         serverTx ? tr.pdfSourceServer.replace('{time}', new Date().toLocaleString(lang === 'FA' ? 'fa-IR' : lang === 'FR' ? 'fr-CA' : 'en-CA')) : tr.pdfSourceLocal,
         `font-size:10px;margin-bottom:16px;color:${serverTx ? '#94a3b8' : '#dc2626'};`));
@@ -328,9 +358,9 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
         const grandEst = groups.reduce((s, g) => s + g.est, 0);
         const summary = el('div', undefined, 'margin-bottom:20px;');
         summary.appendChild(el('div', tr.categoryPdfSummary, 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;'));
-        summary.appendChild(row(['', tr.pdfColCategory, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
+        summary.appendChild(row(['', groupBy === 'month' ? tr.pdfColMonth : tr.pdfColCategory, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
         groups.forEach(g => {
-          summary.appendChild(row(['', catLabel(g.cat), formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'border-bottom:1px solid #f1f5f9;'));
+          summary.appendChild(row(['', groupLabel(g.cat), formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'border-bottom:1px solid #f1f5f9;'));
         });
         summary.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;padding-top:8px;'));
         if (grandEst > 0) {
@@ -346,14 +376,14 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
 
       groups.forEach(g => {
         const block = el('div', undefined, 'margin-bottom:16px;');
-        const catHead = el('div', catLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;');
+        const catHead = el('div', groupLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;');
         catHead.className = 'pdf-cat';
         block.appendChild(catHead);
         block.appendChild(row([tr.pdfColDate, tr.pdfColMerchant, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
         g.txs.forEach(t => {
           block.appendChild(row([
             t.date,
-            t.merchant || t.description,
+            groupBy === 'month' ? `${t.merchant || t.description} [${catLabel(t.category)}]` : (t.merchant || t.description),
             t.taxAmount ? formatCurrency(t.taxAmount, lang, 2) : (estTaxFor(t) > 0 ? `~${formatCurrency(estTaxFor(t), lang, 2)}` : '—'),
             formatCurrency(t.amount, lang, 2),
           ], 'border-bottom:1px solid #f1f5f9;'));
@@ -366,7 +396,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       await html2pdfFn()
         .set({
           margin: 8,
-          filename: `finsnap-expenses-by-category-${currentYear}.pdf`,
+          filename: `finsnap-expenses-by-${groupBy}-${fromDate || 'start'}_${toDate || 'end'}.pdf`,
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-row', '.pdf-cat'] },
@@ -411,6 +441,26 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
             </button>
           </div>
 
+          {/* Report period */}
+          <div className="mb-4 bg-slate-50 rounded-2xl p-3 space-y-2">
+            <div className="text-xs font-semibold text-slate-500">{tr.taxPeriod}</div>
+            <div className="flex flex-wrap gap-1.5" dir="ltr">
+              <button onClick={() => setRange(`${currentYear}-01-01`, `${currentYear}-12-31`)} className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700">{tr.taxPeriodYear}</button>
+              {[1, 2, 3, 4].map(q => (
+                <button key={q} onClick={() => setQuarter(q)} className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700">Q{q}</button>
+              ))}
+              <button onClick={setThisMonth} className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700">{tr.taxPeriodMonth}</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2" dir="ltr">
+              <label className="text-[11px] text-slate-500">{tr.taxPeriodFrom}
+                <input type="date" value={fromDate} max={toDate || undefined} onChange={e => setFromDate(e.target.value)} className="mt-0.5 w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800" />
+              </label>
+              <label className="text-[11px] text-slate-500">{tr.taxPeriodTo}
+                <input type="date" value={toDate} min={fromDate || undefined} onChange={e => setToDate(e.target.value)} className="mt-0.5 w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800" />
+              </label>
+            </div>
+          </div>
+
           {/* Workbook Tab Bar */}
           <div className="flex items-center gap-1 mb-5 bg-slate-100 p-1 rounded-xl" dir="ltr">
             {tabs.map(tab => (
@@ -427,7 +477,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           {activeTab === 'summary' && (
             <div className="space-y-3">
               <div className="bg-slate-50 rounded-2xl p-4">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {currentYear}</div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{periodLabel}</div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-600">{tr.totalIncome}</span>
@@ -607,7 +657,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                   {tr.downloadPDF}
                 </button>
                 <button
-                  onClick={handleDownloadCategoryPDF}
+                  onClick={() => handleDownloadAccountantPDF('category')}
                   disabled={categoryPdfLoading}
                   className="w-full py-3.5 bg-white border-2 border-slate-800 text-slate-800 font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
                 >
@@ -618,6 +668,14 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                     </svg>
                   ) : <FileDown className="w-4 h-4" />}
                   {tr.downloadCategoryPDF}
+                </button>
+                <button
+                  onClick={() => handleDownloadAccountantPDF('month')}
+                  disabled={categoryPdfLoading}
+                  className="w-full py-3.5 bg-white border-2 border-slate-800 text-slate-800 font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
+                >
+                  <FileDown className="w-4 h-4" />
+                  {tr.downloadMonthPDF}
                 </button>
                 <button onClick={handleDownloadExcel} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 flex items-center justify-center gap-2">
                   <Download className="w-4 h-4" />

@@ -167,8 +167,9 @@ function readDeletedIdsMap(): Record<string, number> {
  * exports that must match what is actually stored. Returns null if the
  * server can't be reached so the caller can fall back and say so.
  */
-export async function fetchServerTransactionsForYear(
-  year: number,
+export async function fetchServerTransactionsInRange(
+  fromDate: string,
+  toDate: string,
   accountType: 'personal' | 'business'
 ): Promise<Transaction[] | null> {
   try {
@@ -182,8 +183,8 @@ export async function fetchServerTransactionsForYear(
         .select('*')
         .eq('user_id', session.user.id)
         .eq('account_type', accountType)
-        .gte('date', `${year}-01-01`)
-        .lte('date', `${year}-12-31`)
+        .gte('date', fromDate)
+        .lte('date', toDate)
         .order('date', { ascending: true })
         .range(from, from + PAGE - 1);
       if (error || !data) return null;
