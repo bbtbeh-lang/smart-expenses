@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Download, TrendingUp, TrendingDown, DollarSign, Search, X, Package, Lock } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, Wallet, Search, X, Package, Lock } from 'lucide-react';
 import { Transaction, Lang, Tier } from '@/lib/types';
 import { Translations } from '@/lib/translations';
 import { parseLocalDate, resolveCategoryLabel, csvField, csvTextField, formatCurrency } from '@/lib/utils';
@@ -365,7 +365,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
         </div>
         <div className={`rounded-2xl p-3 ${profit >= 0 ? 'bg-indigo-50' : 'bg-rose-50'}`}>
           <div className="flex items-center gap-1 mb-1">
-            <DollarSign className="w-3.5 h-3.5 text-indigo-600" />
+            <Wallet className="w-3.5 h-3.5 text-indigo-600" />
             <span className="text-[10px] font-semibold text-indigo-600 uppercase">{L.profit}</span>
           </div>
           <p className={`text-sm font-bold ${profit >= 0 ? 'text-indigo-700' : 'text-rose-600'}`} dir="ltr">{fmt(profit)}</p>
