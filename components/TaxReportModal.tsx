@@ -180,7 +180,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       const monthTx = byMonth.get(monthKey)!;
       const monthLabel = monthNames[parseInt(monthKey.slice(5, 7), 10) - 1];
 
-      rows.push([`Month ${monthLabel}`]);
+      rows.push([`Month ${monthLabel} ${monthKey.slice(0, 4)}`]);
       // "Tax Type" holds the label as printed on the source document
       // ("GST", "MwSt", "VAT"...) rather than a fixed Canadian header,
       // since one report can mix receipts from different countries —
