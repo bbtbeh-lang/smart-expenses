@@ -1056,6 +1056,7 @@ export default function Home() {
           hasGiftAccess={state.hasManualAccess}
           lang={state.lang}
           transactions={filteredTransactions}
+          accountType={activeAccountType}
           onClose={() => setShowTaxReport(false)}
           onOpenUpgrade={() => { setShowTaxReport(false); setShowUpgrade(true); }}
           customCategories={state.customCategories}

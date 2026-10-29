@@ -159,3 +159,39 @@ function readDeletedIdsMap(): Record<string, number> {
     return {};
   }
 }
+
+
+/**
+ * Reads one calendar year of this user's transactions (for one account
+ * type) straight from the server, bypassing local state entirely. Used by
+ * exports that must match what is actually stored. Returns null if the
+ * server can't be reached so the caller can fall back and say so.
+ */
+export async function fetchServerTransactionsForYear(
+  year: number,
+  accountType: 'personal' | 'business'
+): Promise<Transaction[] | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+    const out: Transaction[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .eq('account_type', accountType)
+        .gte('date', `${year}-01-01`)
+        .lte('date', `${year}-12-31`)
+        .order('date', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (error || !data) return null;
+      out.push(...data.map(fromRow));
+      if (data.length < PAGE) break;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}

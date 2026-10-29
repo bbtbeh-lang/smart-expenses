@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Tier, Transaction, Lang } from '@/lib/types';
-import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula } from '@/lib/utils';
+import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula, estimateTax } from '@/lib/utils';
+import { fetchServerTransactionsForYear } from '@/lib/transactionSync';
 import { supabase } from '@/lib/supabase';
 
 interface TaxReportModalProps {
@@ -19,6 +20,7 @@ interface TaxReportModalProps {
   hasGiftAccess: boolean;
   lang: Lang;
   transactions: Transaction[];
+  accountType?: 'personal' | 'business';
   onClose: () => void;
   onOpenUpgrade: () => void;
   customCategories?: Record<string, string>;
@@ -41,7 +43,7 @@ async function ensureHtml2Pdf(): Promise<any> {
 
 type Tab = 'summary' | 'ledger' | 'tax';
 
-export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transactions: allTransactions, onClose, onOpenUpgrade, customCategories = {}, customIncomeCategories = {} }: TaxReportModalProps) {
+export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transactions: allTransactions, accountType = 'personal', onClose, onOpenUpgrade, customCategories = {}, customIncomeCategories = {} }: TaxReportModalProps) {
   // BUG FIX: exports (PDF and CSV/Excel) were meant to be a paid-plan
   // feature per the in-app guide ("Downloading as CSV or PDF requires a
   // paid plan or an active gift code"), but only the CSV/Excel button
@@ -54,6 +56,20 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   const [activeTab, setActiveTab] = useState<Tab>('summary');
   const [pdfLoading, setPdfLoading] = useState(false);
   const [categoryPdfLoading, setCategoryPdfLoading] = useState(false);
+  // User-chosen rate for the ESTIMATE on receipts with no tax line. Kept per
+  // device; the default (13) is only a starting point the user can change.
+  const [estRateText, setEstRateText] = useState('13');
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('finsnap_est_tax_rate');
+      if (v !== null && isFinite(parseFloat(v))) setEstRateText(v);
+    } catch { /* storage unavailable: keep default */ }
+  }, []);
+  const onEstRateChange = (raw: string) => {
+    setEstRateText(raw);
+    try { localStorage.setItem('finsnap_est_tax_rate', raw); } catch { /* ignore */ }
+  };
+  const estRate = Math.min(30, Math.max(0, parseFloat(estRateText) || 0));
   const [loadingReceiptId, setLoadingReceiptId] = useState<string | null>(null);
 
   const currentYear = new Date().getFullYear();
@@ -74,6 +90,8 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // excluded: with no receipt there's nothing to say was "not itemized".
   const isUnitemized = (t: Transaction) => t.type === 'expense' && t.hasReceipt && !t.taxAmount;
   const unitemizedCount = transactions.filter(isUnitemized).length;
+  const estTaxFor = (t: Transaction) => (isUnitemized(t) && estRate > 0 ? estimateTax(t.amount, estRate) : 0);
+  const totalEstTax = transactions.reduce((s, t) => s + estTaxFor(t), 0);
   const netProfit = totalIncome - totalExpenses;
 
   // Per-category breakdown for the Tax tab — purely a re-grouping of data
@@ -82,13 +100,14 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // the existing numbers easier for an accountant to work from, category
   // by category, instead of one lump total.
   const categoryBreakdown = (() => {
-    const map: Record<string, { amount: number; tax: number }> = {};
+    const map: Record<string, { amount: number; tax: number; est: number }> = {};
     transactions
       .filter(t => t.type === 'expense')
       .forEach(t => {
-        if (!map[t.category]) map[t.category] = { amount: 0, tax: 0 };
+        if (!map[t.category]) map[t.category] = { amount: 0, tax: 0, est: 0 };
         map[t.category].amount += t.amount;
         map[t.category].tax += t.taxAmount || 0;
+        map[t.category].est += estTaxFor(t);
       });
     return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount);
   })();
@@ -133,7 +152,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       byMonth.get(key)!.push(t);
     });
 
-    let grandPretax = 0, grandTax = 0, grandTotal = 0;
+    let grandPretax = 0, grandTax = 0, grandEst = 0, grandTotal = 0;
 
     Array.from(byMonth.keys()).sort().forEach(monthKey => {
       const monthTx = byMonth.get(monthKey)!;
@@ -145,13 +164,14 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       // since one report can mix receipts from different countries —
       // left blank when the receipt didn't have one recognized (older
       // scans, or a tax-exempt purchase).
-      rows.push(['#', 'Description', 'Date', 'Store', 'Amount', 'Tax', 'Tax Type', 'Total', 'Document']);
+      rows.push(['#', 'Description', 'Date', 'Store', 'Amount', 'Tax', 'Est. Tax', 'Tax Type', 'Total', 'Document']);
 
-      let mPretax = 0, mTax = 0, mTotal = 0;
+      let mPretax = 0, mTax = 0, mEst = 0, mTotal = 0;
       monthTx.forEach((tx, i) => {
         const tax = tx.taxAmount || 0;
         const pretax = tx.amount - tax;
-        mPretax += pretax; mTax += tax; mTotal += tx.amount;
+        const est = estTaxFor(tx);
+        mPretax += pretax; mTax += tax; mEst += est; mTotal += tx.amount;
         const [y, mo, d] = tx.date.split('-');
         rows.push([
           String(i + 1),
@@ -160,18 +180,19 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           neutralizeCsvFormula(tx.merchant || ''),
           pretax.toFixed(2),
           tax.toFixed(2),
-          neutralizeCsvFormula(tx.taxLabel || (isUnitemized(tx) ? 'Not itemized on receipt' : '')),
+          est > 0 ? est.toFixed(2) : '',
+          neutralizeCsvFormula(tx.taxLabel || (isUnitemized(tx) ? (est > 0 ? `Estimated @ ${estRate}%` : 'Not itemized on receipt') : '')),
           tx.amount.toFixed(2),
           tx.receiptHash ? 'Yes' : '',
         ]);
       });
 
-      rows.push(['', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), '', mTotal.toFixed(2), '']);
+      rows.push(['', '', '', 'total', mPretax.toFixed(2), mTax.toFixed(2), mEst.toFixed(2), '', mTotal.toFixed(2), '']);
       rows.push([]);
-      grandPretax += mPretax; grandTax += mTax; grandTotal += mTotal;
+      grandPretax += mPretax; grandTax += mTax; grandEst += mEst; grandTotal += mTotal;
     });
 
-    rows.push(['', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), '', grandTotal.toFixed(2), '']);
+    rows.push(['', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), grandEst.toFixed(2), '', grandTotal.toFixed(2), '']);
 
     // Summary rows
     rows.push([]);
@@ -183,13 +204,13 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
     if (categoryBreakdown.length > 0) {
       rows.push([]);
       rows.push(['TAX BY CATEGORY', '', '', '', '', '', '', '']);
-      rows.push(['Category', 'Total Expense', 'Total Tax', '', '', '', '', '']);
+      rows.push(['Category', 'Total Expense', 'Total Tax', 'Est. Tax', '', '', '', '']);
       categoryBreakdown.forEach(([cat, sums]) => {
         // BUG FIX: this used to only check `tr`, so any custom expense
         // category showed its raw internal key instead of the label the
         // person typed — on the report that goes straight to an accountant.
         const label = neutralizeCsvFormula(catLabel(cat));
-        rows.push([label, String(sums.amount), String(sums.tax), '', '', '', '', '']);
+        rows.push([label, String(sums.amount), String(sums.tax), sums.est.toFixed(2), '', '', '', '']);
       });
     }
 
@@ -248,7 +269,12 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       if (!html2pdfFn) return;
 
       const rtl = lang === 'FA';
-      const expenses = transactions.filter(t => t.type === 'expense');
+      // Build from what the SERVER holds, not from whatever this tab has in
+      // memory (which can be stale or contain unsynced rows). Fall back to
+      // local data only if the server can't be reached, and say so in the file.
+      const serverTx = await fetchServerTransactionsForYear(currentYear, accountType);
+      const source = serverTx ?? transactions;
+      const expenses = source.filter(t => t.type === 'expense' && t.date.slice(0, 4) === String(currentYear));
       const byCat = new Map<string, Transaction[]>();
       expenses.forEach(t => {
         if (!byCat.has(t.category)) byCat.set(t.category, []);
@@ -260,6 +286,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           txs: txs.slice().sort((a, b) => a.date.localeCompare(b.date)),
           amount: txs.reduce((s, t) => s + t.amount, 0),
           tax: txs.reduce((s, t) => s + (t.taxAmount || 0), 0),
+          est: txs.reduce((s, t) => s + estTaxFor(t), 0),
         }))
         .sort((a, b) => b.amount - a.amount);
 
@@ -276,6 +303,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           const isNum = i >= 2;
           r.appendChild(el('div', c, `width:${widths[i]};${isNum ? `text-align:${rtl ? 'left' : 'right'};direction:ltr;` : ''}overflow-wrap:anywhere;`));
         });
+        r.className = 'pdf-row';
         return r;
       };
 
@@ -284,34 +312,55 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       host.appendChild(root);
 
       root.appendChild(el('div', `FinSnap — ${tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
-      root.appendChild(el('div', `${tr.fiscalYear} ${currentYear}`, 'color:#64748b;margin-bottom:16px;'));
+      root.appendChild(el('div', `${tr.fiscalYear} ${currentYear}`, 'color:#64748b;margin-bottom:4px;'));
+      root.appendChild(el('div',
+        serverTx ? tr.pdfSourceServer.replace('{time}', new Date().toLocaleString(lang === 'FA' ? 'fa-IR' : lang === 'FR' ? 'fr-CA' : 'en-CA')) : tr.pdfSourceLocal,
+        `font-size:10px;margin-bottom:16px;color:${serverTx ? '#94a3b8' : '#dc2626'};`));
 
       if (groups.length === 0) {
         root.appendChild(el('div', tr.categoryPdfNoExpenses, 'color:#64748b;'));
+      } else {
+        // Totals go FIRST. html2pdf can drop the tail of a long document
+        // when it inserts page-break spacers, so the numbers an accountant
+        // needs must never depend on the last page surviving.
+        const grandAmount = groups.reduce((s, g) => s + g.amount, 0);
+        const grandTax = groups.reduce((s, g) => s + g.tax, 0);
+        const grandEst = groups.reduce((s, g) => s + g.est, 0);
+        const summary = el('div', undefined, 'margin-bottom:20px;');
+        summary.appendChild(el('div', tr.categoryPdfSummary, 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;'));
+        summary.appendChild(row(['', tr.pdfColCategory, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
+        groups.forEach(g => {
+          summary.appendChild(row(['', catLabel(g.cat), formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'border-bottom:1px solid #f1f5f9;'));
+        });
+        summary.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;padding-top:8px;'));
+        if (grandEst > 0) {
+          const nEst = expenses.filter(t => estTaxFor(t) > 0).length;
+          summary.appendChild(el('p',
+            tr.estTaxSummary.replace('{count}', String(nEst)).replace('{rate}', String(estRate)).replace('{amount}', formatCurrency(grandEst, lang, 2)),
+            'margin-top:8px;font-size:11px;font-weight:600;color:#b45309;'));
+          summary.appendChild(el('p', tr.estTaxLegend.replace('{rate}', String(estRate)), 'margin-top:2px;font-size:10px;color:#94a3b8;'));
+        }
+        summary.appendChild(el('p', tr.taxDisclaimer, 'margin-top:10px;font-size:10px;color:#94a3b8;line-height:1.5;'));
+        root.appendChild(summary);
       }
 
       groups.forEach(g => {
         const block = el('div', undefined, 'margin-bottom:16px;');
-        block.appendChild(el('div', catLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;'));
+        const catHead = el('div', catLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;');
+        catHead.className = 'pdf-cat';
+        block.appendChild(catHead);
         block.appendChild(row([tr.pdfColDate, tr.pdfColMerchant, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
         g.txs.forEach(t => {
           block.appendChild(row([
             t.date,
             t.merchant || t.description,
-            t.taxAmount ? formatCurrency(t.taxAmount, lang, 2) : '—',
+            t.taxAmount ? formatCurrency(t.taxAmount, lang, 2) : (estTaxFor(t) > 0 ? `~${formatCurrency(estTaxFor(t), lang, 2)}` : '—'),
             formatCurrency(t.amount, lang, 2),
           ], 'border-bottom:1px solid #f1f5f9;'));
         });
         block.appendChild(row(['', tr.categoryPdfSubtotal, formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'font-weight:700;padding-top:6px;'));
         root.appendChild(block);
       });
-
-      if (groups.length > 0) {
-        const grandAmount = groups.reduce((s, g) => s + g.amount, 0);
-        const grandTax = groups.reduce((s, g) => s + g.tax, 0);
-        root.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;margin-top:8px;padding-top:8px;'));
-        root.appendChild(el('p', tr.taxDisclaimer, 'margin-top:16px;font-size:10px;color:#94a3b8;line-height:1.5;'));
-      }
 
       document.body.appendChild(host);
       await html2pdfFn()
@@ -320,7 +369,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           filename: `finsnap-expenses-by-category-${currentYear}.pdf`,
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'] },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-row', '.pdf-cat'] },
         })
         .from(root)
         .save();
@@ -484,6 +533,31 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                       .replace('{count}', String(unitemizedCount))
                       .replace(/\{plural\}/g, unitemizedCount !== 1 ? 's' : '')}
                   </p>
+                )}
+                {unitemizedCount > 0 && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-slate-600">{tr.estTaxRateLabel}</label>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={30}
+                      step="0.1"
+                      value={estRateText}
+                      onChange={e => onEstRateChange(e.target.value)}
+                      className="w-28 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 bg-white"
+                      dir="ltr"
+                    />
+                    <p className="text-[11px] text-slate-400 leading-snug">{tr.estTaxRateHint}</p>
+                    {totalEstTax > 0 && (
+                      <p className="text-xs font-semibold text-amber-700" dir="ltr">
+                        {tr.estTaxSummary
+                          .replace('{count}', String(unitemizedCount))
+                          .replace('{rate}', String(estRate))
+                          .replace('{amount}', formatCurrency(totalEstTax, lang, 2))}
+                      </p>
+                    )}
+                  </div>
                 )}
                 <div className="h-px bg-slate-200" />
                 <p className="text-xs text-slate-400 leading-relaxed">{tr.taxLineExplainer}</p>

@@ -288,3 +288,12 @@ export function matchesTransactionSearch(
   ].join(' \n ').toLowerCase();
   return words.every(w => haystack.includes(w));
 }
+
+
+// Tax portion INSIDE a tax-included total at a user-chosen percentage:
+// total * r / (100 + r). Used only as an ESTIMATE for receipts that did
+// not print a separate tax line; never stored as the receipt's real tax.
+export function estimateTax(total: number, ratePercent: number): number {
+  if (!isFinite(total) || !isFinite(ratePercent) || ratePercent <= 0) return 0;
+  return Math.round((total * ratePercent) / (100 + ratePercent) * 100) / 100;
+}
