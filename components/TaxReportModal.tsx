@@ -283,7 +283,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // category, with per-category subtotals and a grand total. Built as a
   // detached DOM tree with textContent (never innerHTML) because merchant
   // names come from OCR/user input and must not be interpreted as markup.
-  const handleDownloadCategoryPDF = async () => {
+  const handleDownloadAccountantPDF = async (groupBy: 'category' | 'month') => {
     setCategoryPdfLoading(true);
     let host: HTMLDivElement | null = null;
     try {
@@ -297,12 +297,20 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       const serverTx = await fetchServerTransactionsInRange(periodStart, periodEnd, accountType);
       const source = serverTx ?? transactions;
       const expenses = source.filter(t => t.type === 'expense' && inPeriod(t.date));
-      const byCat = new Map<string, Transaction[]>();
+      // Group by category (biggest first) or by calendar month (chronological).
+      const monthLabel = (ym: string) => {
+        const [y, m] = ym.split('-').map(Number);
+        const loc = lang === 'FA' ? 'fa-IR-u-ca-gregory' : lang === 'FR' ? 'fr-CA' : 'en-CA';
+        return `${new Date(y, m - 1, 1).toLocaleDateString(loc, { month: 'long' })} ${y}`;
+      };
+      const groupLabel = (key: string) => (groupBy === 'month' ? monthLabel(key) : catLabel(key));
+      const byKey = new Map<string, Transaction[]>();
       expenses.forEach(t => {
-        if (!byCat.has(t.category)) byCat.set(t.category, []);
-        byCat.get(t.category)!.push(t);
+        const k = groupBy === 'month' ? t.date.slice(0, 7) : t.category;
+        if (!byKey.has(k)) byKey.set(k, []);
+        byKey.get(k)!.push(t);
       });
-      const groups = Array.from(byCat.entries())
+      const groups = Array.from(byKey.entries())
         .map(([cat, txs]) => ({
           cat,
           txs: txs.slice().sort((a, b) => a.date.localeCompare(b.date)),
@@ -310,7 +318,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           tax: txs.reduce((s, t) => s + (t.taxAmount || 0), 0),
           est: txs.reduce((s, t) => s + estTaxFor(t), 0),
         }))
-        .sort((a, b) => b.amount - a.amount);
+        .sort((a, b) => (groupBy === 'month' ? a.cat.localeCompare(b.cat) : b.amount - a.amount));
 
       const el = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string, css?: string) => {
         const e = document.createElement(tag);
@@ -333,7 +341,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       const root = el('div', undefined, `padding:24px;font-family:system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;font-size:12px;color:#0f172a;direction:${rtl ? 'rtl' : 'ltr'};`);
       host.appendChild(root);
 
-      root.appendChild(el('div', `FinSnap — ${tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
+      root.appendChild(el('div', `FinSnap — ${groupBy === 'month' ? tr.monthPdfTitle : tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
       root.appendChild(el('div', periodLabel, 'color:#64748b;margin-bottom:4px;'));
       root.appendChild(el('div',
         serverTx ? tr.pdfSourceServer.replace('{time}', new Date().toLocaleString(lang === 'FA' ? 'fa-IR' : lang === 'FR' ? 'fr-CA' : 'en-CA')) : tr.pdfSourceLocal,
@@ -350,9 +358,9 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
         const grandEst = groups.reduce((s, g) => s + g.est, 0);
         const summary = el('div', undefined, 'margin-bottom:20px;');
         summary.appendChild(el('div', tr.categoryPdfSummary, 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;'));
-        summary.appendChild(row(['', tr.pdfColCategory, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
+        summary.appendChild(row(['', groupBy === 'month' ? tr.pdfColMonth : tr.pdfColCategory, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
         groups.forEach(g => {
-          summary.appendChild(row(['', catLabel(g.cat), formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'border-bottom:1px solid #f1f5f9;'));
+          summary.appendChild(row(['', groupLabel(g.cat), formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'border-bottom:1px solid #f1f5f9;'));
         });
         summary.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;padding-top:8px;'));
         if (grandEst > 0) {
@@ -368,14 +376,14 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
 
       groups.forEach(g => {
         const block = el('div', undefined, 'margin-bottom:16px;');
-        const catHead = el('div', catLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;');
+        const catHead = el('div', groupLabel(g.cat), 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;page-break-after:avoid;');
         catHead.className = 'pdf-cat';
         block.appendChild(catHead);
         block.appendChild(row([tr.pdfColDate, tr.pdfColMerchant, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
         g.txs.forEach(t => {
           block.appendChild(row([
             t.date,
-            t.merchant || t.description,
+            groupBy === 'month' ? `${t.merchant || t.description} [${catLabel(t.category)}]` : (t.merchant || t.description),
             t.taxAmount ? formatCurrency(t.taxAmount, lang, 2) : (estTaxFor(t) > 0 ? `~${formatCurrency(estTaxFor(t), lang, 2)}` : '—'),
             formatCurrency(t.amount, lang, 2),
           ], 'border-bottom:1px solid #f1f5f9;'));
@@ -388,7 +396,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       await html2pdfFn()
         .set({
           margin: 8,
-          filename: `finsnap-expenses-by-category-${fromDate || 'start'}_${toDate || 'end'}.pdf`,
+          filename: `finsnap-expenses-by-${groupBy}-${fromDate || 'start'}_${toDate || 'end'}.pdf`,
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-row', '.pdf-cat'] },
@@ -649,7 +657,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                   {tr.downloadPDF}
                 </button>
                 <button
-                  onClick={handleDownloadCategoryPDF}
+                  onClick={() => handleDownloadAccountantPDF('category')}
                   disabled={categoryPdfLoading}
                   className="w-full py-3.5 bg-white border-2 border-slate-800 text-slate-800 font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
                 >
@@ -660,6 +668,14 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                     </svg>
                   ) : <FileDown className="w-4 h-4" />}
                   {tr.downloadCategoryPDF}
+                </button>
+                <button
+                  onClick={() => handleDownloadAccountantPDF('month')}
+                  disabled={categoryPdfLoading}
+                  className="w-full py-3.5 bg-white border-2 border-slate-800 text-slate-800 font-bold rounded-xl text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70"
+                >
+                  <FileDown className="w-4 h-4" />
+                  {tr.downloadMonthPDF}
                 </button>
                 <button onClick={handleDownloadExcel} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-200 flex items-center justify-center gap-2">
                   <Download className="w-4 h-4" />
