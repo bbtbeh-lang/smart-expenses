@@ -297,3 +297,24 @@ export function estimateTax(total: number, ratePercent: number): number {
   if (!isFinite(total) || !isFinite(ratePercent) || ratePercent <= 0) return 0;
   return Math.round((total * ratePercent) / (100 + ratePercent) * 100) / 100;
 }
+
+
+// The tax rate (percent, in 0.5 steps) that this person's own itemized
+// receipts show most often, from tax / (total - tax). Needs at least 3
+// receipts agreeing, so one odd receipt can't set the default. Returns
+// null when there isn't enough evidence.
+export function suggestTaxRate(
+  txs: { type: string; amount: number; taxAmount?: number }[]
+): number | null {
+  const counts = new Map<number, number>();
+  for (const t of txs) {
+    if (t.type !== 'expense' || !t.taxAmount || t.taxAmount <= 0 || t.taxAmount >= t.amount) continue;
+    const r = (t.taxAmount / (t.amount - t.taxAmount)) * 100;
+    if (r < 2 || r > 20) continue;
+    const bucket = Math.round(r * 2) / 2;
+    counts.set(bucket, (counts.get(bucket) || 0) + 1);
+  }
+  let best: number | null = null, bestN = 0;
+  counts.forEach((n, r) => { if (n > bestN) { best = r; bestN = n; } });
+  return best !== null && bestN >= 3 ? best : null;
+}

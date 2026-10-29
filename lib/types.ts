@@ -23,6 +23,9 @@ export interface Transaction {
   hasReceipt: boolean;
   merchant?: string;
   taxAmount?: number;
+  // Tax percentage for THIS receipt (e.g. 13): printed on the receipt, or
+  // chosen by the person. Only used to ESTIMATE tax when taxAmount is missing.
+  taxRate?: number;
   originalCurrency?: string;
   originalAmount?: number;
   items?: ReceiptItem[];

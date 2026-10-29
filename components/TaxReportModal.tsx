@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react';
 import { Translations } from '@/lib/translations';
 import { Tier, Transaction, Lang } from '@/lib/types';
-import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula, estimateTax } from '@/lib/utils';
+import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula, estimateTax, suggestTaxRate } from '@/lib/utils';
 import { fetchServerTransactionsInRange } from '@/lib/transactionSync';
 import { supabase } from '@/lib/supabase';
 
@@ -62,8 +62,13 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   useEffect(() => {
     try {
       const v = localStorage.getItem('finsnap_est_tax_rate');
-      if (v !== null && isFinite(parseFloat(v))) setEstRateText(v);
-    } catch { /* storage unavailable: keep default */ }
+      if (v !== null && isFinite(parseFloat(v))) { setEstRateText(v); return; }
+    } catch { /* storage unavailable: fall through to the suggestion */ }
+    // No saved choice yet: start from the rate this person's own receipts
+    // most often show, instead of a hard-coded 13. Still fully editable.
+    const suggested = suggestTaxRate(allTransactions);
+    if (suggested) setEstRateText(String(suggested));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const onEstRateChange = (raw: string) => {
     setEstRateText(raw);
@@ -112,7 +117,8 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // excluded: with no receipt there's nothing to say was "not itemized".
   const isUnitemized = (t: Transaction) => t.type === 'expense' && t.hasReceipt && !t.taxAmount;
   const unitemizedCount = transactions.filter(isUnitemized).length;
-  const estTaxFor = (t: Transaction) => (isUnitemized(t) && estRate > 0 ? estimateTax(t.amount, estRate) : 0);
+  const rateFor = (t: Transaction) => t.taxRate ?? estRate; // the receipt's own rate wins over the default
+  const estTaxFor = (t: Transaction) => (isUnitemized(t) && rateFor(t) > 0 ? estimateTax(t.amount, rateFor(t)) : 0);
   const totalEstTax = transactions.reduce((s, t) => s + estTaxFor(t), 0);
   const netProfit = totalIncome - totalExpenses;
 
@@ -203,7 +209,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           pretax.toFixed(2),
           tax.toFixed(2),
           est > 0 ? est.toFixed(2) : '',
-          neutralizeCsvFormula(tx.taxLabel || (isUnitemized(tx) ? (est > 0 ? `Estimated @ ${estRate}%` : 'Not itemized on receipt') : '')),
+          neutralizeCsvFormula(tx.taxLabel || (isUnitemized(tx) ? (est > 0 ? `Estimated @ ${rateFor(tx)}%` : 'Not itemized on receipt') : '')),
           tx.amount.toFixed(2),
           tx.receiptHash ? 'Yes' : '',
         ]);
