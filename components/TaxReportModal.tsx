@@ -288,6 +288,21 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
 
       if (groups.length === 0) {
         root.appendChild(el('div', tr.categoryPdfNoExpenses, 'color:#64748b;'));
+      } else {
+        // Totals go FIRST. html2pdf can drop the tail of a long document
+        // when it inserts page-break spacers, so the numbers an accountant
+        // needs must never depend on the last page surviving.
+        const grandAmount = groups.reduce((s, g) => s + g.amount, 0);
+        const grandTax = groups.reduce((s, g) => s + g.tax, 0);
+        const summary = el('div', undefined, 'margin-bottom:20px;');
+        summary.appendChild(el('div', tr.categoryPdfSummary, 'font-size:14px;font-weight:700;padding:6px 8px;background:#f1f5f9;border-radius:6px;'));
+        summary.appendChild(row(['', tr.pdfColCategory, tr.pdfColTax, tr.pdfColTotal], 'font-weight:600;color:#64748b;border-bottom:1px solid #e2e8f0;'));
+        groups.forEach(g => {
+          summary.appendChild(row(['', catLabel(g.cat), formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'border-bottom:1px solid #f1f5f9;'));
+        });
+        summary.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;padding-top:8px;'));
+        summary.appendChild(el('p', tr.taxDisclaimer, 'margin-top:10px;font-size:10px;color:#94a3b8;line-height:1.5;'));
+        root.appendChild(summary);
       }
 
       groups.forEach(g => {
@@ -305,13 +320,6 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
         block.appendChild(row(['', tr.categoryPdfSubtotal, formatCurrency(g.tax, lang, 2), formatCurrency(g.amount, lang, 2)], 'font-weight:700;padding-top:6px;'));
         root.appendChild(block);
       });
-
-      if (groups.length > 0) {
-        const grandAmount = groups.reduce((s, g) => s + g.amount, 0);
-        const grandTax = groups.reduce((s, g) => s + g.tax, 0);
-        root.appendChild(row(['', tr.categoryPdfGrandTotal, formatCurrency(grandTax, lang, 2), formatCurrency(grandAmount, lang, 2)], 'font-size:14px;font-weight:700;border-top:2px solid #0f172a;margin-top:8px;padding-top:8px;'));
-        root.appendChild(el('p', tr.taxDisclaimer, 'margin-top:16px;font-size:10px;color:#94a3b8;line-height:1.5;'));
-      }
 
       document.body.appendChild(host);
       await html2pdfFn()
