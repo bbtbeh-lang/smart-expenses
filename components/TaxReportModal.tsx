@@ -5,7 +5,7 @@ import { X, Download, Lock, FileSpreadsheet, FileDown, Eye } from 'lucide-react'
 import { Translations } from '@/lib/translations';
 import { Tier, Transaction, Lang } from '@/lib/types';
 import { formatCurrency, resolveCategoryLabel, csvField, neutralizeCsvFormula, estimateTax } from '@/lib/utils';
-import { fetchServerTransactionsForYear } from '@/lib/transactionSync';
+import { fetchServerTransactionsInRange } from '@/lib/transactionSync';
 import { supabase } from '@/lib/supabase';
 
 interface TaxReportModalProps {
@@ -78,7 +78,29 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
   // new Date("2026-07-27") UTC-midnight parsing bug — so we compare
   // the year as a string slice here too, instead of re-parsing with
   // `new Date(t.date)`, to stay consistent with that fix.
-  const transactions = allTransactions.filter(t => t.date.slice(0, 4) === String(currentYear));
+  // Report period: defaults to the current calendar year (the old fixed
+  // behaviour), but the person can narrow it to a quarter, a month or any
+  // custom range. Dates are plain 'YYYY-MM-DD' strings, so string
+  // comparison is correct and timezone-safe. Every tab, both PDFs and the
+  // CSV all read from this one filtered list.
+  const [fromDate, setFromDate] = useState(`${currentYear}-01-01`);
+  const [toDate, setToDate] = useState(`${currentYear}-12-31`);
+  const periodStart = fromDate || '0000-01-01';
+  const periodEnd = toDate || '9999-12-31';
+  const periodLabel = `${fromDate || '…'} → ${toDate || '…'}`;
+  const inPeriod = (d: string) => d >= periodStart && d <= periodEnd;
+  const transactions = allTransactions.filter(t => inPeriod(t.date));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const lastDay = (y: number, m: number) => new Date(y, m, 0).getDate(); // m is 1-based
+  const setRange = (f: string, t: string) => { setFromDate(f); setToDate(t); };
+  const setQuarter = (q: number) => {
+    const m1 = (q - 1) * 3 + 1, m3 = m1 + 2;
+    setRange(`${currentYear}-${pad(m1)}-01`, `${currentYear}-${pad(m3)}-${pad(lastDay(currentYear, m3))}`);
+  };
+  const setThisMonth = () => {
+    const m = new Date().getMonth() + 1;
+    setRange(`${currentYear}-${pad(m)}-01`, `${currentYear}-${pad(m)}-${pad(lastDay(currentYear, m))}`);
+  };
 
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -230,7 +252,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'finsnap-tax-report.csv';
+    a.download = `finsnap-tax-report-${fromDate || 'start'}_${toDate || 'end'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -272,9 +294,9 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       // Build from what the SERVER holds, not from whatever this tab has in
       // memory (which can be stale or contain unsynced rows). Fall back to
       // local data only if the server can't be reached, and say so in the file.
-      const serverTx = await fetchServerTransactionsForYear(currentYear, accountType);
+      const serverTx = await fetchServerTransactionsInRange(periodStart, periodEnd, accountType);
       const source = serverTx ?? transactions;
-      const expenses = source.filter(t => t.type === 'expense' && t.date.slice(0, 4) === String(currentYear));
+      const expenses = source.filter(t => t.type === 'expense' && inPeriod(t.date));
       const byCat = new Map<string, Transaction[]>();
       expenses.forEach(t => {
         if (!byCat.has(t.category)) byCat.set(t.category, []);
@@ -312,7 +334,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       host.appendChild(root);
 
       root.appendChild(el('div', `FinSnap — ${tr.categoryPdfTitle}`, 'font-size:18px;font-weight:700;margin-bottom:2px;'));
-      root.appendChild(el('div', `${tr.fiscalYear} ${currentYear}`, 'color:#64748b;margin-bottom:4px;'));
+      root.appendChild(el('div', periodLabel, 'color:#64748b;margin-bottom:4px;'));
       root.appendChild(el('div',
         serverTx ? tr.pdfSourceServer.replace('{time}', new Date().toLocaleString(lang === 'FA' ? 'fa-IR' : lang === 'FR' ? 'fr-CA' : 'en-CA')) : tr.pdfSourceLocal,
         `font-size:10px;margin-bottom:16px;color:${serverTx ? '#94a3b8' : '#dc2626'};`));
@@ -366,7 +388,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
       await html2pdfFn()
         .set({
           margin: 8,
-          filename: `finsnap-expenses-by-category-${currentYear}.pdf`,
+          filename: `finsnap-expenses-by-category-${fromDate || 'start'}_${toDate || 'end'}.pdf`,
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { format: 'a4', orientation: 'portrait' },
           pagebreak: { mode: ['css', 'legacy'], avoid: ['.pdf-row', '.pdf-cat'] },
@@ -411,6 +433,26 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
             </button>
           </div>
 
+          {/* Report period */}
+          <div className="mb-4 bg-slate-50 rounded-2xl p-3 space-y-2">
+            <div className="text-xs font-semibold text-slate-500">{tr.taxPeriod}</div>
+            <div className="flex flex-wrap gap-1.5" dir="ltr">
+              <button onClick={() => setRange(`${currentYear}-01-01`, `${currentYear}-12-31`)} className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700">{tr.taxPeriodYear}</button>
+              {[1, 2, 3, 4].map(q => (
+                <button key={q} onClick={() => setQuarter(q)} className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700">Q{q}</button>
+              ))}
+              <button onClick={setThisMonth} className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white border border-slate-200 text-slate-700">{tr.taxPeriodMonth}</button>
+            </div>
+            <div className="grid grid-cols-2 gap-2" dir="ltr">
+              <label className="text-[11px] text-slate-500">{tr.taxPeriodFrom}
+                <input type="date" value={fromDate} max={toDate || undefined} onChange={e => setFromDate(e.target.value)} className="mt-0.5 w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800" />
+              </label>
+              <label className="text-[11px] text-slate-500">{tr.taxPeriodTo}
+                <input type="date" value={toDate} min={fromDate || undefined} onChange={e => setToDate(e.target.value)} className="mt-0.5 w-full px-2 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800" />
+              </label>
+            </div>
+          </div>
+
           {/* Workbook Tab Bar */}
           <div className="flex items-center gap-1 mb-5 bg-slate-100 p-1 rounded-xl" dir="ltr">
             {tabs.map(tab => (
@@ -427,7 +469,7 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
           {activeTab === 'summary' && (
             <div className="space-y-3">
               <div className="bg-slate-50 rounded-2xl p-4">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{tr.fiscalYear} {currentYear}</div>
+                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">{periodLabel}</div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-600">{tr.totalIncome}</span>

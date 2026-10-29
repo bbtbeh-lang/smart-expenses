@@ -195,11 +195,11 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
   // months, which the pills alone can't express. Picking a custom range
   // resets the month selector back to "all" so the two controls never
   // fight each other silently.
-  const hasCustomRange = !!(dateFrom && dateTo);
+  const hasCustomRange = !!(dateFrom || dateTo);
 
   // Filter by month or custom range
   const monthFiltered = useMemo(() => {
-    if (hasCustomRange) return transactions.filter(t => t.date >= dateFrom && t.date <= dateTo);
+    if (hasCustomRange) return transactions.filter(t => (!dateFrom || t.date >= dateFrom) && (!dateTo || t.date <= dateTo));
     if (selectedMonth === 'all') return transactions;
     return transactions.filter(t => t.date.startsWith(selectedMonth));
   }, [transactions, selectedMonth, hasCustomRange, dateFrom, dateTo]);
@@ -388,7 +388,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
           </h3>
           <button
             onClick={canExport
-              ? () => exportToCSV(filtered, hasCustomRange ? `Report_${dateFrom}_to_${dateTo}_${view}` : selectedMonth === 'all' ? `All_${view}` : `Report_${selectedMonth}_${view}`, catLabel)
+              ? () => exportToCSV(filtered, hasCustomRange ? `Report_${dateFrom || 'start'}_to_${dateTo || 'end'}_${view}` : selectedMonth === 'all' ? `All_${view}` : `Report_${selectedMonth}_${view}`, catLabel)
               : onOpenUpgrade}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-all active:scale-95 ${
               canExport ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
