@@ -16,7 +16,7 @@ export default function PrivacyPolicyPage() {
         <p className="text-slate-400 text-xs mb-8">Last updated: July 2026</p>
 
         <p>
-          FinSnap ("we", "our", "us") is a personal and small-business expense tracking
+          FinSnap (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is a personal and small-business expense tracking
           application operated in Canada. This policy explains what information we collect,
           how we use it, and the choices you have.
         </p>
@@ -26,12 +26,12 @@ export default function PrivacyPolicyPage() {
           <li><strong>Account information:</strong> your email address, provided when you sign in with Google.</li>
           <li><strong>Financial data you enter:</strong> transactions, amounts, categories, dates, and any receipt photos you scan.</li>
           <li><strong>Payment information:</strong> if you subscribe to a paid plan, billing is handled entirely by Stripe. We never see or store your card number — we only receive your subscription status and plan.</li>
-          <li><strong>Usage data:</strong> how many receipts you've scanned in a billing period, so we can enforce your plan's limits.</li>
+          <li><strong>Usage data:</strong> how many receipts you&apos;ve scanned in a billing period, so we can enforce your plan&apos;s limits.</li>
         </ul>
 
         <h2>2. How receipt photos are processed and stored</h2>
         <p>
-          When you scan a receipt, the photo is sent to Anthropic's Claude API to extract the
+          When you scan a receipt, the photo is sent to Anthropic&apos;s Claude API to extract the
           merchant, date, amount, and line items. We also compute a fingerprint of the image to
           detect accidental duplicate scans. <strong>The receipt photo is then archived in your
           private storage</strong> — accessible only to your account — so you retain a copy for
@@ -52,19 +52,19 @@ export default function PrivacyPolicyPage() {
           You can request a copy of your data or ask us to delete your account and all associated
           data at any time from Settings, or by contacting us. Under Canadian privacy law (PIPEDA),
           you have the right to access, correct, or withdraw consent for the use of your personal
-          information, subject to legal or contractual retention requirements (e.g. Stripe's own
+          information, subject to legal or contractual retention requirements (e.g. Stripe&apos;s own
           record-keeping obligations for payments already processed).
         </p>
 
         <h2>5. Cookies and local storage</h2>
         <p>
-          FinSnap uses your browser's local storage to keep the app responsive offline and to
+          FinSnap uses your browser&apos;s local storage to keep the app responsive offline and to
           remember your language preference. Authentication is managed via secure, signed session
           tokens issued by Supabase.
         </p>
 
         <h2>6. Changes to this policy</h2>
-        <p>We may update this policy from time to time. Material changes will be reflected by the "Last updated" date above.</p>
+        <p>We may update this policy from time to time. Material changes will be reflected by the &quot;Last updated&quot; date above.</p>
 
         <h2>7. Contact</h2>
         <p>

@@ -17,7 +17,7 @@ export default function TermsOfServicePage() {
         <p>
           FinSnap is an expense-tracking application that lets you record transactions manually
           or by scanning receipts, which are processed using AI to extract merchant, date, amount,
-          and item details. FinSnap is provided "as is" and we make no guarantee that extracted
+          and item details. FinSnap is provided &quot;as is&quot; and we make no guarantee that extracted
           data will always be 100% accurate — please review scanned entries before relying on them.
         </p>
 
@@ -34,7 +34,7 @@ export default function TermsOfServicePage() {
         <ul>
           <li>Paid plans (Basic, Pro, Business) are billed monthly or yearly through Stripe.</li>
           <li>Each plan includes a monthly receipt-scan allowance; scanning (OCR) is only available on paid plans.</li>
-          <li>You can cancel, upgrade, or downgrade your subscription at any time from the "Manage Subscription" option, which opens Stripe's secure billing portal.</li>
+          <li>You can cancel, upgrade, or downgrade your subscription at any time from the &quot;Manage Subscription&quot; option, which opens Stripe&apos;s secure billing portal.</li>
           <li>Except where required by law, payments already processed are non-refundable, but you will retain access to your current plan until the end of the paid period after cancelling.</li>
         </ul>
 
@@ -47,7 +47,7 @@ export default function TermsOfServicePage() {
 
         <h2>5. Your data</h2>
         <p>
-          You own the financial data you enter. See our Privacy Policy for details on how it's
+          You own the financial data you enter. See our Privacy Policy for details on how it&apos;s
           stored and processed. You may request deletion of your account and data at any time.
         </p>
 

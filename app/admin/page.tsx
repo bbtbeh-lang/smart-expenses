@@ -372,7 +372,7 @@ export default function AdminPage() {
 
         <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 mb-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            Today's code ({status?.validDate})
+            Today&apos;s code ({status?.validDate})
           </div>
 
           {status?.code ? (
@@ -420,7 +420,7 @@ export default function AdminPage() {
 
         <p className="text-xs text-slate-400 text-center mt-4 leading-relaxed">
           This code unlocks <b>manual transaction entry only</b> for whoever redeems it today.
-          It never grants OCR/receipt scanning — that's exclusive to paid plans.
+          It never grants OCR/receipt scanning — that&apos;s exclusive to paid plans.
         </p>
 
         <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-5 mt-4">
