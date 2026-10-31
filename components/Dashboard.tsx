@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell, Zap, Receipt } from 'lucide-react';
+import { TrendingUp, TrendingDown, Star, Youtube, FileText, Crown, Wallet, Lock, Bell, Zap, Receipt, Plus } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Translations } from '@/lib/translations';
 import { AppState, Transaction } from '@/lib/types';
@@ -513,6 +513,27 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* Quick actions: add a transaction first, then budget management.
+          Two equal-size tiles, placed ABOVE the charts so the main actions
+          are the first thing under the totals. DOM order is add -> budget,
+          so RTL puts "add" on the right, LTR on the left. */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={onAddTransaction}
+          className="h-24 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-2 px-3"
+        >
+          <Plus className="w-6 h-6" strokeWidth={2.5} />
+          <span className="text-sm font-bold text-center leading-tight">{tr.addTransaction.replace(/^\+\s*/, '')}</span>
+        </button>
+        <button
+          onClick={onOpenBudget}
+          className="h-24 rounded-2xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:border-emerald-300 hover:bg-emerald-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-2 px-3"
+        >
+          <Wallet className="w-6 h-6 text-emerald-600" />
+          <span className="text-sm font-bold text-center leading-tight">{tr.manageBudgets}</span>
+        </button>
+      </div>
+
       {/* Monthly Trend Chart */}
       <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{tr.monthlyTrend}</div>
@@ -624,21 +645,6 @@ export default function Dashboard({
             })}
           </div>
         </div>
-      )}
-
-      {allCategorySpending.length === 0 && (
-        <button
-          onClick={onOpenBudget}
-          className="w-full bg-white border border-dashed border-slate-200 rounded-2xl p-4 flex items-center gap-3 hover:border-emerald-300 hover:bg-emerald-50 transition-all group"
-        >
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 group-hover:bg-emerald-200 flex items-center justify-center shrink-0 transition-colors">
-            <Wallet className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div className="text-left">
-            <div className="text-sm font-semibold text-slate-700">{tr.manageBudgets}</div>
-            <div className="text-xs text-slate-400">{tr.budgetTitle}</div>
-          </div>
-        </button>
       )}
 
       {/* Recent Transactions */}
