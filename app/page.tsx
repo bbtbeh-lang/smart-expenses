@@ -968,7 +968,7 @@ export default function Home() {
       </main>
 
       {state.screen === 'dashboard' && (
-        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} />
+        <NavBar activeTab={activeTab} onTabChange={setActiveTab} tr={tr} onAdd={() => setShowTransactionModal(true)} />
       )}
 
       {/* Quick Scan fast-path: always-available shortcut so someone who
@@ -991,33 +991,6 @@ export default function Home() {
           <Receipt className="w-3.5 h-3.5" />
           {tr.quickScanFabLabel}
         </button>
-      )}
-
-      {state.screen === 'dashboard' && activeTab === 'dashboard' && (
-        <div className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-8 lg:rtl:right-auto lg:rtl:left-8 z-30 max-w-sm lg:w-72 mx-auto lg:mx-0 lg:bottom-8">
-          <button
-            onClick={() => setShowTransactionModal(true)}
-            className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-2xl text-sm shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            {tr.addTransaction}
-          </button>
-        </div>
-      )}
-
-      {state.screen === 'dashboard' && activeTab === 'transactions' && (
-        <div className="fixed bottom-20 right-4 rtl:right-auto rtl:left-4 lg:bottom-8 lg:right-8 lg:rtl:right-auto lg:rtl:left-8 z-30">
-          <button
-            onClick={() => setShowTransactionModal(true)}
-            className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl shadow-2xl shadow-emerald-500/40 hover:shadow-emerald-500/60 active:scale-[0.95] transition-all duration-150 flex items-center justify-center"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-        </div>
       )}
 
       {showTransactionModal && (
