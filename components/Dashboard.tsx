@@ -462,6 +462,27 @@ export default function Dashboard({
         </div>
       )}
 
+      {/* Quick actions: add a transaction first, then budget management.
+          Two equal-size tiles, placed ABOVE the totals and the date filter so the
+          main actions are the first thing on the page. DOM order is add -> budget,
+          so RTL puts "add" on the right, LTR on the left. */}
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={onAddTransaction}
+          className="h-24 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-2 px-3"
+        >
+          <Plus className="w-6 h-6" strokeWidth={2.5} />
+          <span className="text-sm font-bold text-center leading-tight">{tr.addTransaction.replace(/^\+\s*/, '')}</span>
+        </button>
+        <button
+          onClick={onOpenBudget}
+          className="h-24 rounded-2xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:border-emerald-300 hover:bg-emerald-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-2 px-3"
+        >
+          <Wallet className="w-6 h-6 text-emerald-600" />
+          <span className="text-sm font-bold text-center leading-tight">{tr.manageBudgets}</span>
+        </button>
+      </div>
+
       {/* Date Filter */}
       <div className="flex gap-1.5 bg-white border border-slate-100 rounded-2xl p-1.5 shadow-sm">
         {DATE_FILTERS.map(f => (
@@ -511,27 +532,6 @@ export default function Dashboard({
             </div>
           )}
         </div>
-      </div>
-
-      {/* Quick actions: add a transaction first, then budget management.
-          Two equal-size tiles, placed ABOVE the charts so the main actions
-          are the first thing under the totals. DOM order is add -> budget,
-          so RTL puts "add" on the right, LTR on the left. */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={onAddTransaction}
-          className="h-24 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-2 px-3"
-        >
-          <Plus className="w-6 h-6" strokeWidth={2.5} />
-          <span className="text-sm font-bold text-center leading-tight">{tr.addTransaction.replace(/^\+\s*/, '')}</span>
-        </button>
-        <button
-          onClick={onOpenBudget}
-          className="h-24 rounded-2xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:border-emerald-300 hover:bg-emerald-50 active:scale-[0.98] transition-all flex flex-col items-center justify-center gap-2 px-3"
-        >
-          <Wallet className="w-6 h-6 text-emerald-600" />
-          <span className="text-sm font-bold text-center leading-tight">{tr.manageBudgets}</span>
-        </button>
       </div>
 
       {/* Monthly Trend Chart */}
