@@ -5,6 +5,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Receipt } from 'lucide-react';
 import { SCAN_PACK, SCAN_PACK_ENABLED } from '@/lib/plans';
 import { AppState, AppScreen, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
+import { projectScoped, writeScoped, migrateLegacyScope, hasLegacyKeys } from '@/lib/budgetScope';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
 import NavBar, { NavTab } from '@/components/NavBar';
@@ -786,7 +787,20 @@ export default function Home() {
     budgetTerms: AppState['budgetTerms']
   ) => {
     budgetsClearedByUserRef.current = true; // this save came from the person, so an empty list is intentional
-    setState(prev => ({ ...prev, budgets, customCategories, budgetDueDates, budgetReminders, budgetPeriods, budgetTerms }));
+    // The modal edits the ACTIVE account's slice only; write it back without
+    // touching the other account's budgets.
+    setState(prev => {
+      const acct: AccountType = prev.accountType || 'personal';
+      return {
+        ...prev,
+        customCategories,
+        budgets: writeScoped(prev.budgets, acct, budgets),
+        budgetDueDates: writeScoped(prev.budgetDueDates, acct, budgetDueDates),
+        budgetReminders: writeScoped(prev.budgetReminders, acct, budgetReminders),
+        budgetPeriods: writeScoped(prev.budgetPeriods, acct, budgetPeriods),
+        budgetTerms: writeScoped(prev.budgetTerms, acct, budgetTerms),
+      };
+    });
     setShowBudget(false);
     addToast(tr.saveBudgets, 'success');
   };
@@ -808,9 +822,39 @@ export default function Home() {
   // draftQueue, etc.) — swapping in the filtered list here means it stays
   // untouched everywhere else while never seeing the other bucket's transactions.
   const dashboardState = useMemo(
-    () => ({ ...state, transactions: filteredTransactions }),
-    [state, filteredTransactions]
+    () => ({
+      ...state,
+      transactions: filteredTransactions,
+      budgets: projectScoped(state.budgets, activeAccountType),
+      budgetDueDates: projectScoped(state.budgetDueDates, activeAccountType),
+      budgetReminders: projectScoped(state.budgetReminders, activeAccountType),
+      budgetPeriods: projectScoped(state.budgetPeriods, activeAccountType),
+      budgetTerms: projectScoped(state.budgetTerms, activeAccountType),
+    }),
+    [state, filteredTransactions, activeAccountType]
   );
+
+  // One-time upgrade: budgets saved before accounts were separated are
+  // shared (unprefixed) entries; copy them to both accounts so nothing
+  // disappears, then they evolve independently. The existing debounced save
+  // effect persists the result.
+  useEffect(() => {
+    if (isPreAuthScreen(state.screen)) return;
+    if (
+      hasLegacyKeys(state.budgets) || hasLegacyKeys(state.budgetDueDates) ||
+      hasLegacyKeys(state.budgetReminders) || hasLegacyKeys(state.budgetPeriods) ||
+      hasLegacyKeys(state.budgetTerms)
+    ) {
+      setState(prev => ({
+        ...prev,
+        budgets: migrateLegacyScope(prev.budgets),
+        budgetDueDates: migrateLegacyScope(prev.budgetDueDates),
+        budgetReminders: migrateLegacyScope(prev.budgetReminders),
+        budgetPeriods: migrateLegacyScope(prev.budgetPeriods),
+        budgetTerms: migrateLegacyScope(prev.budgetTerms),
+      }));
+    }
+  }, [state.screen, state.budgets, state.budgetDueDates, state.budgetReminders, state.budgetPeriods, state.budgetTerms]);
 
   const isRtl = state.lang === 'FA';
   const isLoggedIn = !isPreAuthScreen(state.screen);
@@ -1071,12 +1115,12 @@ export default function Home() {
           tr={tr}
           accountType={state.accountType || 'personal'}
           lang={state.lang}
-          budgets={state.budgets}
+          budgets={dashboardState.budgets}
           customCategories={state.customCategories}
-          budgetDueDates={state.budgetDueDates}
-          budgetReminders={state.budgetReminders}
-          budgetPeriods={state.budgetPeriods}
-          budgetTerms={state.budgetTerms}
+          budgetDueDates={dashboardState.budgetDueDates}
+          budgetReminders={dashboardState.budgetReminders}
+          budgetPeriods={dashboardState.budgetPeriods}
+          budgetTerms={dashboardState.budgetTerms}
           onSave={handleSaveBudgets}
           onClose={() => setShowBudget(false)}
         />
