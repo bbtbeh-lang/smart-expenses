@@ -445,8 +445,13 @@ export default function Home() {
   // this exists: without it, budget data only lived in localStorage and
   // every sign-out silently erased it.
   const budgetDataSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const budgetsClearedByUserRef = useRef(false);
   useEffect(() => {
-    if (isPreAuthScreen(state.screen) || Object.keys(state.budgets).length === 0) return;
+    // An empty budget list is normally just the not-yet-loaded initial state, so
+    // it is NOT saved (that would wipe the server copy). The one exception is the
+    // person deliberately clearing every budget in the modal; without this the
+    // old budgets silently came back after the next refresh or sign-in.
+    if (isPreAuthScreen(state.screen) || (Object.keys(state.budgets).length === 0 && !budgetsClearedByUserRef.current)) return;
     if (budgetDataSaveTimer.current) clearTimeout(budgetDataSaveTimer.current);
     budgetDataSaveTimer.current = setTimeout(async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -780,6 +785,7 @@ export default function Home() {
     budgetPeriods: AppState['budgetPeriods'],
     budgetTerms: AppState['budgetTerms']
   ) => {
+    budgetsClearedByUserRef.current = true; // this save came from the person, so an empty list is intentional
     setState(prev => ({ ...prev, budgets, customCategories, budgetDueDates, budgetReminders, budgetPeriods, budgetTerms }));
     setShowBudget(false);
     addToast(tr.saveBudgets, 'success');
