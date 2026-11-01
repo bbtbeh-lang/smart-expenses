@@ -167,6 +167,11 @@ const LABELS = {
     marketCheckTitle: 'Market check (optional)',
     marketCheckHint: "What do competitors charge for something similar? See how your price compares.",
     marketRefPricePlaceholder: 'e.g. what competitors charge',
+    salesTaxTitle: 'Sales tax (optional)',
+    salesTaxHint: 'Enter your local rate (for example 13 for Ontario HST or 5 for GST) to see the final price your customer pays. Tax you collect is not your profit, so this does not change the price or profit above.',
+    salesTaxPlaceholder: 'e.g. 13',
+    priceWithTax: 'Final price with tax (per unit)',
+    taxPerUnit: 'Tax added per unit',
     marketBelowBreakEvenWarning: "That market price is below your break-even point — you'd lose money on every sale at that price.",
     marginAtMarketPriceLabel: 'Your margin at that price',
     aboveSuggested: 'above your suggested price',
@@ -246,6 +251,11 @@ const LABELS = {
     marketCheckTitle: 'Comparaison du marché (facultatif)',
     marketCheckHint: 'Que facturent les concurrents pour un produit ou service similaire? Comparez votre prix.',
     marketRefPricePlaceholder: 'p. ex. ce que facturent les concurrents',
+    salesTaxTitle: 'Taxe de vente (facultatif)',
+    salesTaxHint: "Saisissez votre taux local (par exemple 13 pour la TVH de l'Ontario ou 5 pour la TPS) pour voir le prix final payé par votre client. La taxe perçue n'est pas votre profit : le prix et le profit ci-dessus ne changent donc pas.",
+    salesTaxPlaceholder: 'p. ex. 13',
+    priceWithTax: 'Prix final avec taxe (par unité)',
+    taxPerUnit: 'Taxe ajoutée par unité',
     marketBelowBreakEvenWarning: 'Ce prix du marché est inférieur à votre seuil de rentabilité — vous perdriez de l\u2019argent à chaque vente à ce prix.',
     marginAtMarketPriceLabel: 'Votre marge à ce prix',
     aboveSuggested: 'au-dessus de votre prix suggéré',
@@ -325,6 +335,11 @@ const LABELS = {
     marketCheckTitle: 'مقایسه با بازار (اختیاری)',
     marketCheckHint: 'رقبا برای یه چیز مشابه چقدر می‌گیرن؟ قیمتت رو باهاش مقایسه کن.',
     marketRefPricePlaceholder: 'مثلاً قیمت رقبا',
+    salesTaxTitle: 'مالیات فروش (اختیاری)',
+    salesTaxHint: 'درصد مالیات محلی خودت رو بنویس (مثلاً ۱۳ برای HST اونتاریو یا ۵ برای GST) تا قیمت نهایی‌ای که مشتری می‌پردازه رو ببینی. مالیاتی که جمع می‌کنی سود تو نیست، برای همین قیمت و سود بالا تغییری نمی‌کنه.',
+    salesTaxPlaceholder: 'مثلاً 13',
+    priceWithTax: 'قیمت نهایی با مالیات (هر واحد)',
+    taxPerUnit: 'مالیات اضافه‌شده به هر واحد',
     marketBelowBreakEvenWarning: 'این قیمت بازار از نقطه‌ی سربه‌سرت پایین‌تره — با این قیمت توی هر فروش ضرر می‌کنی.',
     marginAtMarketPriceLabel: 'حاشیه سودت با این قیمت',
     aboveSuggested: 'بالاتر از قیمت پیشنهادیت',
@@ -767,6 +782,20 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
   // number. Kept ephemeral/local since it's advisory, not a fact about
   // the product itself.
   const [marketRefPrice, setMarketRefPrice] = useState('');
+  // Optional local sales-tax rate (e.g. 13). Only used to show the final
+  // customer-facing price; never feeds the cost/profit math. Remembered on
+  // this device so it doesn't have to be retyped for every product.
+  const [salesTaxPct, setSalesTaxPct] = useState('');
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem('finsnap_pricing_sales_tax');
+      if (v !== null && isFinite(parseFloat(v))) setSalesTaxPct(v);
+    } catch { /* storage unavailable: start empty */ }
+  }, []);
+  const onSalesTaxChange = (raw: string) => {
+    setSalesTaxPct(raw);
+    try { localStorage.setItem('finsnap_pricing_sales_tax', raw); } catch { /* ignore */ }
+  };
   const [saved, setSaved] = useState<SavedProduct[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   // Which saved record (if any) the form currently mirrors. Non-null
@@ -1527,6 +1556,35 @@ export default function PricingTab({ lang, accountType }: PricingTabProps) {
             <p className="text-[10px] opacity-80 mt-1" dir="ltr">
               {L.breakEvenPrice}: {fmt(calc.breakEvenPrice)}
             </p>
+          )}
+        </div>
+
+        {/* Optional sales tax: shows what the customer pays, without touching cost/profit */}
+        <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 mb-3">
+          <p className="text-xs font-bold text-slate-700 mb-1">{L.salesTaxTitle}</p>
+          <p className="text-[10px] text-slate-400 mb-2 leading-snug">{L.salesTaxHint}</p>
+          <input
+            type="number"
+            min="0"
+            max="30"
+            step="0.1"
+            value={salesTaxPct}
+            onChange={e => onSalesTaxChange(e.target.value)}
+            placeholder={L.salesTaxPlaceholder}
+            className={`${inputClass} mb-2`}
+            dir="ltr"
+          />
+          {Math.min(30, num(salesTaxPct)) > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white rounded-xl p-3 border border-slate-100">
+                <p className="text-[10px] font-semibold text-slate-500 uppercase mb-0.5">{L.taxPerUnit}</p>
+                <p className="text-sm font-bold text-slate-800" dir="ltr">{fmt(calc.suggestedPrice * Math.min(30, num(salesTaxPct)) / 100)}</p>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                <p className="text-[10px] font-semibold text-emerald-700 uppercase mb-0.5">{L.priceWithTax}</p>
+                <p className="text-sm font-bold text-emerald-800" dir="ltr">{fmt(calc.suggestedPrice * (1 + Math.min(30, num(salesTaxPct)) / 100))}</p>
+              </div>
+            </div>
           )}
         </div>
 

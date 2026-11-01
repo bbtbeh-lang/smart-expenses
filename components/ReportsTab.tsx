@@ -48,6 +48,7 @@ const LABELS = {
     noMatches: 'No transactions match your search',
     fromDate: 'From',
     toDate: 'To',
+    invalidRange: 'The start date is after the end date, so nothing matches. Swap them or change one.',
     categoryFilter: 'Category',
     allCategories: 'All categories',
     clearSearch: 'Clear search',
@@ -76,6 +77,7 @@ const LABELS = {
     noMatches: 'Aucune transaction ne correspond à votre recherche',
     fromDate: 'Du',
     toDate: 'Au',
+    invalidRange: 'La date de début est après la date de fin, donc rien ne correspond. Inversez-les ou changez-en une.',
     categoryFilter: 'Catégorie',
     allCategories: 'Toutes les catégories',
     clearSearch: 'Effacer la recherche',
@@ -104,6 +106,7 @@ const LABELS = {
     noMatches: 'هیچ تراکنشی با این جستجو مطابقت ندارد',
     fromDate: 'از تاریخ',
     toDate: 'تا تاریخ',
+    invalidRange: 'تاریخ شروع بعد از تاریخ پایانه، برای همین هیچ تراکنشی پیدا نمی‌شه. جاشون رو عوض کن یا یکی رو درست کن. (قالب تاریخ این فیلد ماه/روز/سال است.)',
     categoryFilter: 'دسته‌بندی',
     allCategories: 'همه‌ی دسته‌بندی‌ها',
     clearSearch: 'پاک کردن جستجو',
@@ -296,6 +299,7 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
           <input
             type="date"
             value={dateFrom}
+            max={dateTo || undefined}
             onChange={e => setDateFrom(e.target.value)}
             className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
             dir="ltr"
@@ -306,12 +310,16 @@ export default function ReportsTab({ transactions, lang, tr, customCategories = 
           <input
             type="date"
             value={dateTo}
+            min={dateFrom || undefined}
             onChange={e => setDateTo(e.target.value)}
             className="w-full px-2.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
             dir="ltr"
           />
         </div>
       </div>
+      {dateFrom && dateTo && dateFrom > dateTo && (
+        <p className="mb-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">{L.invalidRange}</p>
+      )}
       <div className="mb-4">
         <label className="text-[10px] font-semibold text-slate-400 uppercase mb-1 block">{L.categoryFilter}</label>
         <select
