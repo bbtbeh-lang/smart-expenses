@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Translations } from '@/lib/translations';
 import { supabase } from '@/lib/supabase';
 import { SUPPORT_EMAIL } from '@/lib/support';
@@ -22,8 +22,23 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
   // 'sent': confirmation screen after the magic link has gone out
   const [mode, setMode] = useState<'options' | 'email' | 'sent'>('options');
   const [email, setEmail] = useState('');
+  // Explicit, unticked-by-default agreement (not just "by continuing").
+  // Remembered on this device so a returning user isn't asked every time.
+  const [agreed, setAgreed] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem('finsnap_terms_accepted_at')) setAgreed(true); } catch { /* ignore */ }
+  }, []);
+  const requireAgreement = (): boolean => {
+    if (agreed) {
+      try { if (!localStorage.getItem('finsnap_terms_accepted_at')) localStorage.setItem('finsnap_terms_accepted_at', new Date().toISOString()); } catch { /* ignore */ }
+      return true;
+    }
+    setError(tr.authMustAgree);
+    return false;
+  };
 
   const handleGoogleSignIn = async () => {
+    if (!requireAgreement()) return;
     setLoading(true);
     setError('');
     const { error: err } = await supabase.auth.signInWithOAuth({
@@ -35,6 +50,7 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
 
   const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!requireAgreement()) return;
     const trimmed = email.trim();
     // Deliberately simple check, not a full RFC 5322 validator — this is
     // just to catch obvious typos before hitting the network; Supabase
@@ -161,7 +177,14 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
           <div role="alert" className="text-xs font-medium text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5 mt-4">{error}</div>
         )}
 
-        <p className="text-xs text-slate-400 mt-6 leading-relaxed">
+        <label className="flex items-start gap-2 text-xs text-slate-500 mt-6 leading-relaxed cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={e => { setAgreed(e.target.checked); if (e.target.checked) setError(''); }}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-emerald-600"
+          />
+          <span>
           {(() => {
             // authTermsAgreement has {terms} and {privacy} placeholders so
             // the two legal links can be real <a> tags (clickable, with
@@ -180,7 +203,8 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
               </>
             );
           })()}
-        </p>
+          </span>
+        </label>
 
         {/* Public, crawlable link to the guide. /guide was previously only
             reachable from Settings (behind login), so Google had no page
