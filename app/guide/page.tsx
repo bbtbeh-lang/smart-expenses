@@ -207,7 +207,7 @@ const CONTENT: Record<GLang, Section[]> = {
       blocks: [
         { type: 'ul', items: [
           'All amounts are in Canadian dollars (CAD).',
-          'Scanned receipts are kept for 6 years, matching the CRA\'s record-keeping requirement for small businesses.',
+          'Scanned receipt photos are saved to your account as a convenience copy. FinSnap does not guarantee how long they are kept, so keep your own backup of any receipt you must retain for tax purposes.',
           'FinSnap is a tracking and estimating tool, not a substitute for a professional accountant — always double-check tax-related figures before filing.',
           'The Pricing Calculator\'s numbers (overhead %, business templates) are realistic starting points, not guarantees — adjust them to match your real costs.',
         ] },
@@ -396,7 +396,7 @@ const CONTENT: Record<GLang, Section[]> = {
       blocks: [
         { type: 'ul', items: [
           'همه‌ی مبلغ‌ها به دلار کانادا (CAD) هستن.',
-          'رسیدهای اسکن‌شده ۶ سال نگه‌داری می‌شن، مطابق با الزام نگه‌داری مدارک CRA برای کسب‌وکارهای کوچیک.',
+          'عکس رسیدهای اسکن‌شده برای راحتی خودت توی حسابت ذخیره می‌شه. فاین‌اسنپ مدت نگه‌داری مشخصی تضمین نمی‌کنه؛ برای رسیدهایی که باید برای مالیات نگه داری، یه نسخه‌ی پشتیبان خودت داشته باش.',
           'فاین‌اسنپ یه ابزار پیگیری و تخمینه، نه جایگزین یه حسابدار حرفه‌ای — قبل از اظهارنامه، همیشه ارقام مالیاتی رو دوباره چک کن.',
           'اعداد محاسبه‌گر قیمت‌گذاری (٪ سربار، قالب‌های کسب‌وکار) نقطه‌ی شروعِ واقع‌بینانه‌ان، نه تضمین — با هزینه‌ی واقعیت تطبیقشون بده.',
         ] },
