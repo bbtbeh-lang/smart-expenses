@@ -43,12 +43,22 @@ export async function POST(req: NextRequest) {
   // Best-effort cleanup of archived receipt/invoice images — Storage
   // objects don't cascade-delete via foreign keys the way Postgres rows
   // do, so we remove them explicitly before deleting the account.
+  // list() returns at most 100 entries by default, so a person with more than
+  // 100 saved receipts used to keep the rest after "deleting" their account.
+  // Page through in batches of up to 1000, deleting each batch, until the
+  // folder is empty (capped so a storage problem can never loop forever).
   for (const bucket of ['receipts', 'invoices']) {
     try {
-      const { data: files } = await supabaseAdmin.storage.from(bucket).list(userData.user.id);
-      if (files && files.length > 0) {
+      for (let round = 0; round < 50; round++) {
+        const { data: files, error: listError } = await supabaseAdmin.storage
+          .from(bucket)
+          .list(userData.user.id, { limit: 1000 });
+        if (listError) throw listError;
+        if (!files || files.length === 0) break;
         const paths = files.map(f => `${userData.user.id}/${f.name}`);
-        await supabaseAdmin.storage.from(bucket).remove(paths);
+        const { error: removeError } = await supabaseAdmin.storage.from(bucket).remove(paths);
+        if (removeError) throw removeError;
+        if (files.length < 1000) break;
       }
     } catch (err) {
       console.error(`${bucket} cleanup on account deletion failed (continuing anyway):`, err);

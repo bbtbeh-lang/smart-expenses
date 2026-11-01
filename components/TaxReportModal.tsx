@@ -646,10 +646,6 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
                 </div>
               )}
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
-                <Lock className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" />
-                <p className="text-xs text-amber-700 leading-relaxed">{tr.taxDisclaimer}</p>
-              </div>
             </div>
           )}
 
