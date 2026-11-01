@@ -26,6 +26,7 @@ export default function PrivacyPolicyPage() {
         <h2>1. Information we collect</h2>
         <ul>
           <li><strong>Account information:</strong> your email address (from Google sign-in or the email link you request) and, if you choose to add it in Settings, your date of birth.</li>
+          <li><strong>Consent record:</strong> when you accept our Terms and Privacy Policy we keep the date and the version you accepted, as proof of your consent.</li>
           <li><strong>Financial information you enter:</strong> transactions, amounts, dates, merchants, categories, taxes, notes, budgets, custom categories and pricing-calculator entries.</li>
           <li><strong>Receipt photos:</strong> images you scan, and a short fingerprint of each image used to spot accidental duplicate scans.</li>
           <li><strong>Billing information:</strong> if you subscribe, payment is handled entirely by Stripe. We never see or store your card number. We keep your plan, subscription status and Stripe identifiers.</li>

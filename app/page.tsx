@@ -6,6 +6,7 @@ import { Receipt } from 'lucide-react';
 import { SCAN_PACK, SCAN_PACK_ENABLED } from '@/lib/plans';
 import { AppState, AppScreen, Transaction, TransactionType, AccountType, Lang } from '@/lib/types';
 import { projectScoped, writeScoped, migrateLegacyScope, hasLegacyKeys } from '@/lib/budgetScope';
+import { recordConsentIfNeeded } from '@/lib/legal';
 import { t } from '@/lib/translations';
 import Header from '@/components/Header';
 import NavBar, { NavTab } from '@/components/NavBar';
@@ -313,6 +314,7 @@ export default function Home() {
         // of the merge, so a periodic TOKEN_REFRESHED event firing moments
         // after the user adds a transaction can never make it disappear.
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+          recordConsentIfNeeded(session.access_token);
           syncUserTransactions(session.user.id, transactionsRef.current.length > 0 ? transactionsRef.current : loaded.transactions);
           const localCats = Object.keys(customCategoriesRef.current).length > 0 ? customCategoriesRef.current : loaded.customCategories;
           syncUserCustomCategoryMap(session.user.id, 'customCategories', localCats);
