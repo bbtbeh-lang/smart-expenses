@@ -221,6 +221,8 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
     });
 
     rows.push(['', '', '', 'GRAND TOTAL', grandPretax.toFixed(2), grandTax.toFixed(2), grandEst.toFixed(2), '', grandTotal.toFixed(2), '']);
+    rows.push([]);
+    rows.push([neutralizeCsvFormula(tr.taxDisclaimer)]);
 
     // Summary rows
     rows.push([]);
@@ -445,6 +447,11 @@ export default function TaxReportModal({ tr, tier, hasGiftAccess, lang, transact
             <button onClick={onClose} title={tr.closeModal} aria-label={tr.closeModal} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
               <X className="w-5 h-5 text-slate-500" />
             </button>
+          </div>
+
+          {/* Always visible, on every tab: this is a record-keeping tool, not tax advice */}
+          <div className="mb-3 rounded-2xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-[11px] text-amber-800 leading-snug">{tr.taxDisclaimer}</p>
           </div>
 
           {/* Report period */}

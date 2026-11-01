@@ -205,6 +205,7 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
           })()}
           </span>
         </label>
+        <p className="text-[11px] text-slate-400 mt-3 leading-snug">{tr.taxDisclaimer}</p>
 
         {/* Public, crawlable link to the guide. /guide was previously only
             reachable from Settings (behind login), so Google had no page

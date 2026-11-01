@@ -705,6 +705,7 @@ export default function Dashboard({
           {state.tier === 'premium' ? `${tr.tier}: ${tr.premium}` : tr.upgradeToPremium}
         </button>
       </div>
+      <p className="text-[11px] text-slate-400 leading-snug pt-1">{tr.taxDisclaimer}</p>
     </div>
   );
 }
