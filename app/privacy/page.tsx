@@ -33,11 +33,11 @@ export default function PrivacyPolicyPage() {
         <p>
           When you scan a receipt, the photo is sent to Anthropic&apos;s Claude API to extract the
           merchant, date, amount, and line items. We also compute a fingerprint of the image to
-          detect accidental duplicate scans. <strong>The receipt photo is then archived in your
-          private storage</strong> — accessible only to your account — so you retain a copy for
-          your own records, since tax authorities such as the CRA generally require supporting
-          documents to be kept for several years. Archived receipts are permanently deleted if
-          you delete your account.
+          detect accidental duplicate scans. <strong>The receipt photo is then saved in your
+          private storage</strong> — accessible only to your account — as a convenience copy.
+          We do not promise to keep it for any particular length of time, so keep your own
+          backup of any receipt you need to retain for tax purposes. Saved receipts are
+          permanently deleted if you delete your account.
         </p>
 
         <h2>3. Where your data is stored</h2>
