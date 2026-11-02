@@ -13,7 +13,7 @@ export default function TermsOfServicePage() {
       </div>
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 p-8 prose prose-slate prose-sm">
         <h1 className="text-2xl font-bold text-slate-900 mb-1">FinSnap Terms of Service</h1>
-        <p className="text-slate-400 text-xs mb-8">Last updated: October 2026</p>
+        <p className="text-slate-400 text-xs mb-8">Last updated: November 2026</p>
 
         <p>
           These terms are the agreement between you and FinSnap (“we”, “us”) for using the FinSnap web
@@ -69,18 +69,37 @@ export default function TermsOfServicePage() {
           account and data at any time.
         </p>
 
-        <h2>6. Acceptable use</h2>
+        <h2>6. Ownership of the service</h2>
+        <p>
+          FinSnap’s software, design, name, logo and the way the service is put together belong to us
+          and are protected by intellectual property laws. We give you a personal, non-exclusive,
+          non-transferable right to use FinSnap for your own personal or business record-keeping while
+          these terms apply. You may not copy, resell, rent out, reverse engineer or build a competing
+          service from it without our written permission. Your own data stays yours (section 5).
+        </p>
+
+        <h2>7. Acceptable use</h2>
         <p>
           You agree not to misuse the service. That includes trying to get around usage limits, sharing
           or reselling access codes outside their intended use, probing for or accessing other people’s
-          data, interfering with the service’s security or operation, or using FinSnap for anything
-          unlawful. We may suspend or close an account that breaks these rules.
+          data, scraping or harvesting data from the service, uploading viruses or other harmful code,
+          interfering with the service’s security or operation, or using FinSnap for anything
+          unlawful.
         </p>
 
-        <h2>7. Limitation of liability</h2>
+        <h2>8. Suspension and ending your account</h2>
+        <p>
+          You can stop using FinSnap at any time and delete your account from Settings. We may suspend
+          or end your access if you break these terms, misuse the service, put it or other people at
+          risk, fail to pay, or if we are required to by law. Where reasonable we will tell you why and
+          give you a chance to export your records first. Ending your account does not entitle you to a
+          refund of amounts already paid, except where the law requires it.
+        </p>
+
+        <h2>9. Limitation of liability</h2>
         <p>
           To the fullest extent the law allows, FinSnap and its operators are not liable for indirect,
-          incidental, special or consequential damages, or for lost profits, lost data, penalties,
+          incidental, special, consequential or punitive damages, or for lost profits, lost data, penalties,
           interest or tax assessments, arising from your use of the service. That includes errors in
           AI-read or estimated figures, missed budget reminders, service interruptions, and reliance on
           any report or summary for a tax filing or financial decision. To the extent liability cannot be
@@ -89,21 +108,21 @@ export default function TermsOfServicePage() {
           cannot be waived.
         </p>
 
-        <h2>8. Changes to the service and to these terms</h2>
+        <h2>10. Changes to the service and to these terms</h2>
         <p>
           We may change, add or remove features and plans. We may also update these terms. If a change
           is material we will tell you in the app or by email before it takes effect, and using FinSnap
           after that date means you accept the updated terms.
         </p>
 
-        <h2>9. Governing law</h2>
+        <h2>11. Governing law</h2>
         <p>
           These terms are governed by the laws of the Province of Ontario and the federal laws of Canada
           that apply there. Any dispute will be handled by the courts of Ontario, except where the law
           of your place of residence gives you the right to bring a claim elsewhere.
         </p>
 
-        <h2>10. Contact</h2>
+        <h2>12. Contact</h2>
         <p>
           Questions about these terms?{' '}
           {SUPPORT_EMAIL ? (

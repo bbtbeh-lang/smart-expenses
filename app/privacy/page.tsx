@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
       </div>
       <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-100 p-8 prose prose-slate prose-sm">
         <h1 className="text-2xl font-bold text-slate-900 mb-1">FinSnap Privacy Policy</h1>
-        <p className="text-slate-400 text-xs mb-8">Last updated: October 2026</p>
+        <p className="text-slate-400 text-xs mb-8">Last updated: November 2026</p>
 
         <p>
           FinSnap (“we”, “us”) is an expense and receipt tracking application operated from Ontario,

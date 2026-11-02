@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { termsAcceptedForCurrentVersion, markTermsAccepted } from '@/lib/legal';
 import { Translations } from '@/lib/translations';
 import { supabase } from '@/lib/supabase';
 import { SUPPORT_EMAIL } from '@/lib/support';
@@ -26,11 +27,11 @@ export default function AuthScreen({ tr }: AuthScreenProps) {
   // Remembered on this device so a returning user isn't asked every time.
   const [agreed, setAgreed] = useState(false);
   useEffect(() => {
-    try { if (localStorage.getItem('finsnap_terms_accepted_at')) setAgreed(true); } catch { /* ignore */ }
+    if (termsAcceptedForCurrentVersion()) setAgreed(true);
   }, []);
   const requireAgreement = (): boolean => {
     if (agreed) {
-      try { if (!localStorage.getItem('finsnap_terms_accepted_at')) localStorage.setItem('finsnap_terms_accepted_at', new Date().toISOString()); } catch { /* ignore */ }
+      markTermsAccepted();
       return true;
     }
     setError(tr.authMustAgree);
